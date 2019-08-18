@@ -34,7 +34,7 @@ type_name:
   min_length: 4 # only warning
   max_length: # warning and error
     warning: 40
-    error: 50
+    error: 56
   excluded: iPhone # excluded via string
 
 identifier_name:
