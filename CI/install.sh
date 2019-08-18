@@ -1,3 +1,4 @@
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/Linuxbrew/install/master/install.sh)"
 brew install swiftlint
 brew install libressl
 brew install vapor/tap/vapor
