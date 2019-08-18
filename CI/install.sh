@@ -2,7 +2,7 @@ brew install swiftlint
 brew install libressl
 brew install vapor/tap/vapor
 
-gem install xcpretty
+swift package tools-version --set-current
 swift package resolve
 swift package clean
 
