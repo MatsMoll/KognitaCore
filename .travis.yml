@@ -1,9 +1,8 @@
-os:
-  - linux
-
-language: swift
-osx_image: xcode10.3
+os: linux
+dist: xenial
 sudo: required
+services: docker
+env: DOCKER_IMAGE=swift:4.2.4 SWIFT_SNAPSHOT=4.2.4
 
 install: . CI/install.sh
 
