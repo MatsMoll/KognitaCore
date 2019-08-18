@@ -1,4 +1,8 @@
-sudo apt install linuxbrew-wrapper
+git clone https://github.com/Homebrew/linuxbrew.git ~/.linuxbrew
+
+export PATH="$HOME/.linuxbrew/bin:$PATH"
+export MANPATH="$HOME/.linuxbrew/share/man:$MANPATH"
+export INFOPATH="$HOME/.linuxbrew/share/info:$INFOPATH"
 
 brew install swiftlint
 brew install libressl
