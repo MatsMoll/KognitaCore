@@ -17,8 +17,8 @@ pipelines:
                     - ./CI/install.sh
                     - swiftlint
                     - swift test
-            services:
-                - postgres
+                services:
+                    - postgres
             - step:
                 name: Release
                 script:
