@@ -5,7 +5,7 @@ test: &test
         name: Test
         script:
             - ls
-            - chmod +x /CI/install.sh
+            - chmod +x ./CI/install.sh
             - ./CI/install.sh
             - swiftlint
             - swift test
