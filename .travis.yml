@@ -1,0 +1,22 @@
+os:
+- osx
+
+language: swift
+osx_image: xcode10.1
+sudo: required
+
+jobs:
+include:
+  - stage: "Installation"
+    script: bash CI/install.sh
+  - stage: "Static Tests"
+    script: swiftlint
+  - stage: "Build"
+    script: swift build
+  - stage: "Testing"
+    script: swift test
+  - stage: "Deploy"
+    if: branch = master
+    script: git push https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git HEAD:master
+
+
