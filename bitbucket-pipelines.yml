@@ -4,6 +4,7 @@ test: &test
     step:
         name: Test
         script:
+            - chmod +x /CI/install.sh
             - ./CI/install.sh
             - swiftlint
             - swift test
@@ -19,6 +20,7 @@ pipelines:
             - step:
                 name: Release
                 script:
+                    - chmod +x /CI/release-version.sh
                     - ./CI/release-version.sh
 
 definitions: 
