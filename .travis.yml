@@ -1,10 +1,8 @@
-os: linux
-dist: trusty
+language: generic
 sudo: required
-
-language: swift
-
-osx_image: xcode11
+dist: trusty
+env:
+- SWIFT_VERSION=swift-2.2-SNAPSHOT-2015-12-01-b
 
 install: . CI/install.sh
 
