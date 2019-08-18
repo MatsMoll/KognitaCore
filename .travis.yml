@@ -1,3 +1,6 @@
+os:
+  - linux
+
 language: swift
 osx_image: xcode11
 sudo: required
@@ -8,3 +11,9 @@ script:
   - swiftlint
   - swift build
   - swift test
+
+deploy:
+  provider: script
+  script: CI/release-version.sh
+  on:
+    branch: master
