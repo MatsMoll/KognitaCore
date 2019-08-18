@@ -107,27 +107,18 @@ struct EmptyContent: Content {}
 private func setupDatabase(for enviroment: Environment, in services: inout Services) {
 
     // Configure a PostgreSQL database
-    let databaseConfig: PostgreSQLDatabaseConfig!
 
     let hostname = Environment.get("DATABASE_HOSTNAME") ?? "localhost"
     let username = Environment.get("DATABASE_USER") ?? "matsmollestad"
-
-    if let url = Environment.get("DATABASE_URL") {  // Heroku
-        guard let psqlConfig = PostgreSQLDatabaseConfig(url: url) else {
-            fatalError("Failed to create PostgreSQL Config")
-        }
-        databaseConfig = psqlConfig
-    } else {                                        // Localy testing
-        let databaseName = Environment.get("DATABASE_DB") ?? "testing"
-        let databasePort = 5432
-        let password = Environment.get("DATABASE_PASSWORD") ?? nil
-        databaseConfig = PostgreSQLDatabaseConfig(
-            hostname: hostname,
-            port: databasePort,
-            username: username,
-            database: databaseName,
-            password: password)
-    }
+    let databaseName = Environment.get("DATABASE_DB") ?? "testing"
+    let databasePort = 5432
+    let password = Environment.get("DATABASE_PASSWORD") ?? nil
+    let databaseConfig = PostgreSQLDatabaseConfig(
+        hostname: hostname,
+        port: databasePort,
+        username: username,
+        database: databaseName,
+        password: password)
 
     let postgres = PostgreSQLDatabase(config: databaseConfig)
 

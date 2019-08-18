@@ -37,4 +37,8 @@ class TopicTests: VaporTestCase {
         XCTAssertTrue(timely.contains(where: { $0.numberOfTasks == 3 }))
         XCTAssertTrue(timely.contains(where: { $0.numberOfTasks == 0 }))
     }
+
+    static let allTests = [
+        ("testTimlyTopics", testTimlyTopics)
+    ]
 }

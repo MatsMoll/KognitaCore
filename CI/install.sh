@@ -9,3 +9,6 @@ rm -rf SwiftLint
 
 swift package resolve
 swift package clean
+
+export DATABASE_DB=postgres
+export DATABASE_USER=postgres

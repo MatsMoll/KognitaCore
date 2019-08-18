@@ -60,12 +60,12 @@ public class DatabaseMigrations {
     }
 
     static func versionBump(_ migrations: inout MigrationConfig) {
-        migrations.add(migration: PracticeSessionTaskPivotSessionDeleteRelationMigration.self, database: .psql)
-        migrations.add(migration: PracticeSessionTopicPivotSessionDeleteRelationMigration.self, database: .psql)
-        migrations.add(migration: PracticeSessionEndedAtMigration.self, database: .psql)
-        migrations.add(migration: TaskResultScoreMigration.self, database: .psql)
-        migrations.add(migration: TaskEditedTaskID.self, database: .psql)
-
-        migrations.add(migration: UserActivationTokenMigration.self, database: .psql)
+//        migrations.add(migration: PracticeSessionTaskPivotSessionDeleteRelationMigration.self, database: .psql)
+//        migrations.add(migration: PracticeSessionTopicPivotSessionDeleteRelationMigration.self, database: .psql)
+//        migrations.add(migration: PracticeSessionEndedAtMigration.self, database: .psql)
+//        migrations.add(migration: TaskResultScoreMigration.self, database: .psql)
+//        migrations.add(migration: TaskEditedTaskID.self, database: .psql)
+//
+//        migrations.add(migration: UserActivationTokenMigration.self, database: .psql)
     }
 }

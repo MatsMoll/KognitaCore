@@ -27,4 +27,8 @@ class TaskTests: VaporTestCase {
             .wait()
         XCTAssertEqual(tasks.count, 4)
     }
+
+    static var allTests = [
+        ("testTasksInSubject", testTasksInSubject)
+    ]
 }

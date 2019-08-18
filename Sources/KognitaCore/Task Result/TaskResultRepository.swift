@@ -124,6 +124,7 @@ public class TaskResultRepository {
             .groupBy(.function("date", [.expression(.column(.keyPath(\TaskResult.createdAt)))]))
             .all(decoding: TaskResultHistory.self)
             .map { days in
+                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
                 let now = Date()
                 let formatter = DateFormatter()
                 formatter.dateFormat = "dd-MM-yyyy"
