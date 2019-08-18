@@ -2,6 +2,7 @@ brew install swiftlint
 brew install libressl
 brew install vapor/tap/vapor
 
+swift --version
 swift package tools-version --set-current
 swift package resolve
 swift package clean

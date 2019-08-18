@@ -26,7 +26,6 @@ class VaporTestCase: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        print("Running setup")
         try! Application.reset()
         app = try! Application.testable()
         conn = try! app.newConnection(to: .psql).wait()
