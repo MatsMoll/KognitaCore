@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 git clone https://github.com/realm/SwiftLint.git
 cd SwiftLint
 swift build -c release --static-swift-stdlib

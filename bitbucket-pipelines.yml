@@ -1,24 +1,21 @@
 image: swift:4.2.3
 
+test: &test
+    step:
+        name: Test
+        script:
+            - ./CI/install.sh
+            - swiftlint
+            - swift test
+        services:
+            - postgres
+
 pipelines:
     default:
-        - step:
-            script:
-                - ./CI/install.sh
-                - swiftlint
-                - swift test
-            services:
-                - postgres
+    - <<: *test
     branches:
         master:
-            - step:
-                name: Testing
-                script:
-                    - ./CI/install.sh
-                    - swiftlint
-                    - swift test
-                services:
-                    - postgres
+            - <<: *test
             - step:
                 name: Release
                 script:
