@@ -7,9 +7,6 @@ language: swift
 
 osx_image: xcode11
 
-before_install:
-- sudo apt-get update
-
 install: . CI/install.sh
 
 script:
