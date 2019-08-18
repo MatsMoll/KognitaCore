@@ -1,5 +1,5 @@
 os: linux
-dist: xenial
+dist: trusty
 sudo: required
 services: docker
 env: DOCKER_IMAGE=swift:4.2.4 SWIFT_SNAPSHOT=4.2.4
