@@ -4,7 +4,7 @@ pipelines:
     default:
         - step:
             script:
-                - . CI/install.sh
+                - ./CI/install.sh
                 - swiftlint
                 - swift test
             services:
@@ -12,9 +12,17 @@ pipelines:
     branches:
         master:
             - step:
+                name: Testing
+                script:
+                    - ./CI/install.sh
+                    - swiftlint
+                    - swift test
+            services:
+                - postgres
+            - step:
                 name: Release
                 script:
-                    - . CI/release-version.sh
+                    - ./CI/release-version.sh
 
 definitions: 
     services:
