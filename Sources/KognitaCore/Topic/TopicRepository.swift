@@ -108,4 +108,62 @@ public class TopicRepository {
             .execute(on: conn, andDecode: TimelyTopic.self)
 
     }
+
+    public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
+        return try getAll(in: subject, conn: conn)
+            .flatMap { topics in
+                topics.map { TopicRepository.shared.exportTasks(in: $0, on: conn) }
+                    .flatten(on: conn)
+        }.map { topicContent in
+            SubjectExportContent(subject: subject, topics: topicContent)
+        }
+    }
+
+    public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) -> Future<TopicExportContent> {
+        return MultipleChoiseTask.query(on: conn)
+            .join(\Task.id, to: \MultipleChoiseTask.id)
+            .filter(\Task.isOutdated == false)
+            .all()
+            .flatMap { tasks in
+                try tasks.map { try MultipleChoiseTaskRepository.shared.get(task: $0, conn: conn) }
+                    .flatten(on: conn)
+        }.flatMap { multipleTasks in
+            NumberInputTask.query(on: conn)
+                .join(\Task.id, to: \NumberInputTask.id)
+                .filter(\Task.isOutdated == false)
+                .all()
+                .flatMap { tasks in
+                    try tasks.map { try NumberInputTaskRepository.shared.get(task: $0, conn: conn) }
+                        .flatten(on: conn)
+            }.flatMap { numberTasks in
+                FlashCardTask.query(on: conn)
+                    .join(\Task.id, to: \FlashCardTask.id)
+                    .filter(\Task.isOutdated == false)
+                    .all()
+                    .flatMap { tasks in
+                        try tasks.map { try FlashCardRepository.shared.get(task: $0, conn: conn) }
+                            .flatten(on: conn)
+                }.map { flashCards in
+                    TopicExportContent(
+                        topic: topic,
+                        multipleChoiseTasks: multipleTasks,
+                        inputTasks: numberTasks,
+                        flashCards: flashCards
+                    )
+                }
+            }
+        }
+    }
+}
+
+public struct TopicExportContent: Content {
+    let topic: Topic
+    let multipleChoiseTasks: [MultipleChoiseTaskContent]
+    let inputTasks: [NumberInputTaskContent]
+    let flashCards: [Task]
+}
+
+public struct SubjectExportContent: Content {
+    let subject: Subject
+    let topics: [TopicExportContent]
 }
