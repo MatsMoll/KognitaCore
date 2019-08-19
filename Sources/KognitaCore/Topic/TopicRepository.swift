@@ -112,33 +112,36 @@ public class TopicRepository {
     public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
         return try getAll(in: subject, conn: conn)
             .flatMap { topics in
-                topics.map { TopicRepository.shared.exportTasks(in: $0, on: conn) }
+                try topics.map { try TopicRepository.shared.exportTasks(in: $0, on: conn) }
                     .flatten(on: conn)
         }.map { topicContent in
             SubjectExportContent(subject: subject, topics: topicContent)
         }
     }
 
-    public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) -> Future<TopicExportContent> {
-        return MultipleChoiseTask.query(on: conn)
+    public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<TopicExportContent> {
+        return try MultipleChoiseTask.query(on: conn)
             .join(\Task.id, to: \MultipleChoiseTask.id)
             .filter(\Task.isOutdated == false)
+            .filter(\Task.topicId == topic.requireID())
             .all()
             .flatMap { tasks in
                 try tasks.map { try MultipleChoiseTaskRepository.shared.get(task: $0, conn: conn) }
                     .flatten(on: conn)
         }.flatMap { multipleTasks in
-            NumberInputTask.query(on: conn)
+            try NumberInputTask.query(on: conn)
                 .join(\Task.id, to: \NumberInputTask.id)
                 .filter(\Task.isOutdated == false)
+                .filter(\Task.topicId == topic.requireID())
                 .all()
                 .flatMap { tasks in
                     try tasks.map { try NumberInputTaskRepository.shared.get(task: $0, conn: conn) }
                         .flatten(on: conn)
             }.flatMap { numberTasks in
-                FlashCardTask.query(on: conn)
+                try FlashCardTask.query(on: conn)
                     .join(\Task.id, to: \FlashCardTask.id)
                     .filter(\Task.isOutdated == false)
+                    .filter(\Task.topicId == topic.requireID())
                     .all()
                     .flatMap { tasks in
                         try tasks.map { try FlashCardRepository.shared.get(task: $0, conn: conn) }
