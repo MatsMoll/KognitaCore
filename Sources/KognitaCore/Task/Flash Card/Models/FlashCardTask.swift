@@ -44,34 +44,3 @@ extension FlashCardTask {
         return FlashCardRepository.shared.content(for: self, on: conn)
     }
 }
-
-//extension FlashCardTask {
-//
-//    public func render(session: PracticeSession, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<HTTPResponse> {
-//        FlashCardRepository.shared
-//            .content(for: self, on: conn)
-//            .flatMap { preview in
-//
-//                try session
-//                    .getNextTaskPath(conn)
-//                    .flatMap { nextPath in
-//
-//                        try session
-//                            .goalProgress(on: conn)
-//                            .map { progress in
-//
-//                                try req.renderer().render(
-//                                    FlashCardTaskTemplate.self,
-//                                    with: .init(
-//                                        taskPreview: preview,
-//                                        user: user,
-//                                        nextTaskPath: nextPath,
-//                                        practiceProgress: progress,
-//                                        session: session
-//                                    )
-//                                )
-//                        }
-//                }
-//        }
-//    }
-//}

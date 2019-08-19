@@ -13,20 +13,20 @@ public final class Subject: PostgreSQLModel {
     /// The subject id
     public var id: Int?
 
-    /// The subject code. A unique key
-    public private(set) var code: String
-
     /// A description of the topic
     public private(set) var description: String
 
     /// The name of the subject
     public private(set) var name: String
 
-    /// A url to a image depicting the subject
-    public private(set) var imageURL: String
-
     /// The creator of the subject
     public private(set) var creatorId: User.ID
+
+    /// The category describing the subject etc. Tech
+    public var category: String
+
+    /// The bootstrap color class
+    public var colorClass: String
 
     /// Creation data
     public var createdAt: Date?
@@ -37,10 +37,10 @@ public final class Subject: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
-    init(code: String, name: String, imageURL: String, description: String, creatorId: User.ID) throws {
-        self.code = code
+    init(name: String, category: String, colorClass: String, description: String, creatorId: User.ID) throws {
+        self.colorClass = colorClass
+        self.category = category
         self.name = name
-        self.imageURL = imageURL
         self.creatorId = creatorId
         self.description = description
 
@@ -49,10 +49,10 @@ public final class Subject: PostgreSQLModel {
 
     init(content: CreateSubjectRequest, creator: User) throws {
         self.creatorId = try creator.requireID()
-        self.code = content.code
         self.name = content.name
-        self.imageURL = content.imageURL
         self.description = content.description
+        self.category = content.category
+        self.colorClass = content.colorClass
 
         try self.validateSubject()
     }
@@ -65,12 +65,6 @@ public final class Subject: PostgreSQLModel {
         guard try name.validateWith(regex: "[A-Za-z0-9 ]+") else {
             throw Abort(.badRequest, reason: "Misformed subject name")
         }
-        guard try code.validateWith(regex: "[A-Z]{3,5}[0-9]{4,6}") else {
-            throw Abort(.badRequest, reason: "Misformed subject code")
-        }
-        guard try imageURL.validateWith(regex: "(http(s?):)([/|.|\\w|\\s|-])*\\.(?:jpg|png)") else {
-            throw Abort(.badRequest, reason: "Misformed subject image URL")
-        }
         description.makeHTMLSafe()
     }
 
@@ -82,9 +76,9 @@ public final class Subject: PostgreSQLModel {
     /// - Throws:
     ///     If invalid values
     func updateValues(with content: CreateSubjectRequest) throws {
-        code = content.code
+        colorClass = content.colorClass
         name = content.name
-        imageURL = content.imageURL
+        category = content.category
         description = content.description
 
         try validateSubject()
@@ -105,18 +99,8 @@ extension Subject {
 extension Subject: Migration {
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.create(Subject.self, on: conn) { builder in
-            builder.field(for: \.id, isIdentifier: true)
-            builder.field(for: \.name)
-            builder.field(for: \.code)
-            builder.field(for: \.imageURL)
-            builder.field(for: \.description)
-            builder.field(for: \.creatorId)
-            builder.field(for: \.createdAt)
-            builder.field(for: \.updatedAt)
-
-            builder.reference(from: \.creatorId, to: \User.id)
-
-            builder.unique(on: \.code)
+            try addProperties(to: builder)
+            builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 

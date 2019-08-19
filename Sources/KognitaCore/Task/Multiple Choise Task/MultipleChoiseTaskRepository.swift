@@ -35,8 +35,7 @@ public class MultipleChoiseTaskRepository {
                         .flatMap { (task) in
                             try MultipleChoiseTask(
                                 isMultipleSelect: content.isMultipleSelect,
-                                task: task,
-                                creator: user)
+                                task: task)
                                 .create(on: conn)
                         } .flatMap { (task) in
                             try content.choises.map { choise in

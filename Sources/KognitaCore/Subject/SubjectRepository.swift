@@ -54,7 +54,7 @@ public class SubjectRepository {
 
 public struct CreateSubjectRequest: Content {
     let name: String
-    let code: String
+    let colorClass: String
     let description: String
-    let imageURL: String
+    let category: String
 }

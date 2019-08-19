@@ -94,9 +94,9 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         return try Task(content: content, topic: topic, creator: user)
             .create(on: connection)
             .flatMap { (task) in
-                try MultipleChoiseTask(isMultipleSelect: content.isMultipleSelect,
-                                       task: task,
-                                       creator: user)
+                try MultipleChoiseTask(
+                    isMultipleSelect: content.isMultipleSelect,
+                    task: task)
                     .create(on: connection)
             } .flatMap { (task) in
                 try content.choises.map { choise in

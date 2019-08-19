@@ -10,6 +10,19 @@ import FluentPostgreSQL
 
 public final class PracticeSessionTaskPivot: PostgreSQLPivot {
 
+    public var id: Int?
+
+    var sessionID: PracticeSession.ID
+
+    var taskID: Task.ID
+
+    public var createdAt: Date?
+
+    var isCompleted: Bool = false
+
+    var score: Double?
+
+
     public typealias Left = PracticeSession
     public typealias Right = Task
 
@@ -18,13 +31,6 @@ public final class PracticeSessionTaskPivot: PostgreSQLPivot {
 
     public static var createdAtKey: TimestampKey? = \.createdAt
 
-    public var id: Int?
-    var sessionID: PracticeSession.ID
-    var taskID: Task.ID
-    public var createdAt: Date?
-    var isCompleted: Bool = false
-    var score: Double?
-    var unforgivingScore: Double?
 
     init(session: PracticeSession, task: Task) throws {
         self.sessionID = try session.requireID()
@@ -54,50 +60,5 @@ extension PracticeSessionTaskPivot: Migration {
 
     public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.delete(PracticeSessionTaskPivot.self, on: connection)
-    }
-}
-
-//struct PracticeSessionTaskScoreMigration: PostgreSQLMigration {
-//
-//    static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-//        return PostgreSQLDatabase.update(PracticeSessionTaskPivot.self, on: conn) { builder in
-//            builder.field(for: \.score)
-//        }
-//    }
-//
-//    static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-//        return PostgreSQLDatabase.delete(PracticeSessionTaskPivot.self, on: connection)
-//    }
-//}
-//
-//
-//struct PSTaskPivotUnforgivingScoreMigration: PostgreSQLMigration {
-//
-//    static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-//        return PostgreSQLDatabase.update(PracticeSessionTaskPivot.self, on: conn) { builder in
-//            builder.field(for: \.unforgivingScore)
-//        }
-//    }
-//
-//    static func revert(on conn: PostgreSQLConnection) -> Future<Void> {
-//        return PostgreSQLDatabase.update(PracticeSessionTaskPivot.self, on: conn) { builder in
-//            builder.deleteField(for: \.unforgivingScore)
-//        }
-//    }
-//}
-
-
-struct PracticeSessionTaskPivotSessionDeleteRelationMigration: PostgreSQLMigration {
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(PracticeSessionTaskPivot.self, on: conn) { builder in
-            builder.deleteReference(from: \.sessionID, to: \PracticeSession.id)
-            builder.deleteReference(from: \.taskID, to: \Task.id)
-            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return conn.future()
     }
 }

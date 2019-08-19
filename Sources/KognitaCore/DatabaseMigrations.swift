@@ -53,19 +53,12 @@ public class DatabaseMigrations {
         migrations.add(model: PracticeSession.self, database: .psql)
         migrations.add(model: PracticeSessionTaskPivot.self, database: .psql)
         migrations.add(model: PracticeSessionTopicPivot.self, database: .psql)
-//        migrations.add(model: UserTopicLevel.self, database: .psql)
         migrations.add(model: NumberInputTask.self, database: .psql)
         migrations.add(model: FlashCardTask.self, database: .psql)
         migrations.add(model: TaskResult.self, database: .psql)
     }
 
     static func versionBump(_ migrations: inout MigrationConfig) {
-//        migrations.add(migration: PracticeSessionTaskPivotSessionDeleteRelationMigration.self, database: .psql)
-//        migrations.add(migration: PracticeSessionTopicPivotSessionDeleteRelationMigration.self, database: .psql)
-//        migrations.add(migration: PracticeSessionEndedAtMigration.self, database: .psql)
-//        migrations.add(migration: TaskResultScoreMigration.self, database: .psql)
-//        migrations.add(migration: TaskEditedTaskID.self, database: .psql)
-//
-//        migrations.add(migration: UserActivationTokenMigration.self, database: .psql)
+        
     }
 }
