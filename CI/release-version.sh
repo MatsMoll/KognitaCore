@@ -5,6 +5,9 @@ BRANCH_NAME=`git rev-parse --abbrev-ref HEAD`
 VERSION=`git describe --abbrev=0 --tags`
 GIT_COMMIT=`git rev-parse HEAD`
 
+#removes rc tag if added
+VERSION=${VERSION%%"-"*}
+
 if [[ $BRANCH_NAME == *"-rc" ]]; then
 RC_TAG="$VERSION-$GIT_COMMIT-rc"
 echo "Tagged with $RC_TAG"
