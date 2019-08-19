@@ -31,7 +31,7 @@ extension MultipleChoiseTask {
                        isMultipleSelect:    Bool        = true,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
-        return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId, creatorID: creatorId)
+        return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
             .create(on: conn).wait()
     }
 }
