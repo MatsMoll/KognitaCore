@@ -62,23 +62,18 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     /// A bool indicating if the user should be able to select one or more choises
     public var isMultipleSelect: Bool
 
-    /// The id of the user creating the task
-    public var creatorId: User.ID
-
-    public convenience init(isMultipleSelect: Bool, task: Task, creator: User) throws {
+    public convenience init(isMultipleSelect: Bool, task: Task) throws {
         try self.init(isMultipleSelect: isMultipleSelect,
-                      taskID: task.requireID(),
-                      creatorID: creator.requireID())
+                      taskID: task.requireID())
     }
 
     public var actionDescription: String {
         return isMultipleSelect ? "Velg et eller flere alternativ" : "Velg et alternativ"
     }
 
-    public init(isMultipleSelect: Bool, taskID: Task.ID, creatorID: User.ID) {
+    public init(isMultipleSelect: Bool, taskID: Task.ID) {
         self.isMultipleSelect = isMultipleSelect
         self.id = taskID
-        self.creatorId = creatorID
     }
 
     /// Creates and saves a multiple choise task
@@ -240,9 +235,7 @@ extension MultipleChoiseTask: Migration {
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.create(MultipleChoiseTask.self, on: conn) { builder in
             try addProperties(to: builder)
-            
             builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade)
         }
     }
 

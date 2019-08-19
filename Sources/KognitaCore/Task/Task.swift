@@ -194,20 +194,3 @@ extension Task: Migration {
 
 extension Task: Content { }
 extension Task: Parameter { }
-
-
-
-struct TaskEditedTaskID: PostgreSQLMigration {
-
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(Task.self, on: conn) { builder in
-            builder.field(for: \.editedTaskID)
-        }
-    }
-
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(Task.self, on: conn) { builder in
-            builder.deleteField(for: \.editedTaskID)
-        }
-    }
-}
