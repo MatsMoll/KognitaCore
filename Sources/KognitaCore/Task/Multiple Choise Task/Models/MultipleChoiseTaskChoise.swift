@@ -21,13 +21,13 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
     /// The id of the taks this choise relates to
     public var taskId: MultipleChoiseTask.ID
 
-    init(choise: String, isCorrect: Bool) {
+    public init(choise: String, isCorrect: Bool, taskId: MultipleChoiseTask.ID) {
         self.choise = choise
         self.isCorrect = isCorrect
-        self.taskId = 0
+        self.taskId = taskId
     }
 
-    init(content: MultipleChoiseTaskChoiseContent, task: MultipleChoiseTask) throws {
+    public init(content: MultipleChoiseTaskChoiseContent, task: MultipleChoiseTask) throws {
         self.taskId = try task.requireID()
         self.choise = content.choise
         self.isCorrect = content.isCorrect

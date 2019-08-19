@@ -65,7 +65,7 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     /// The id of the user creating the task
     public var creatorId: User.ID
 
-    convenience init(isMultipleSelect: Bool, task: Task, creator: User) throws {
+    public convenience init(isMultipleSelect: Bool, task: Task, creator: User) throws {
         try self.init(isMultipleSelect: isMultipleSelect,
                       taskID: task.requireID(),
                       creatorID: creator.requireID())
@@ -75,7 +75,7 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         return isMultipleSelect ? "Velg et eller flere alternativ" : "Velg et alternativ"
     }
 
-    init(isMultipleSelect: Bool, taskID: Task.ID, creatorID: User.ID) {
+    public init(isMultipleSelect: Bool, taskID: Task.ID, creatorID: User.ID) {
         self.isMultipleSelect = isMultipleSelect
         self.id = taskID
         self.creatorId = creatorID

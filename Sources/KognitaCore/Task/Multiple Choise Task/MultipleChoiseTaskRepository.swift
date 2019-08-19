@@ -96,7 +96,7 @@ public class MultipleChoiseTaskRepository {
             .all()
             .map { choises in
                 guard let first = choises.first else {
-                    throw Abort(.internalServerError)
+                    throw Abort(.noContent, reason: "Missing choises in task")
                 }
                 return MultipleChoiseTaskContent(
                     task: first.1,
