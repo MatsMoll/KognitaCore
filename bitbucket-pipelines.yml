@@ -22,7 +22,7 @@ pipelines:
     - <<: *static-test
     - <<: *test
     branches:
-        '*-rc':
+        '**-rc':
             - <<: *static-test
             - <<: *test
             - step:
