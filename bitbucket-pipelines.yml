@@ -22,7 +22,15 @@ pipelines:
     - <<: *static-test
     - <<: *test
     branches:
-        (master|*-rc):
+        '*-rc':
+            - <<: *static-test
+            - <<: *test
+            - step:
+                name: Release
+                script:
+                    - chmod +x ./CI/release-version.sh
+                    - ./CI/release-version.sh
+        'master':
             - <<: *static-test
             - <<: *test
             - step:
