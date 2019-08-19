@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 
 #get highest tag number
+BRANCH_NAME=`git rev-parse --abbrev-ref HEAD`
 VERSION=`git describe --abbrev=0 --tags`
+GIT_COMMIT=`git rev-parse HEAD`
+
+if [[ $BRANCH_NAME == *"-rc" ]]; then
+RC_TAG="$VERSION-$GIT_COMMIT-rc"
+echo "Tagged with $RC_TAG"
+git tag $RC_TAG
+git push origin $RC_TAG
+exit 0
+fi
 
 #replace . with space so can split into an array
 VERSION_BITS=(${VERSION//./ })
@@ -12,7 +22,6 @@ MINOR_VERSION=${VERSION_BITS[1]:-0}
 BUILD_VERSION=${VERSION_BITS[2]:-(-1)}
 
 #get current hash and see if it already has a tag
-GIT_COMMIT=`git rev-parse HEAD`
 GIT_MESSAGE="$(git log --format=%B -n 1 $GIT_COMMIT)"
 NEEDS_TAG=`git describe --contains $GIT_COMMIT`
 
