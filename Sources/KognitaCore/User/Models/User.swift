@@ -5,9 +5,6 @@ import Vapor
 /// A registered user, capable of owning todo items.
 public final class User: PostgreSQLModel {
 
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
-
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
     public var id: Int?
@@ -31,10 +28,13 @@ public final class User: PostgreSQLModel {
     public var updatedAt: Date?
 
     /// A token used to activate other users
-    public var activationToken: String?
+    public var loseAccessDate: Date?
 
-    /// The user that recruteed the current user
-    public var recruterUserID: User.ID?
+
+    public static var createdAtKey: TimestampKey? = \.createdAt
+    public static var updatedAtKey: TimestampKey? = \.updatedAt
+    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
+
 
     /// Creates a new `User`.
     init(id: Int? = nil, name: String, email: String, passwordHash: String, isCreator: Bool = false) {
@@ -83,20 +83,11 @@ extension User: Migration {
 extension User: Parameter { }
 
 extension User {
-    func content(on conn: DatabaseConnectable) throws -> Future<UserResponse> {
+    func content() throws -> UserResponse {
 
         guard let registrationDate = createdAt else {
             throw Abort(.internalServerError)
         }
-        var response = try UserResponse(id: requireID(), name: name, email: email, registrationDate: registrationDate, recruitierName: nil)
-        guard let recruiterID =  recruterUserID else {
-            return conn.future(response)
-        }
-
-        return User.find(recruiterID, on: conn)
-            .map { recruiter in
-                response.recruitierName = recruiter?.name
-                return response
-        }
+        return try UserResponse(id: requireID(), name: name, email: email, registrationDate: registrationDate)
     }
 }
