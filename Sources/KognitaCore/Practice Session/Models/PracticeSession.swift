@@ -30,14 +30,7 @@ public final class PracticeSession: PostgreSQLModel {
     public var endedAt: Date?
 
     /// The number of task to complete in the session
-    public private(set) var numberOfTaskGoal: Int = 1
-
-    /// The total time actively practiced
-    public private(set) var totalTimePracticed: TimeInterval = 0
-
-//    var timeString: String {
-//        return totalTimePracticed.timeString
-//    }
+    public private(set) var numberOfTaskGoal: Int
 
     /// The current task if any
     private(set) var currentTaskID: Task.ID?
