@@ -20,18 +20,16 @@ extension MultipleChoiseTask {
         
         let usedTask = try task ?? Task.create(creator: creator, topic: topic, on: conn)
         
-        return try create(creatorId: usedTask.creatorId,
-                          taskId: usedTask.requireID(),
+        return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
                           on: conn)
     }
     
-    static func create(creatorId:           User.ID,
-                       taskId:              Task.ID,
+    static func create(taskId:              Task.ID,
                        isMultipleSelect:    Bool        = true,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
-        return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId, creatorID: creatorId)
+        return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
             .create(on: conn).wait()
     }
 }

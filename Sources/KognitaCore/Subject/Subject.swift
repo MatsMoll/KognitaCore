@@ -10,6 +10,19 @@ import Vapor
 
 public final class Subject: PostgreSQLModel {
 
+    public enum ColorClass: String, PostgreSQLEnum, PostgreSQLMigration {
+        case primary
+        case danger
+        case warning
+        case info
+        case success
+        case secondary
+        case light
+        case dark
+        case white
+        case muted
+    }
+
     /// The subject id
     public var id: Int?
 
@@ -26,7 +39,7 @@ public final class Subject: PostgreSQLModel {
     public var category: String
 
     /// The bootstrap color class
-    public var colorClass: String
+    public var colorClass: ColorClass
 
     /// Creation data
     public var createdAt: Date?
@@ -37,7 +50,7 @@ public final class Subject: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
-    init(name: String, category: String, colorClass: String, description: String, creatorId: User.ID) throws {
+    init(name: String, category: String, colorClass: ColorClass, description: String, creatorId: User.ID) throws {
         self.colorClass = colorClass
         self.category = category
         self.name = name

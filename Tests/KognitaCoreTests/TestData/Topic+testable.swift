@@ -20,7 +20,8 @@ extension Topic {
     
     static func create(name: String = "Topic", chapter: Int = 1, preTopic: Topic? = nil, creatorId: User.ID, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
         
-        return try Topic(name: name, description: "", importance: 1, chapter: chapter, subjectId: subjectId, preTopicId: preTopic?.requireID(), creatorId: creatorId)
-            .save(on: conn).wait()
+        return try Topic(name: name, description: "", chapter: chapter, subjectId: subjectId, preTopicId: preTopic?.requireID(), creatorId: creatorId)
+            .save(on: conn)
+            .wait()
     }
 }

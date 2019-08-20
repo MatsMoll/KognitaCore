@@ -42,6 +42,7 @@ public class DatabaseMigrations {
     static func setupTables(_ migrations: inout MigrationConfig) {
 
         migrations.add(migration: Task.ExamSemester.self, database: .psql)
+        migrations.add(migration: Subject.ColorClass.self, database: .psql)
 
         migrations.add(model: User.self, database: .psql)
         migrations.add(model: UserToken.self, database: .psql)

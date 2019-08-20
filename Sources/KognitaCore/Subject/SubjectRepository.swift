@@ -66,7 +66,7 @@ public class SubjectRepository {
 
 public struct CreateSubjectRequest: Content {
     let name: String
-    let colorClass: String
+    let colorClass: Subject.ColorClass
     let description: String
     let category: String
 }
