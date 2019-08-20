@@ -15,9 +15,6 @@ public final class Topic: PostgreSQLModel {
     /// The subject the topic is assigned to
     public var subjectId: Subject.ID
 
-    /// A topic need or recommended before this
-    public var preTopicId: Topic.ID?
-
     /// The name of the topic
     public private(set) var name: String
 
@@ -39,12 +36,11 @@ public final class Topic: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
-    init(name: String, description: String, chapter: Int, subjectId: Subject.ID, preTopicId: Topic.ID?, creatorId: User.ID) throws {
+    init(name: String, description: String, chapter: Int, subjectId: Subject.ID, creatorId: User.ID) throws {
         self.name           = name
         self.description    = description
         self.chapter        = chapter
         self.subjectId      = subjectId
-        self.preTopicId     = preTopicId
         self.creatorId      = creatorId
 
         try validateTopic()
@@ -54,7 +50,6 @@ public final class Topic: PostgreSQLModel {
         creatorId   = try creator.requireID()
         subjectId   = try subject.requireID()
         name        = content.name
-        preTopicId  = content.preTopicId
         description = content.description
         chapter     = content.chapter
 
@@ -70,7 +65,6 @@ public final class Topic: PostgreSQLModel {
 
     func updateValues(with content: TopicCreateContent) throws {
         name        = content.name
-        preTopicId  = content.preTopicId
         description = content.description
         chapter     = content.chapter
 
@@ -82,10 +76,6 @@ extension Topic {
 
     var subject: Parent<Topic, Subject> {
         return parent(\.subjectId)
-    }
-
-    var preTopic: Parent<Topic, Topic>? {
-        return parent(\.id)
     }
 
     var creator: Parent<Topic, User> {
@@ -111,7 +101,6 @@ extension Topic: Migration {
 
             builder.unique(on: \.chapter, \.subjectId)
 
-            builder.reference(from: \.preTopicId, to: \Topic.id, onUpdate: .cascade, onDelete: .setNull)
             builder.reference(from: \.subjectId, to: \Subject.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
         }
@@ -143,9 +132,6 @@ public final class TopicCreateContent: Content {
 
     /// This is needed when creating, but is not when editing
     public let subjectId: Subject.ID
-
-    /// A topic need or recommended before this
-    public let preTopicId: Topic.ID?
 
     /// The name of the topic
     public let name: String

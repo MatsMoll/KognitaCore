@@ -19,8 +19,6 @@ public final class Subject: PostgreSQLModel {
         case secondary
         case light
         case dark
-        case white
-        case muted
     }
 
     /// The subject id

@@ -8,7 +8,6 @@
 import Vapor
 import FluentPostgreSQL
 
-
 public final class Task: PostgreSQLModel {
 
     /// The semester a exam was taken
@@ -66,7 +65,6 @@ public final class Task: PostgreSQLModel {
     /// The id of the new edited task if there exists one
     public var editedTaskID: Task.ID?
 
-
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
     public static var deletedAtKey: TimestampKey? = \.deletedAt
@@ -80,7 +78,6 @@ public final class Task: PostgreSQLModel {
         explenation: String?,
         question: String,
         creatorId: User.ID,
-        isOutdated: Bool = false,
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
         isExaminable: Bool = true
@@ -110,7 +107,7 @@ public final class Task: PostgreSQLModel {
         self.isExaminable   = content.isExaminable
         self.creatorId      = try creator.requireID()
         self.examPaperSemester = content.examPaperSemester
-        self.examPaperYear = content.examPaperYear
+        self.examPaperYear  = content.examPaperYear
 
         try validate()
     }

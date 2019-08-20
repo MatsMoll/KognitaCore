@@ -5,6 +5,13 @@ import Vapor
 /// A registered user, capable of owning todo items.
 public final class User: PostgreSQLModel {
 
+    public enum Role: String, PostgreSQLEnum, PostgreSQLMigration {
+        case none
+        case user
+        case creator
+        case admin
+    }
+
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
     public var id: Int?
@@ -18,8 +25,11 @@ public final class User: PostgreSQLModel {
     /// BCrypt hash of the user's password.
     public private(set) var passwordHash: String
 
+    /// The role of the User
+    public private(set) var role: Role
+
     /// A bool indicating if the user is a creator
-    public private(set) var isCreator: Bool
+    public var isCreator: Bool { role == .creator || role == .admin }
 
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
@@ -37,12 +47,12 @@ public final class User: PostgreSQLModel {
 
 
     /// Creates a new `User`.
-    init(id: Int? = nil, name: String, email: String, passwordHash: String, isCreator: Bool = false) {
+    init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role = .creator) {
         self.id = id
         self.name = name
         self.email = email.lowercased()
         self.passwordHash = passwordHash
-        self.isCreator = isCreator
+        self.role = role
     }
 }
 

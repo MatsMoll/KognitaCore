@@ -88,7 +88,7 @@ public class TopicRepository {
             .select("\"sub\".\"\(numberOfTasksKey)\" as \"\(numberOfTasksKey)\"")
             .from(Subject.self)
             .orderBy(.asc(numberOfTasksKey))
-//            .limit(12)
+            .limit(12)
             .join(
                 .inner,
                 subquery: FQL()
@@ -159,7 +159,6 @@ public class TopicRepository {
 
         content.topic.id = nil
         content.topic.creatorId = 1
-        content.topic.preTopicId = nil
         try content.topic.subjectId = subject.requireID()
         return content.topic
             .create(on: conn)
