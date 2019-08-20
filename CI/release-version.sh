@@ -11,7 +11,7 @@ VERSION=${VERSION%%"-"*}
 RC_TAG="$VERSION-$GIT_COMMIT-$BRANCH_NAME"
 echo "Tagged with $RC_TAG"
 git tag $RC_TAG
-#git push origin $RC_TAG
+git push origin $RC_TAG
 exit 0
 fi
 
@@ -52,7 +52,7 @@ echo "Updating $VERSION to $NEW_TAG"
 echo "Tagged with $NEW_TAG (Ignoring fatal:cannot describe - this means commit is untagged) "
 
 git tag $NEW_TAG
-#git push origin $NEW_TAG
+git push origin $NEW_TAG
 else
 echo "Already a tag on this commit"
 exit 1

@@ -29,7 +29,7 @@ public final class User: PostgreSQLModel {
     public private(set) var role: Role
 
     /// A bool indicating if the user is a creator
-    public var isCreator: Bool { role == .creator || role == .admin }
+    public var isCreator: Bool { return role == .creator || role == .admin }
 
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
