@@ -311,7 +311,6 @@ public class PracticeSessionRepository {
         return try PracticeSessionTopicPivot.query(on: conn)
             .join(\Task.topicId, to: \PracticeSessionTopicPivot.topicID)
             .filter(\PracticeSessionTopicPivot.sessionID == session.requireID())
-            .filter(\Task.isOutdated == false)
             .count()
     }
 }

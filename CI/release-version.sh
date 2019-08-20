@@ -2,19 +2,21 @@
 
 #get highest tag number
 BRANCH_NAME=`git rev-parse --abbrev-ref HEAD`
-VERSION=`git tag -l --sort -version:refname | head -n 1`
+VERSION=`git tag -l --sort -version:refname | head -n 1` # newest version
 GIT_COMMIT=`git rev-parse HEAD`
 
-#removes rc tag if added
-VERSION=${VERSION%%"-"*}
-
 if [[ $BRANCH_NAME == *"-rc" ]]; then
-RC_TAG="$VERSION-$GIT_COMMIT-rc"
+VERSION=`git describe --abbrev=0` # latest tag on branch
+VERSION=${VERSION%%"-"*}
+RC_TAG="$VERSION-$GIT_COMMIT-$BRANCH_NAME"
 echo "Tagged with $RC_TAG"
 git tag $RC_TAG
 #git push origin $RC_TAG
 exit 0
 fi
+
+#removes rc tag if added
+VERSION=${VERSION%%"-"*}
 
 #replace . with space so can split into an array
 VERSION_BITS=(${VERSION//./ })

@@ -18,7 +18,6 @@ public class TaskRepository {
         return try subject.topics
             .query(on: conn)
             .join(\Task.topicId, to: \Topic.id)
-            .filter(\Task.isOutdated == false)
             .join(\User.id, to: \Task.creatorId)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
@@ -97,7 +96,6 @@ public class TaskRepository {
 
     public func getNumberOfTasks(in topicIDs: Topic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
         return Task.query(on: conn)
-            .filter(\.isOutdated == false)
             .filter(\.topicId ~~ topicIDs)
             .count()
     }

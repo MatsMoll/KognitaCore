@@ -20,7 +20,7 @@ public final class Subject: PostgreSQLModel {
     public private(set) var name: String
 
     /// The creator of the subject
-    public private(set) var creatorId: User.ID
+    public var creatorId: User.ID
 
     /// The category describing the subject etc. Tech
     public var category: String

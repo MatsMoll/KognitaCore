@@ -30,6 +30,17 @@ public class FlashCardRepository {
         }
     }
 
+    public func importTask(from task: Task, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        task.id = nil
+        task.creatorId = 1
+        try task.topicId = topic.requireID()
+        return task.create(on: conn).flatMap { task in
+            try FlashCardTask(task: task)
+                .create(on: conn)
+                .transform(to: ())
+        }
+    }
+
     public func edit(task flashCard: FlashCardTask, with content: FlashCardTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<Task> {
         guard user.isCreator else {
             throw Abort(.forbidden)
@@ -43,7 +54,7 @@ public class FlashCardRepository {
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
-                        task.isOutdated = true
+                        task.deletedAt = Date()
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)
@@ -62,10 +73,7 @@ public class FlashCardRepository {
         }
         return task.get(on: conn)
             .flatMap { task in
-                task.isOutdated = true
-                return task
-                    .save(on: conn)
-                    .transform(to: ())
+                return task.delete(on: conn)
         }
     }
 

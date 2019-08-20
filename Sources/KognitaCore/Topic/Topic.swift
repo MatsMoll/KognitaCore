@@ -13,10 +13,10 @@ public final class Topic: PostgreSQLModel {
     public var id: Int?
 
     /// The subject the topic is assigned to
-    public private(set) var subjectId: Subject.ID
+    public var subjectId: Subject.ID
 
     /// A topic need or recommended before this
-    public private(set) var preTopicId: Topic.ID?
+    public var preTopicId: Topic.ID?
 
     /// The name of the topic
     public private(set) var name: String

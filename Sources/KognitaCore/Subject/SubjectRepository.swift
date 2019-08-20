@@ -49,6 +49,18 @@ public class SubjectRepository {
         return subject
             .delete(on: conn)
     }
+
+    public func importContent(_ content: SubjectExportContent, on conn: DatabaseConnectable) -> Future<Subject> {
+        content.subject.id = nil
+        content.subject.creatorId = 1
+        return conn.transaction(on: .psql) { conn in
+            content.subject.create(on: conn).flatMap { subject in
+                try content.topics.map { try TopicRepository.shared.importContent(from: $0, in: subject, on: conn) }
+                    .flatten(on: conn)
+                    .transform(to: subject)
+            }
+        }
+    }
 }
 
 

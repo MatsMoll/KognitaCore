@@ -128,7 +128,6 @@ extension PracticeSession {
                         )
                     )
                     .filter(\.topicId ~~ topicIDs)
-                    .filter(\.isOutdated == false)
                     .all()
             }.flatMap { (tasks) in
                 conn.databaseConnection(to: .psql)

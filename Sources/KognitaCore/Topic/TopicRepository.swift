@@ -95,11 +95,11 @@ public class TopicRepository {
                     .select(\Topic.subjectId)
                     .select(\Topic.name)
                     .select(\Topic.id)
-                    .select(.count(\Task.isOutdated), as: numberOfTasksKey)
+                    .select(.count(\Task.id), as: numberOfTasksKey)
                     .from(Topic.self)
                     .join(.left, Task.self, where: \Task.topicId == \Topic.id)
                     .where(
-                        FQWhere(\Task.isOutdated == false).or(\Task.isOutdated == nil)
+                        \Task.deletedAt == nil
                     )
                     .groupBy(\Topic.id),
                 alias: alias,
@@ -122,7 +122,6 @@ public class TopicRepository {
     public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<TopicExportContent> {
         return try MultipleChoiseTask.query(on: conn)
             .join(\Task.id, to: \MultipleChoiseTask.id)
-            .filter(\Task.isOutdated == false)
             .filter(\Task.topicId == topic.requireID())
             .all()
             .flatMap { tasks in
@@ -131,7 +130,6 @@ public class TopicRepository {
         }.flatMap { multipleTasks in
             try NumberInputTask.query(on: conn)
                 .join(\Task.id, to: \NumberInputTask.id)
-                .filter(\Task.isOutdated == false)
                 .filter(\Task.topicId == topic.requireID())
                 .all()
                 .flatMap { tasks in
@@ -140,7 +138,6 @@ public class TopicRepository {
             }.flatMap { numberTasks in
                 try FlashCardTask.query(on: conn)
                     .join(\Task.id, to: \FlashCardTask.id)
-                    .filter(\Task.isOutdated == false)
                     .filter(\Task.topicId == topic.requireID())
                     .all()
                     .flatMap { tasks in
@@ -156,6 +153,35 @@ public class TopicRepository {
                 }
             }
         }
+    }
+
+    public func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
+
+        content.topic.id = nil
+        content.topic.creatorId = 1
+        content.topic.preTopicId = nil
+        try content.topic.subjectId = subject.requireID()
+        return content.topic
+            .create(on: conn)
+            .flatMap { topic in
+                try content.multipleChoiseTasks
+                    .map { task in
+                        try MultipleChoiseTaskRepository.shared
+                            .importTask(from: task, in: topic, on: conn)
+                }.flatten(on: conn).flatMap { _ in
+                    try content.inputTasks
+                    .map { task in
+                        try NumberInputTaskRepository.shared
+                            .importTask(from: task, in: topic, on: conn)
+                    }.flatten(on: conn).flatMap { _ in
+                        try content.flashCards
+                        .map { task in
+                            try FlashCardRepository.shared
+                                .importTask(from: task, in: topic, on: conn)
+                        }.flatten(on: conn)
+                    }
+                }
+        }.transform(to: ())
     }
 }
 
