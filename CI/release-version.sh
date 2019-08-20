@@ -2,7 +2,7 @@
 
 #get highest tag number
 BRANCH_NAME=`git rev-parse --abbrev-ref HEAD`
-VERSION=`git describe --abbrev=0 --tags`
+VERSION=`git tag -l --sort -version:refname | head -n 1`
 GIT_COMMIT=`git rev-parse HEAD`
 
 #removes rc tag if added
@@ -12,7 +12,7 @@ if [[ $BRANCH_NAME == *"-rc" ]]; then
 RC_TAG="$VERSION-$GIT_COMMIT-rc"
 echo "Tagged with $RC_TAG"
 git tag $RC_TAG
-git push origin $RC_TAG
+#git push origin $RC_TAG
 exit 0
 fi
 
@@ -50,7 +50,7 @@ echo "Updating $VERSION to $NEW_TAG"
 echo "Tagged with $NEW_TAG (Ignoring fatal:cannot describe - this means commit is untagged) "
 
 git tag $NEW_TAG
-git push origin $NEW_TAG
+#git push origin $NEW_TAG
 else
 echo "Already a tag on this commit"
 exit 1

@@ -11,9 +11,6 @@ import FluentPostgreSQL
 
 public final class Task: PostgreSQLModel {
 
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
-
     /// The semester a exam was taken
     ///
     /// - fall: The fall
@@ -35,23 +32,11 @@ public final class Task: PostgreSQLModel {
     /// The topic.id for the topic this task relates to
     public var topicId: Topic.ID
 
-    /// A variable containing the difficutly of the task. This will be a the success rate (0...100)
-    public var difficulty: Double
-
-    /// The estimated time in seconds
-    public var estimatedTime: TimeInterval
-
     /// Some html that contains extra information about the task if needed
     public var description: String?
 
     /// The question needed to answer the task
     public var question: String
-
-    /// A bool indicating if the task should still be used
-    public var isOutdated: Bool
-
-    // This should be a list of some type
-//    var resourceURL: String?
 
     /// A soulution to the task (May be changed to support multiple solutions)
     public var solution: String?
@@ -75,10 +60,17 @@ public final class Task: PostgreSQLModel {
     /// - Note: Usually a task will be marked as isOutdated and create a new `Task` when updated
     public var updatedAt: Date?
 
+
+    public var deletedAt: Date?
+
     /// The id of the new edited task if there exists one
     public var editedTaskID: Task.ID?
 
-//    var canAnswer: Bool
+
+    public static var createdAtKey: TimestampKey? = \.createdAt
+    public static var updatedAtKey: TimestampKey? = \.updatedAt
+    public static var deletedAtKey: TimestampKey? = \.deletedAt
+
 
     init(
         topicId: Topic.ID,
@@ -94,13 +86,10 @@ public final class Task: PostgreSQLModel {
         isExaminable: Bool = true
     ) {
         self.topicId        = topicId
-        self.difficulty     = 1
-        self.estimatedTime  = estimatedTime
         self.solution       = explenation
         self.description    = description
         self.question       = question
         self.creatorId      = creatorId
-        self.isOutdated     = isOutdated
         self.isExaminable   = isExaminable
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
@@ -115,14 +104,11 @@ public final class Task: PostgreSQLModel {
         canAnswer: Bool = true
     ) throws {
         self.topicId        = try topic.requireID()
-        self.difficulty     = content.difficulty
-        self.estimatedTime  = content.estimatedTime
         self.description    = content.description
         self.question       = content.question
         self.solution       = content.solution
         self.isExaminable   = content.isExaminable
         self.creatorId      = try creator.requireID()
-        self.isOutdated     = false
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear = content.examPaperYear
 

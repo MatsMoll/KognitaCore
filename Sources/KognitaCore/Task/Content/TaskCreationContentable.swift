@@ -9,8 +9,6 @@ import Vapor
 
 
 public protocol TaskCreationContentable {
-    var difficulty: Double { get }
-    var estimatedTime: TimeInterval { get }
     var description: String? { get }
     var question: String { get }
     var solution: String? { get }

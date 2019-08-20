@@ -31,6 +31,4 @@ public struct TaskContent {
 
     public var status: String { return "" }
 
-    public var isOutdated: Bool { return task.isOutdated }
-
 }

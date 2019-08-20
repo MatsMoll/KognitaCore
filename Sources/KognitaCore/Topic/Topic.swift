@@ -27,9 +27,6 @@ public final class Topic: PostgreSQLModel {
     /// The chapther number in a subject
     public private(set) var chapter: Int
 
-    /// The importance of the topic in a subject
-    public private(set) var importance: Double
-
     /// The id of the creator
     public internal(set) var creatorId: User.ID
 
@@ -42,10 +39,9 @@ public final class Topic: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
-    init(name: String, description: String, importance: Double, chapter: Int, subjectId: Subject.ID, preTopicId: Topic.ID?, creatorId: User.ID) throws {
+    init(name: String, description: String, chapter: Int, subjectId: Subject.ID, preTopicId: Topic.ID?, creatorId: User.ID) throws {
         self.name           = name
         self.description    = description
-        self.importance     = importance
         self.chapter        = chapter
         self.subjectId      = subjectId
         self.preTopicId     = preTopicId
@@ -61,7 +57,6 @@ public final class Topic: PostgreSQLModel {
         preTopicId  = content.preTopicId
         description = content.description
         chapter     = content.chapter
-        importance  = content.importance
 
         try validateTopic()
     }
@@ -78,7 +73,6 @@ public final class Topic: PostgreSQLModel {
         preTopicId  = content.preTopicId
         description = content.description
         chapter     = content.chapter
-        importance  = content.importance
 
         try validateTopic()
     }
@@ -161,7 +155,4 @@ public final class TopicCreateContent: Content {
 
     /// The chapther number in a subject
     public let chapter: Int
-
-    /// The importance of the topic in a subject
-    public let importance: Double
 }

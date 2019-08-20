@@ -58,9 +58,8 @@ public class MultipleChoiseTaskRepository {
         }
         return task.get(on: conn)
             .flatMap { task in
-                task.isOutdated = true
                 return task
-                    .save(on: conn)
+                    .delete(on: conn)
                     .transform(to: ())
         }
     }
@@ -77,7 +76,6 @@ public class MultipleChoiseTaskRepository {
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
-                        task.isOutdated = true
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)

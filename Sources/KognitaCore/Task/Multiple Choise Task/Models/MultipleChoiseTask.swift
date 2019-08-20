@@ -141,7 +141,6 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         return task.get(on: conn).flatMap { (task) in
             Task.query(on: conn)
                 .filter(\.topicId == task.topicId)
-                .filter(\.isOutdated == false)
                 .filter(\.id > task.id)
                 .first()
         }
