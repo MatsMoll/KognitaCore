@@ -20,9 +20,10 @@ public final class NumberInputTask: PostgreSQLModel {
     // The unit the answer is given in
     public var unit: String?
 
-    init(correctAnswer: Double, unit: String? = nil) {
+    init(correctAnswer: Double, unit: String? = nil, taskId: Task.ID? = nil) {
         self.correctAnswer = correctAnswer
         self.unit = unit
+        self.id = taskId
     }
 
     init(content: NumberInputTaskCreateContent, task: Task) throws {

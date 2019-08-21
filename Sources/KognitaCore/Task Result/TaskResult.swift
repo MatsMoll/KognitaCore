@@ -68,7 +68,7 @@ extension TaskResult: Migration {
         return PostgreSQLDatabase.create(TaskResult.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.taskID, to: \Task.id)
+            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
             builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .setNull)
         }
@@ -89,24 +89,5 @@ extension TaskResult {
 
     public var content: TaskResultContent {
         return TaskResultContent(result: self, daysUntilRevisit: daysUntilRevisit)
-    }
-}
-
-struct TaskResultScoreMigration: PostgreSQLMigration {
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return TaskResult.query(on: conn)
-            .filter(\TaskResult.resultScore < 1)
-            .all()
-            .flatMap { results in
-                results.map { result in
-                    result.resultScore = result.resultScore.clamped(to: 0...1)
-                    return result.save(on: conn)
-                        .transform(to: ())
-                    }.flatten(on: conn)
-        }
-    }
-
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return conn.future()
     }
 }

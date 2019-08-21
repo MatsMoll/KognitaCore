@@ -18,7 +18,6 @@ public class TaskRepository {
         return try subject.topics
             .query(on: conn)
             .join(\Task.topicId, to: \Topic.id)
-            .filter(\Task.isOutdated == false)
             .join(\User.id, to: \Task.creatorId)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
@@ -37,9 +36,9 @@ public class TaskRepository {
         }
     }
 
-    public func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
-        return Task.query(on: conn)
+        return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
             .join(\Topic.id, to: \Task.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
             .join(\User.id, to: \Task.creatorId)
@@ -47,6 +46,7 @@ public class TaskRepository {
             .alsoDecode(Topic.self)
             .alsoDecode(Subject.self)
             .alsoDecode(User.self)
+            .range(lower: 0, upper: maxAmount)
             .all()
             .flatMap { tasks in
                 try tasks.map { content in
@@ -74,7 +74,7 @@ public class TaskRepository {
 
     public func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
 
-        return Task.query(on: conn)
+        return Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == id)
             .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
             .join(\NumberInputTask.id, to: \Task.id, method: .left)
@@ -97,7 +97,6 @@ public class TaskRepository {
 
     public func getNumberOfTasks(in topicIDs: Topic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
         return Task.query(on: conn)
-            .filter(\.isOutdated == false)
             .filter(\.topicId ~~ topicIDs)
             .count()
     }

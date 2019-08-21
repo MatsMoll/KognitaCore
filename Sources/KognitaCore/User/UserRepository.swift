@@ -57,28 +57,16 @@ public class UserRepository {
         let newUser = User(id: nil, name: userContent.name, email: userContent.email, passwordHash: hash)
 
         return User.query(on: conn)
-            .filter(\.activationToken == userContent.activationKey).first()
-            .unwrap(or: UserErrors.invalidRecruterToken)
-            .flatMap { recruterUser in
+            .filter(\.email == newUser.email)
+            .first()
+            .flatMap { existingUser in
 
-                User.query(on: conn)
-                    .filter(\.email == newUser.email)
-                    .first()
-                    .flatMap { existingUser in
-
-                        guard existingUser == nil else {
-                            throw UserErrors.existingUser(newUser.email)
-                        }
-                        newUser.recruterUserID = try recruterUser.requireID()
-                        return newUser.save(on: conn)
-                            .flatMap { user in
-                                recruterUser.activationToken = UUID().uuidString
-                                return recruterUser.save(on: conn)
-                                    .map { _ in
-                                        // map to public user response (omits password hash)
-                                        try UserResponse(id: user.requireID(), name: user.name, email: user.email, registrationDate: Date(), recruitierName: recruterUser.name)
-                                }
-                        }
+                guard existingUser == nil else {
+                    throw UserErrors.existingUser(newUser.email)
+                }
+                return newUser.save(on: conn)
+                    .map { user in
+                        try UserResponse(id: user.requireID(), name: user.name, email: user.email, registrationDate: Date())
                 }
         }
     }
@@ -87,8 +75,8 @@ public class UserRepository {
 
         return User.query(on: conn)
             .all()
-            .flatMap { users in
-                try users.map { try $0.content(on: conn) }.flatten(on: conn)
+            .map { users in
+                try users.map { try $0.content() }
         }
     }
 }

@@ -26,8 +26,7 @@ class TopicTests: VaporTestCase {
         _ = try Task.create(topic: topic, on: conn)
         _ = try Task.create(topic: topic, on: conn)
         let outdated = try Task.create(topic: topic, on: conn)
-        outdated.isOutdated = true
-        _ = try outdated.save(on: conn).wait()
+        _ = try outdated.delete(on: conn).wait()
 
         let timely = try TopicRepository.shared
             .timelyTopics(on: conn)
@@ -36,6 +35,26 @@ class TopicTests: VaporTestCase {
         XCTAssertEqual(timely.count, 4)
         XCTAssertTrue(timely.contains(where: { $0.numberOfTasks == 3 }))
         XCTAssertTrue(timely.contains(where: { $0.numberOfTasks == 0 }))
+    }
+
+    func testSoftDelete() throws {
+        let topic = try Topic.create(on: conn)
+
+        _ = try Topic.create(on: conn)
+
+        _ = try Task.create(on: conn)
+        _ = try Task.create(on: conn)
+
+        _ = try Task.create(topic: topic, on: conn)
+        let outdated = try Task.create(topic: topic, on: conn)
+        _ = try outdated.delete(on: conn)
+            .wait()
+
+        let allValidTasks = try Task.query(on: conn).all().wait()
+        let allTasks = try Task.query(on: conn, withSoftDeleted: true).all().wait()
+
+        XCTAssertEqual(allValidTasks.count, 3)
+        XCTAssertEqual(allTasks.count, 4)
     }
 
     static let allTests = [

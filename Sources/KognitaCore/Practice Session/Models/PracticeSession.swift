@@ -30,14 +30,7 @@ public final class PracticeSession: PostgreSQLModel {
     public var endedAt: Date?
 
     /// The number of task to complete in the session
-    public private(set) var numberOfTaskGoal: Int = 1
-
-    /// The total time actively practiced
-    public private(set) var totalTimePracticed: TimeInterval = 0
-
-//    var timeString: String {
-//        return totalTimePracticed.timeString
-//    }
+    public private(set) var numberOfTaskGoal: Int
 
     /// The current task if any
     private(set) var currentTaskID: Task.ID?
@@ -128,7 +121,6 @@ extension PracticeSession {
                         )
                     )
                     .filter(\.topicId ~~ topicIDs)
-                    .filter(\.isOutdated == false)
                     .all()
             }.flatMap { (tasks) in
                 conn.databaseConnection(to: .psql)
@@ -290,23 +282,3 @@ extension PracticeSession: Migration {
 }
 
 extension PracticeSession: Parameter {}
-
-
-
-struct PracticeSessionEndedAtMigration: PostgreSQLMigration {
-
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(PracticeSession.self, on: conn) { (builder) in
-            builder.field(for: \.endedAt)
-        }.flatMap { _ in
-            PracticeSessionRepository.shared
-                .cleanSessions(on: conn)
-        }
-    }
-
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(PracticeSession.self, on: conn) { (builder) in
-            builder.deleteField(for: \.endedAt)
-        }
-    }
-}

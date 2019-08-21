@@ -49,6 +49,24 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
+    public func importTask(from taskContent: MultipleChoiseTaskContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        taskContent.task.id = nil
+        taskContent.task.creatorId = 1
+        try taskContent.task.topicId = topic.requireID()
+        return taskContent.task.create(on: conn).flatMap { task in
+            try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                .create(on: conn)
+        }.flatMap { task in
+            try taskContent.choises
+                .map { choise in
+                    try choise.taskId = task.requireID()
+                    return choise.create(on: conn)
+                        .transform(to: ())
+            }
+            .flatten(on: conn)
+        }
+    }
+
     public func delete(task multiple: MultipleChoiseTask, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
         guard user.isCreator else {
             throw Abort(.forbidden)
@@ -58,9 +76,8 @@ public class MultipleChoiseTaskRepository {
         }
         return task.get(on: conn)
             .flatMap { task in
-                task.isOutdated = true
                 return task
-                    .save(on: conn)
+                    .delete(on: conn)
                     .transform(to: ())
         }
     }
@@ -77,7 +94,6 @@ public class MultipleChoiseTaskRepository {
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
-                        task.isOutdated = true
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)

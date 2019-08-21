@@ -94,8 +94,9 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         return try Task(content: content, topic: topic, creator: user)
             .create(on: connection)
             .flatMap { (task) in
-                try MultipleChoiseTask(isMultipleSelect: content.isMultipleSelect,
-                                       task: task)
+                try MultipleChoiseTask(
+                    isMultipleSelect: content.isMultipleSelect,
+                    task: task)
                     .create(on: connection)
             } .flatMap { (task) in
                 try content.choises.map { choise in
@@ -140,7 +141,6 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         return task.get(on: conn).flatMap { (task) in
             Task.query(on: conn)
                 .filter(\.topicId == task.topicId)
-                .filter(\.isOutdated == false)
                 .filter(\.id > task.id)
                 .first()
         }

@@ -24,9 +24,6 @@ public struct CreateUserRequest: Content {
     /// If the terms is accepted
     public let acceptedTermsInput: String
 
-    /// The activation key
-    public let activationKey: String
-
     /// If the terms is accepted
     public var acceptedTerms: Bool { return acceptedTermsInput == "on" }
 }

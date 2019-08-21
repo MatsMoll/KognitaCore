@@ -40,6 +40,17 @@ public class NumberInputTaskRepository {
         }
     }
 
+    public func importTask(from taskContent: NumberInputTaskContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        taskContent.task.id = nil
+        taskContent.task.creatorId = 1
+        try taskContent.task.topicId = topic.requireID()
+        return taskContent.task.create(on: conn).flatMap { task in
+            try NumberInputTask(correctAnswer: taskContent.input.correctAnswer, unit: taskContent.input.unit, taskId: task.requireID())
+                .create(on: conn)
+                .transform(to: ())
+        }
+    }
+
     public func delete(task number: NumberInputTask, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
         guard user.isCreator else {
             throw Abort(.forbidden)
@@ -49,10 +60,7 @@ public class NumberInputTaskRepository {
         }
         return task.get(on: conn)
             .flatMap { task in
-                task.isOutdated = true
-                return task
-                    .save(on: conn)
-                    .transform(to: ())
+                return task.delete(on: conn)
         }
     }
 
@@ -68,8 +76,8 @@ public class NumberInputTaskRepository {
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
-                        task.isOutdated = true
                         task.editedTaskID = newTask.id
+                        task.deletedAt = Date()
                         return task
                             .save(on: conn)
                             .transform(to: newTask)

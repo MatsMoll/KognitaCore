@@ -21,7 +21,4 @@ public struct UserResponse: Content {
 
     /// The User's registration date
     public let registrationDate: Date
-
-    /// The recruiter's User name
-    public internal(set) var recruitierName: String?
 }

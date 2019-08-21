@@ -28,11 +28,11 @@ public class TaskResultRepository {
         let topicID: Int
     }
 
-    private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"isOutdated\" = FALSE ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"isOutdated\" = FALSE AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"isOutdated\" = FALSE AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
 
     public func getAllResults(for userId: User.ID, with conn: PostgreSQLConnection) throws -> Future<[TaskResult]> {
@@ -174,12 +174,11 @@ public class TaskResultRepository {
                     .all(decoding: UserLevelScore.self)
                     .flatMap { scores in
 
-                        return scores.group(by: \.topicID)
+                        return scores.group(by: \UserLevelScore.topicID)
                             .map { topicID, grouped in
 
                             Task.query(on: conn)
                                 .filter(\.topicId == topicID)
-                                .filter(\.isOutdated == false)
                                 .count()
                                 .map { maxScore in
                                     UserLevel(
@@ -217,7 +216,6 @@ public class TaskResultRepository {
                         try Task.query(on: conn)
                             .join(\Topic.id, to: \Task.topicId)
                             .filter(\Topic.subjectId == subject.requireID())
-                            .filter(\.isOutdated == false)
                             .count()
                             .map { maxScore in
                                 
