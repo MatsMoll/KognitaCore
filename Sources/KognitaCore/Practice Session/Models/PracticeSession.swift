@@ -282,23 +282,3 @@ extension PracticeSession: Migration {
 }
 
 extension PracticeSession: Parameter {}
-
-
-
-struct PracticeSessionEndedAtMigration: PostgreSQLMigration {
-
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(PracticeSession.self, on: conn) { (builder) in
-            builder.field(for: \.endedAt)
-        }.flatMap { _ in
-            PracticeSessionRepository.shared
-                .cleanSessions(on: conn)
-        }
-    }
-
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(PracticeSession.self, on: conn) { (builder) in
-            builder.deleteField(for: \.endedAt)
-        }
-    }
-}
