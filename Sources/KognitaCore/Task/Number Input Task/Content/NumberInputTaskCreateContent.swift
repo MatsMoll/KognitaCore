@@ -11,10 +11,6 @@ public struct NumberInputTaskCreateContent: Content, TaskCreationContentable {
 
     public let topicId: Topic.ID
 
-    public let difficulty: Double
-
-    public let estimatedTime: TimeInterval
-
     public let description: String?
 
     public let question: String

@@ -16,6 +16,7 @@ extension MultipleChoiseTask {
                        topic:               Topic?      = nil,
                        task:                Task?       = nil,
                        isMultipleSelect:    Bool        = true,
+                       choises:             [MultipleChoiseTaskChoiseContent] = MultipleChoiseTaskChoiseContent.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
         let usedTask = try task ?? Task.create(creator: creator, topic: topic, on: conn)
@@ -27,9 +28,27 @@ extension MultipleChoiseTask {
     
     static func create(taskId:              Task.ID,
                        isMultipleSelect:    Bool        = true,
+                       choises:             [MultipleChoiseTaskChoiseContent] = MultipleChoiseTaskChoiseContent.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
         return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
-            .create(on: conn).wait()
+            .create(on: conn)
+            .flatMap { task in
+                try choises.map {
+                    try MultipleChoiseTaskChoise(content: $0, task: task)
+                        .create(on: conn)
+                }
+                .flatten(on: conn)
+                .transform(to: task)
+        }
+            .wait()
     }
+}
+
+extension MultipleChoiseTaskChoiseContent {
+    static let standard: [MultipleChoiseTaskChoiseContent] = [
+        .init(choise: "not", isCorrect: false),
+        .init(choise: "yes", isCorrect: true),
+        .init(choise: "not again", isCorrect: false)
+    ]
 }
