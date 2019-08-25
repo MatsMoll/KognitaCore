@@ -77,7 +77,7 @@ public class NumberInputTaskRepository {
                 task.get(on: conn)
                     .flatMap { task in
                         task.editedTaskID = newTask.id
-                        task.deletedAt = Date()
+                        task.deletedAt = Date()  // Equilent to .delete(on: conn)
                         return task
                             .save(on: conn)
                             .transform(to: newTask)

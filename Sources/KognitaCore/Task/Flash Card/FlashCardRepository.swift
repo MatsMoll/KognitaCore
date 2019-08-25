@@ -54,7 +54,7 @@ public class FlashCardRepository {
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
-                        task.deletedAt = Date()
+                        task.deletedAt = Date()  // Equilent to .delete(on: conn)
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)

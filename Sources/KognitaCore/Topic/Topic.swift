@@ -36,7 +36,7 @@ public final class Topic: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
-    init(name: String, description: String, chapter: Int, subjectId: Subject.ID, creatorId: User.ID) throws {
+    public init(name: String, description: String, chapter: Int, subjectId: Subject.ID, creatorId: User.ID) throws {
         self.name           = name
         self.description    = description
         self.chapter        = chapter
