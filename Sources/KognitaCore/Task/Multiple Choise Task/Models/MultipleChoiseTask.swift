@@ -19,10 +19,6 @@ public struct MultipleChoiseTaskCreationContent: Content, TaskCreationContentabl
 
     public let topicId: Topic.ID
 
-    public let difficulty: Double
-
-    public let estimatedTime: TimeInterval
-
     public let description: String?
 
     public let question: String

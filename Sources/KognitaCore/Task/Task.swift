@@ -109,10 +109,10 @@ public final class Task: PostgreSQLModel {
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
 
-        try validate()
+        validate()
     }
 
-    func validate() throws {
+    func validate() {
         description?.makeHTMLSafe()
         question.makeHTMLSafe()
         solution?.makeHTMLSafe()
