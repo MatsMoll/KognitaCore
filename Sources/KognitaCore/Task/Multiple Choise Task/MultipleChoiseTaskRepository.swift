@@ -40,7 +40,7 @@ public class MultipleChoiseTaskRepository {
                         } .flatMap { (task) in
                             try content.choises.map { choise in
                                 try MultipleChoiseTaskChoise(content: choise, task: task)
-                                    .create(on: conn)
+                                    .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
                                 }
                                 .flatten(on: conn)
                                 .transform(to: task)
@@ -89,17 +89,21 @@ public class MultipleChoiseTaskRepository {
         guard let task = multiple.task else {
             throw Abort(.internalServerError)
         }
+
         return try MultipleChoiseTaskRepository.shared
             .create(with: content, user: user, conn: conn)
             .flatMap { newTask in
+
                 task.get(on: conn)
                     .flatMap { task in
+
+                        task.deletedAt = Date() // Equilent to .delete(on: conn)
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)
                             .transform(to: newTask)
                 }
-        }
+            }
     }
 
     public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTaskContent> {

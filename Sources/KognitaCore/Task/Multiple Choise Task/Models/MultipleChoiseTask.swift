@@ -27,8 +27,6 @@ public struct MultipleChoiseTaskCreationContent: Content, TaskCreationContentabl
 
     public let isMultipleSelect: Bool
 
-    public let examPaper: String?
-
     public let examPaperSemester: Task.ExamSemester?
 
     public let examPaperYear: Int?
