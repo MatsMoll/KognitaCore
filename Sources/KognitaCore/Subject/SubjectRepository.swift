@@ -13,7 +13,7 @@ public class SubjectRepository {
     public static let shared = SubjectRepository()
 
 
-    public func createSubject(with content: CreateSubjectRequest, for user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
+    public func createSubject(with content: Subject.Request.Create, for user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
         return try Subject(content: content, creator: user)
             .create(on: conn)
     }
@@ -34,7 +34,7 @@ public class SubjectRepository {
             .all()
     }
 
-    public func edit(subject: Subject, with content: CreateSubjectRequest, user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
+    public func edit(subject: Subject, with content: Subject.Request.Create, user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
         guard try subject.creatorId == user.requireID() else {
             throw Abort(.forbidden, reason: "You are not the creator of this content")
         }
@@ -64,9 +64,13 @@ public class SubjectRepository {
 }
 
 
-public struct CreateSubjectRequest: Content {
-    let name: String
-    let colorClass: Subject.ColorClass
-    let description: String
-    let category: String
+extension Subject {
+    public struct Request {
+        public struct Create : Content {
+            let name: String
+            let colorClass: Subject.ColorClass
+            let description: String
+            let category: String
+        }
+    }
 }

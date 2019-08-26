@@ -26,11 +26,11 @@ public class NumberInputTaskRepository {
             throw Abort(.forbidden)
         }
         try content.validate()
-        return Topic.find(content.topicId, on: conn)
+        return Subtopic.find(content.subtopicID, on: conn)
             .unwrap(or: TaskCreationError.invalidTopic)
-            .flatMap { topic in
+            .flatMap { subtopic in
                 conn.transaction(on: .psql) { conn in
-                    try Task(content: content, topic: topic, creator: user)
+                    try Task(content: content, subtopic: subtopic, creator: user)
                         .create(on: conn)
                         .flatMap { (task) in
                             try NumberInputTask(content: content, task: task)
@@ -40,10 +40,10 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func importTask(from taskContent: NumberInputTaskContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public func importTask(from taskContent: NumberInputTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
-        try taskContent.task.topicId = topic.requireID()
+        try taskContent.task.subtopicId = subtopic.requireID()
         return taskContent.task.create(on: conn).flatMap { task in
             try NumberInputTask(correctAnswer: taskContent.input.correctAnswer, unit: taskContent.input.unit, taskId: task.requireID())
                 .create(on: conn)
@@ -99,7 +99,8 @@ public class NumberInputTaskRepository {
 
         return Task.query(on: conn)
             .filter(\Task.id == input.id)
-            .join(\Topic.id, to: \Task.topicId)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
             .alsoDecode(Topic.self)
             .alsoDecode(Subject.self)

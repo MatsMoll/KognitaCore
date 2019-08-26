@@ -43,7 +43,9 @@ extension Application {
         }
 
         try services.register(FluentPostgreSQLProvider())
-        services.register(DatabaseMigrations.migrationConfig())
+        services.register(
+            DatabaseMigrations.migrationConfig(enviroment: env)
+        )
 
         setupDatabase(for: env, in: &services)
 

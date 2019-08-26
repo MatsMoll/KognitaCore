@@ -31,10 +31,10 @@ final class TestModel: SoftDeleatableModel {
 
 public class DatabaseMigrations {
 
-    public static func migrationConfig() -> MigrationConfig {
+    public static func migrationConfig(enviroment: Environment) -> MigrationConfig {
         var migrations = MigrationConfig()
         setupTables(&migrations)
-        versionBump(&migrations)
+        versionBump(&migrations, enviroment: enviroment)
         return migrations
     }
 
@@ -49,6 +49,7 @@ public class DatabaseMigrations {
         migrations.add(model: UserToken.self, database: .psql)
         migrations.add(model: Subject.self, database: .psql)
         migrations.add(model: Topic.self, database: .psql)
+        migrations.add(model: Subtopic.self, database: .psql)
         migrations.add(model: Task.self, database: .psql)
         migrations.add(model: MultipleChoiseTask.self, database: .psql)
         migrations.add(model: MultipleChoiseTaskChoise.self, database: .psql)
@@ -60,7 +61,8 @@ public class DatabaseMigrations {
         migrations.add(model: TaskResult.self, database: .psql)
     }
 
-    static func versionBump(_ migrations: inout MigrationConfig) {
-        
+    static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
+        guard enviroment != .testing else { return }
+        migrations.add(migration: TaskSubtopicMigration.self, database: .psql)
     }
 }

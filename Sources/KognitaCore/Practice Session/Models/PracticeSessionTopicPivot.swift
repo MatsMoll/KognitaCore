@@ -14,23 +14,23 @@ public final class PracticeSessionTopicPivot: PostgreSQLPivot {
     public typealias Right = Topic
 
     public static var leftIDKey: LeftIDKey = \.sessionID
-    public static var rightIDKey: RightIDKey = \.topicID
+    public static var rightIDKey: RightIDKey = \.subtopicID
 
     public static var createdAtKey: TimestampKey? = \.createdAt
 
     public var id: Int?
     var sessionID: PracticeSession.ID
-    var topicID: Topic.ID
+    var subtopicID: Subtopic.ID
 
     public var createdAt: Date?
 
-    init(topicID: Topic.ID, session: PracticeSession) throws {
+    init(subtopicID: Subtopic.ID, session: PracticeSession) throws {
         self.sessionID = try session.requireID()
-        self.topicID = topicID
+        self.subtopicID = subtopicID
     }
 
-    func create(on conn: DatabaseConnectable, topicID: Topic.ID, _ session: PracticeSession) throws -> Future<PracticeSessionTopicPivot> {
-        return try PracticeSessionTopicPivot(topicID: topicID, session: session)
+    func create(on conn: DatabaseConnectable, subtopicID: Subtopic.ID, _ session: PracticeSession) throws -> Future<PracticeSessionTopicPivot> {
+        return try PracticeSessionTopicPivot(subtopicID: subtopicID, session: session)
             .create(on: conn)
     }
 }
@@ -40,7 +40,7 @@ extension PracticeSessionTopicPivot: Migration {
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.create(PracticeSessionTopicPivot.self, on: conn) { builder in
             try addProperties(to: builder)
-            builder.unique(on: \.sessionID, \.topicID)
+            builder.unique(on: \.sessionID, \.subtopicID)
         }
     }
 

@@ -28,8 +28,10 @@ public final class Task: PostgreSQLModel {
 
     public var id: Int?
 
+    var topicId: Topic.ID?
+
     /// The topic.id for the topic this task relates to
-    public var topicId: Topic.ID
+    public var subtopicId: Subtopic.ID
 
     /// Some html that contains extra information about the task if needed
     public var description: String?
@@ -71,7 +73,7 @@ public final class Task: PostgreSQLModel {
 
 
     init(
-        topicId: Topic.ID,
+        subtopicId: Subtopic.ID,
         estimatedTime: TimeInterval,
         description: String,
         imageURL: String?,
@@ -82,7 +84,7 @@ public final class Task: PostgreSQLModel {
         examPaperYear: Int? = nil,
         isExaminable: Bool = true
     ) {
-        self.topicId        = topicId
+        self.subtopicId     = subtopicId
         self.solution       = explenation
         self.description    = description
         self.question       = question
@@ -96,11 +98,11 @@ public final class Task: PostgreSQLModel {
 
     init(
         content: TaskCreationContentable,
-        topic: Topic,
+        subtopic: Subtopic,
         creator: User,
         canAnswer: Bool = true
     ) throws {
-        self.topicId        = try topic.requireID()
+        self.subtopicId     = try subtopic.requireID()
         self.description    = content.description
         self.question       = content.question
         self.solution       = content.solution
@@ -119,19 +121,23 @@ public final class Task: PostgreSQLModel {
     }
 
     func taskContent(_ req: Request) -> Future<TaskContent> {
-        return topic.get(on: req).flatMap { topic in
-            topic.subject.get(on: req).flatMap { subject in
-                try self.getTaskTypePath(req).map { path in
-                    TaskContent(task: self, topic: topic, subject: subject, creator: nil, taskTypePath: path)
+        return topic(on: req)
+            .flatMap { topic in
+                topic.subject
+                    .get(on: req)
+                    .flatMap { subject in
+                        try self.getTaskTypePath(req).map { path in
+                            TaskContent(task: self, topic: topic, subject: subject, creator: nil, taskTypePath: path)
+                        }
                 }
-            }
         }
     }
 
     static func taskContent(where filter: FilterOperator<PostgreSQLDatabase, Task>, on conn: DatabaseConnectable) -> Future<[TaskContent]> {
         return Task.query(on: conn)
             .filter(filter)
-            .join(\Topic.id, to: \Task.topicId)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
             .alsoDecode(Topic.self)
             .alsoDecode(Subject.self)
@@ -148,12 +154,20 @@ public final class Task: PostgreSQLModel {
         return try TaskRepository.shared
             .getTaskTypePath(for: requireID(), conn: conn)
     }
+
+    func topic(on conn: DatabaseConnectable) -> Future<Topic> {
+        return Topic.query(on: conn)
+            .join(\Subtopic.topicId, to: \Topic.id)
+            .filter(\Subtopic.id == subtopicId)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
+    }
 }
 
 extension Task {
 
-    var topic: Parent<Task, Topic> {
-        return parent(\.topicId)
+    var subtopic: Parent<Task, Subtopic> {
+        return parent(\.subtopicId)
     }
 
     var creator: Parent<Task, User> {
@@ -165,7 +179,8 @@ extension Task: Migration {
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.create(Task.self, on: conn) { builder in
             try addProperties(to: builder)
-            builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
+
+            builder.reference(from: \.subtopicId, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }

@@ -13,13 +13,13 @@ import XCTest
 extension MultipleChoiseTask {
     
     static func create(creator:             User?       = nil,
-                       topic:               Topic?      = nil,
+                       subtopic:               Subtopic?      = nil,
                        task:                Task?       = nil,
                        isMultipleSelect:    Bool        = true,
                        choises:             [MultipleChoiseTaskChoiseContent] = MultipleChoiseTaskChoiseContent.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
-        let usedTask = try task ?? Task.create(creator: creator, topic: topic, on: conn)
+        let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, on: conn)
         
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,

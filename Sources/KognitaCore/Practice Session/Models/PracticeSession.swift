@@ -79,14 +79,14 @@ extension PracticeSession {
     ///   - conn: A transaction connection to the database
     /// - Returns: A `PracticeSession` object
     /// - Throws: If any of the database queries fails
-    static func create(_ user: User, topics: [Topic.ID], numberOfTaskGoal: Int, on conn: DatabaseConnectable)
+    static func create(_ user: User, subtopics: [Subtopic.ID], numberOfTaskGoal: Int, on conn: DatabaseConnectable)
         throws -> Future<PracticeSession> {
 
         return try PracticeSession(user: user, numberOfTaskGoal: numberOfTaskGoal)
             .create(on: conn)
             .flatMap { (session) in
-                try topics.map {
-                    try PracticeSessionTopicPivot(topicID: $0, session: session)
+                try subtopics.map {
+                    try PracticeSessionTopicPivot(subtopicID: $0, session: session)
                         .create(on: conn)
                 }
                     .flatten(on: conn)
@@ -107,7 +107,7 @@ extension PracticeSession {
             .flatMap(assignTask)
     }
 
-    func assignTask(in topicIDs: [Topic.ID], on conn: DatabaseConnectable) throws -> Future<Int?> {
+    func assignTask(in subtopicIDs: [Subtopic.ID], on conn: DatabaseConnectable) throws -> Future<Int?> {
         return try assignedTasks
             .query(on: conn)
             .all()
@@ -120,14 +120,14 @@ extension PracticeSession {
                             completedTasks.map { $0.id }
                         )
                     )
-                    .filter(\.topicId ~~ topicIDs)
+                    .filter(\.subtopicId ~~ subtopicIDs)
                     .all()
             }.flatMap { (tasks) in
                 conn.databaseConnection(to: .psql)
                     .flatMap { psqlConn in
 
                         try TaskResultRepository.shared
-                            .getAllResults(for: self.userID, filter: \Topic.id ~~ topicIDs, with: psqlConn, maxRevisitDays: nil)
+                            .getAllResults(for: self.userID, filter: \Subtopic.id ~~ subtopicIDs, with: psqlConn, maxRevisitDays: nil)
                             .flatMap { results in
 
                                 self.currentTaskID = self.nextTaskID
