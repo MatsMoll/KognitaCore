@@ -17,8 +17,9 @@ class TaskResultRepoTests: VaporTestCase {
         let user = try User.create(on: conn)
         let subject = try Subject.create(name: "test", on: conn)
         let topic = try Topic.create(subject: subject, on: conn)
-        let taskOne = try Task.create(topic: topic, on: conn)
-        let taskTwo = try Task.create(topic: topic, on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let taskOne = try Task.create(subtopic: subtopic, on: conn)
+        let taskTwo = try Task.create(subtopic: subtopic, on: conn)
 
         _ = try TaskResult.create(task: taskOne, session: nil, user: user, on: conn)
         _ = try TaskResult.create(task: taskTwo, session: nil, user: user, on: conn)

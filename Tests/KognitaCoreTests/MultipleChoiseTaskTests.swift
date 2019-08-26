@@ -14,11 +14,11 @@ import FluentPostgreSQL
 class MultipleChoiseTaskTests: VaporTestCase {
     
     func testCreate() throws {
-        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
         let content = try MultipleChoiseTaskCreationContent(
-            topicId: topic.requireID(),
+            subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -41,11 +41,11 @@ class MultipleChoiseTaskTests: VaporTestCase {
     }
 
     func testCreateWithoutPrivilage() throws {
-        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(role: .user, on: conn)
 
         let content = try MultipleChoiseTaskCreationContent(
-            topicId: topic.requireID(),
+            subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -64,11 +64,10 @@ class MultipleChoiseTaskTests: VaporTestCase {
     func testEdit() throws {
         let startingMultiple = try MultipleChoiseTask.create(on: conn)
         var startingTask = try startingMultiple.task!.get(on: conn).wait()
-//        let startingChoises = try startingMultiple.choises.query(on: conn).all().wait()
         let user = try User.create(on: conn)
 
         let content = MultipleChoiseTaskCreationContent(
-            topicId: startingTask.topicId,
+            subtopicId: startingTask.subtopicId,
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -102,7 +101,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let user = try User.create(on: conn)
 
         let content = MultipleChoiseTaskCreationContent(
-            topicId: startingTask.topicId,
+            subtopicId: startingTask.subtopicId,
             description: startingTask.description,
             question: startingTask.question,
             solution: startingTask.solution,
@@ -124,4 +123,11 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
         XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
     }
+
+    static var allTests = [
+        ("testCreate", testCreate),
+        ("testCreateWithoutPrivilage", testCreateWithoutPrivilage),
+        ("testEdit", testEdit),
+        ("testEditEqualChoisesError", testEditEqualChoisesError),
+    ]
 }

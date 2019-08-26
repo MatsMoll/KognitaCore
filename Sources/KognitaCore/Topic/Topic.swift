@@ -36,6 +36,13 @@ public final class Topic: PostgreSQLModel {
     public static var createdAtKey: TimestampKey? = \.createdAt
     public static var updatedAtKey: TimestampKey? = \.updatedAt
 
+
+    public struct Response : Content {
+        public let topic: Topic
+        public let subtopics: [Subtopic]
+    }
+
+
     public init(name: String, description: String, chapter: Int, subjectId: Subject.ID, creatorId: User.ID) throws {
         self.name           = name
         self.description    = description
@@ -84,12 +91,29 @@ extension Topic {
 
     func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
         return try Task.query(on: conn)
-            .filter(\.topicId == requireID())
+            .join(\Subtopic.id, to: \Task.subtopic)
+            .filter(\Subtopic.topicId == requireID())
             .count()
     }
 
-    var tasks: Children<Topic, Task> {
-        return children(\.topicId)
+    func tasks(on conn: DatabaseConnectable) throws -> Future<[Task]> {
+        return try Task.query(on: conn)
+            .join(\Subtopic.id, to: \Task.subtopic)
+            .filter(\Subtopic.topicId == requireID())
+            .all()
+    }
+
+    func subtopics(on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+        return try SubtopicRepository.shared
+            .getSubtopics(in: self, with: conn)
+    }
+
+    func content(on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
+        let topic = self
+        return try subtopics(on: conn)
+            .map { subtopics in
+                Topic.Response(topic: topic, subtopics: subtopics)
+        }
     }
 }
 
@@ -115,18 +139,6 @@ extension Topic: Content { }
 
 extension Topic: Parameter { }
 
-//final class TopicRemoveCreateDate: PostgreSQLMigration {
-//    
-//    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-//        return PostgreSQLDatabase.update(Topic.self, on: conn) { (builder) in
-//            builder.deleteField(for: \.creationDate)
-//        }
-//    }
-//    
-//    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-//        return conn.future()
-//    }
-//}
 
 public final class TopicCreateContent: Content {
 
@@ -141,4 +153,61 @@ public final class TopicCreateContent: Content {
 
     /// The chapther number in a subject
     public let chapter: Int
+}
+
+extension Subtopic {
+    public static let unselected = Subtopic(name: "", chapter: 0, topicId: 0)
+}
+
+extension Topic {
+    public static let unselected = try! Topic(name: "Velg ...", description: "", chapter: 0, subjectId: 0, creatorId: 0)
+}
+
+extension Topic.Response {
+    public static let unselected: Topic.Response = Topic.Response(topic: .unselected, subtopics: [.unselected])
+}
+
+
+struct TaskSubtopicMigration: PostgreSQLMigration {
+
+    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+
+        let defaultValueConstraint = PostgreSQLColumnConstraint.default(.literal(0))
+
+        return PostgreSQLDatabase.update(Task.self, on: conn) { builder in
+            builder.field(for: \.subtopicId, type: .bigint, defaultValueConstraint)
+            builder.deleteReference(from: \Task.topicId, to: \Topic.id)
+        }.flatMap { _ in
+            Topic.query(on: conn)
+                .all()
+                .flatMap { topics in
+                    try topics.map {
+                        try Subtopic(name: "Generelt", chapter: 1, topicId: $0.requireID())
+                            .save(on: conn)
+                    }
+                    .flatten(on: conn)
+            }
+        }.flatMap { subtopics in
+
+            Task.query(on: conn)
+                .all()
+                .flatMap { tasks in
+                    try tasks.map { task in
+                        task.subtopicId = try (subtopics.first(where: { task.topicId == $0.topicId })?.requireID() ?? 0)
+                        return task.save(on: conn)
+                            .transform(to: ())
+                    }
+                    .flatten(on: conn)
+            }
+        }.flatMap {
+            PostgreSQLDatabase.update(Task.self, on: conn) { builder in
+                builder.reference(from: \Task.subtopicId, to: \Subtopic.id)
+                builder.deleteField(for: \Task.topicId)
+            }
+        }
+    }
+
+    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return conn.future()
+    }
 }

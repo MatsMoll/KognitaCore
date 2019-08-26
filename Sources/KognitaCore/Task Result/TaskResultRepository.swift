@@ -30,9 +30,9 @@ public class TaskResultRepository {
 
     private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Topic\" ON \"Task\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
 
     public func getAllResults(for userId: User.ID, with conn: PostgreSQLConnection) throws -> Future<[TaskResult]> {
@@ -62,7 +62,8 @@ public class TaskResultRepository {
                     .filter(filter)
                     .sort(\.revisitDate)
                     .join(\Task.id, to: \TaskResult.taskID)
-                    .join(\Topic.id, to: \Task.topicId)
+                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Topic.id, to: \Subtopic.topicId)
 
                 if let maxRevisitDays = maxRevisitDays,
                     let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
@@ -85,7 +86,8 @@ public class TaskResultRepository {
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
                     .join(\Task.id, to: \TaskResult.taskID)
-                    .join(\Topic.id, to: \Task.topicId)
+                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Topic.id, to: \Subtopic.topicId)
                     .join(\Subject.id, to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
                     .alsoDecode(Subject.self)
@@ -170,7 +172,8 @@ public class TaskResultRepository {
                     .from(TaskResult.self)
                     .where(\TaskResult.id, .in, ids)
                     .join(\TaskResult.taskID, to: \Task.id)
-                    .join(\Task.topicId, to: \Topic.id)
+                    .join(\Task.subtopicId, to: \Subtopic.id)
+                    .join(\Subtopic.topicId, to: \Topic.id)
                     .all(decoding: UserLevelScore.self)
                     .flatMap { scores in
 
@@ -178,7 +181,8 @@ public class TaskResultRepository {
                             .map { topicID, grouped in
 
                             Task.query(on: conn)
-                                .filter(\.topicId == topicID)
+                                .join(\Subtopic.id, to: \Task.subtopicId)
+                                .filter(\Subtopic.topicId == topicID)
                                 .count()
                                 .map { maxScore in
                                     UserLevel(
@@ -214,7 +218,8 @@ public class TaskResultRepository {
                     .flatMap { score in
 
                         try Task.query(on: conn)
-                            .join(\Topic.id, to: \Task.topicId)
+                            .join(\Subtopic.id, to: \Task.subtopicId)
+                            .join(\Topic.id, to: \Subtopic.topicId)
                             .filter(\Topic.subjectId == subject.requireID())
                             .count()
                             .map { maxScore in

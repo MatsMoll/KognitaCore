@@ -58,7 +58,7 @@ public final class Subject: PostgreSQLModel {
         try self.validateSubject()
     }
 
-    init(content: CreateSubjectRequest, creator: User) throws {
+    init(content: Request.Create, creator: User) throws {
         self.creatorId = try creator.requireID()
         self.name = content.name
         self.description = content.description
@@ -86,7 +86,7 @@ public final class Subject: PostgreSQLModel {
     ///
     /// - Throws:
     ///     If invalid values
-    func updateValues(with content: CreateSubjectRequest) throws {
+    func updateValues(with content: Request.Create) throws {
         colorClass = content.colorClass
         name = content.name
         category = content.category
