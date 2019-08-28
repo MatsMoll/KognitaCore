@@ -21,7 +21,7 @@ public class MultipleChoiseTaskRepository {
     ///     - conn:         A connection to the database
     ///
     /// - Returns:          The task id of the created task
-    public func create(with content: MultipleChoiseTaskCreationContent, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
+    public func create(with content: MultipleChoiseTask.Create.Data, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -49,7 +49,7 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiseTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public func importTask(from taskContent: MultipleChoiseTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
@@ -82,7 +82,7 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
-    public func edit(task multiple: MultipleChoiseTask, with content: MultipleChoiseTaskCreationContent, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
+    public func edit(task multiple: MultipleChoiseTask, with content: MultipleChoiseTask.Create.Data, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -106,7 +106,7 @@ public class MultipleChoiseTaskRepository {
             }
     }
 
-    public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTaskContent> {
+    public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
 
         return try task.choises
             .query(on: conn)
@@ -117,14 +117,14 @@ public class MultipleChoiseTaskRepository {
                 guard let first = choises.first else {
                     throw Abort(.noContent, reason: "Missing choises in task")
                 }
-                return MultipleChoiseTaskContent(
+                return MultipleChoiseTask.Data(
                     task: first.1,
                     multipleTask: task,
                     choises: choises.map { $0.0 }.shuffled())
         }
     }
 
-    public func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTaskContent)> {
+    public func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTask.Data)> {
 
         return try multiple
             .content(on: conn)

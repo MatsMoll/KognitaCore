@@ -17,7 +17,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
-        let content = try MultipleChoiseTaskCreationContent(
+        let content = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
@@ -44,7 +44,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(role: .user, on: conn)
 
-        let content = try MultipleChoiseTaskCreationContent(
+        let content = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
@@ -66,7 +66,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         var startingTask = try startingMultiple.task!.get(on: conn).wait()
         let user = try User.create(on: conn)
 
-        let content = MultipleChoiseTaskCreationContent(
+        let content = MultipleChoiseTask.Create.Data(
             subtopicId: startingTask.subtopicId,
             description: nil,
             question: "Some question",
@@ -100,7 +100,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let startingChoises = try startingMultiple.choises.query(on: conn).all().wait()
         let user = try User.create(on: conn)
 
-        let content = MultipleChoiseTaskCreationContent(
+        let content = MultipleChoiseTask.Create.Data(
             subtopicId: startingTask.subtopicId,
             description: startingTask.description,
             question: startingTask.question,

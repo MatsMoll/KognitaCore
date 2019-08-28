@@ -63,6 +63,5 @@ public class DatabaseMigrations {
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
         guard enviroment != .testing else { return }
-        migrations.add(migration: TaskSubtopicMigration.self, database: .psql)
     }
 }

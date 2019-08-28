@@ -21,12 +21,12 @@ public class NumberInputTaskRepository {
     ///     - conn:         A connection to the database
     ///
     /// - Returns:          The task id of the created task
-    public func create(with content: NumberInputTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
+    public func create(with content: NumberInputTask.Create.Data, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
-        return Subtopic.find(content.subtopicID, on: conn)
+        return Subtopic.find(content.subtopicId, on: conn)
             .unwrap(or: TaskCreationError.invalidTopic)
             .flatMap { subtopic in
                 conn.transaction(on: .psql) { conn in
@@ -40,7 +40,7 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func importTask(from taskContent: NumberInputTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public func importTask(from taskContent: NumberInputTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
@@ -64,7 +64,7 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func edit(task number: NumberInputTask, with content: NumberInputTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
+    public func edit(task number: NumberInputTask, with content: NumberInputTask.Create.Data, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -85,13 +85,13 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTaskContent> {
+    public func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTask.Data> {
         guard let task = number.task else {
             throw Abort(.internalServerError)
         }
         return task.get(on: conn)
             .map { task in
-            NumberInputTaskContent(task: task, input: number)
+                NumberInputTask.Data(task: task, input: number)
         }
     }
 
@@ -120,7 +120,7 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func evaluate(_ answer: NumberInputTaskSubmit, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTaskSubmitResponse> {
+    public func evaluate(_ answer: NumberInputTask.Submit.Data, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
         let wasCorrect = task.correctAnswer == answer.answer
         return PracticeSessionResult(
             result: .init(

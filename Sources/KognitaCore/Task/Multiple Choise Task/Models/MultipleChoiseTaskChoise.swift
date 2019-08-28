@@ -27,7 +27,7 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
         self.taskId = taskId
     }
 
-    public init(content: MultipleChoiseTaskChoiseContent, task: MultipleChoiseTask) throws {
+    public init(content: MultipleChoiseTaskChoise.Data, task: MultipleChoiseTask) throws {
         self.taskId = try task.requireID()
         self.choise = content.choise
         self.isCorrect = content.isCorrect

@@ -8,47 +8,6 @@
 import Vapor
 import FluentPostgreSQL
 
-public struct MultipleChoiseTaskChoiseContent: Content {
-
-    public let choise: String
-
-    public let isCorrect: Bool
-}
-
-public struct MultipleChoiseTaskCreationContent: Content, TaskCreationContentable {
-
-    public let subtopicId: Topic.ID
-
-    public let description: String?
-
-    public let question: String
-
-    public let solution: String?
-
-    public let isMultipleSelect: Bool
-
-    public let examPaperSemester: Task.ExamSemester?
-
-    public let examPaperYear: Int?
-
-    public let isExaminable: Bool
-
-    public let choises: [MultipleChoiseTaskChoiseContent]
-
-    public func validate() throws {
-        try (self as TaskCreationContentable).validate()
-        let numberOfCorrectChoises = choises.filter { $0.isCorrect }
-        guard numberOfCorrectChoises.count > 0 else {
-            throw Abort(.badRequest)
-        }
-        if !isMultipleSelect {
-            guard numberOfCorrectChoises.count == 1 else {
-                throw Abort(.badRequest)
-            }
-        }
-    }
-}
-
 public final class MultipleChoiseTask: PostgreSQLModel {
 
     public var id: Int?
@@ -79,7 +38,7 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     ///
     /// - Returns:          The task id of the created task
     static func create(
-        with content: MultipleChoiseTaskCreationContent,
+        with content: MultipleChoiseTask.Create.Data,
         for subtopic: Subtopic,
         user: User,
         connection: DatabaseConnectable
@@ -107,14 +66,14 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     /// - Parameter conn: A connection to the database
     /// - Returns: A `MultipleChoiseTaskContent` object
     /// - Throws: If there is no relation to a `Task` object or a database error
-    func content(on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTaskContent> {
+    func content(on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
 
         return try choises
             .query(on: conn)
             .all().flatMap { choises in
                 Task.find(self.id ?? 0, on: conn)
                     .unwrap(or: Abort(.internalServerError)).map { task in
-                        MultipleChoiseTaskContent(
+                        MultipleChoiseTask.Data(
                             task: task,
                             multipleTask: self,
                             choises: choises.shuffled()
@@ -205,16 +164,6 @@ extension MultipleChoiseTask {
     var task: Parent<MultipleChoiseTask, Task>? {
         return parent(\.id)
     }
-
-//    func joinTask(on conn: DatabaseConnectable) throws -> Future<String> {
-//        guard let task = task else {
-//            throw Abort(.internalServerError)
-//        }
-//        return conn.future().transform(to: "f")
-//        return task.get(on: conn).map { (task) in
-//            return try JoinedMultipleChoiseTask(task: task, multipleChoise: self, choises: [])
-//        }
-//    }
 
     static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
         return try Task.query(on: conn)

@@ -26,7 +26,7 @@ public final class NumberInputTask: PostgreSQLModel {
         self.id = taskId
     }
 
-    init(content: NumberInputTaskCreateContent, task: Task) throws {
+    init(content: Create.Data, task: Task) throws {
         self.correctAnswer = content.correctAnswer
         self.unit = content.unit
         self.id = try task.requireID()
@@ -50,8 +50,7 @@ extension NumberInputTask {
         return parent(\.id)
     }
 
-
-    func evaluate(for answer: NumberInputTaskSubmit) -> PracticeSessionResult<NumberInputTaskSubmitResponse> {
+    func evaluate(for answer: NumberInputTask.Submit.Data) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
         let wasCorrect = correctAnswer == answer.answer
         return PracticeSessionResult(
             result: .init(
@@ -65,17 +64,3 @@ extension NumberInputTask {
     }
 }
 
-public struct NumberInputTaskContent: Content {
-    public let task: Task
-    public let input: NumberInputTask
-}
-
-public struct NumberInputTaskSubmit: Content, TaskSubmitable {
-    public let timeUsed: TimeInterval
-    public let answer: Double
-}
-
-public struct NumberInputTaskSubmitResponse: Content {
-    public let correctAnswer: Double
-    public let wasCorrect: Bool
-}

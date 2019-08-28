@@ -53,7 +53,7 @@ public class PracticeSessionRepository {
         }
     }
 
-    public func submitInputTask(_ submit: NumberInputTaskSubmit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTaskSubmitResponse>> {
+    public func submitInputTask(_ submit: NumberInputTask.Submit.Data, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTask.Submit.Response>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)

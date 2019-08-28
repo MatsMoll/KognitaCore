@@ -224,8 +224,8 @@ public class TopicRepository {
 
 public struct SubtopicExportContent : Content {
     let subtopic: Subtopic
-    let multipleChoiseTasks: [MultipleChoiseTaskContent]
-    let inputTasks: [NumberInputTaskContent]
+    let multipleChoiseTasks: [MultipleChoiseTask.Data]
+    let inputTasks: [NumberInputTask.Data]
     let flashCards: [Task]
 }
 
