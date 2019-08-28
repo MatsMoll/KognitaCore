@@ -9,11 +9,7 @@ import Vapor
 
 public struct FlashCardTaskCreateContent: Content, TaskCreationContentable {
 
-    public let topicId: Topic.ID
-
-    public let difficulty: Double
-
-    public let estimatedTime: TimeInterval
+    public let subtopicId: Subtopic.ID
 
     public let description: String?
 

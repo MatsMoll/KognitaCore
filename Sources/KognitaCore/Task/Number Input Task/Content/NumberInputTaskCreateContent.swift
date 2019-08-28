@@ -9,19 +9,13 @@ import Vapor
 
 public struct NumberInputTaskCreateContent: Content, TaskCreationContentable {
 
-    public let topicId: Topic.ID
-
-    public let difficulty: Double
-
-    public let estimatedTime: TimeInterval
+    public let subtopicID: Subtopic.ID
 
     public let description: String?
 
     public let question: String
 
     public let solution: String?
-
-    public let examPaper: String?
 
     public let examPaperYear: Int?
 

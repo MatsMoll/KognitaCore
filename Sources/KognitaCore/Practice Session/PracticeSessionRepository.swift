@@ -26,8 +26,8 @@ public class PracticeSessionRepository {
                 .create(on: conn)
                 .flatMap { session in
 
-                    try content.topicIDs.map {
-                        try PracticeSessionTopicPivot(topicID: $0, session: session)
+                    try content.subtopicsIDs.map {
+                        try PracticeSessionTopicPivot(subtopicID: $0, session: session)
                             .create(on: conn)
                         }
                         .flatten(on: conn)
@@ -225,7 +225,8 @@ public class PracticeSessionRepository {
         return try TaskResult.query(on: conn)
             .filter(\TaskResult.sessionID == session.requireID())
             .join(\Task.id, to: \TaskResult.taskID)
-            .join(\Topic.id, to: \Task.topicId)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Topic.id, to: \Subtopic.topicId)
             .alsoDecode(Task.self)
             .alsoDecode(Topic.self).all()
             .map { tasks in
@@ -333,7 +334,7 @@ public class PracticeSessionRepository {
     public func getNumberOfTasks(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Int> {
 
         return try PracticeSessionTopicPivot.query(on: conn)
-            .join(\Task.topicId, to: \PracticeSessionTopicPivot.topicID)
+            .join(\Task.subtopicId, to: \PracticeSessionTopicPivot.subtopicID)
             .filter(\PracticeSessionTopicPivot.sessionID == session.requireID())
             .count()
     }
@@ -347,11 +348,11 @@ public class PracticeSessionCreateContent: Decodable {
     public let numberOfTaskGoal: Int
 
     /// The topic id's for the tasks to map
-    public let topicIDs: [Topic.ID]
+    public let subtopicsIDs: [Subtopic.ID]
     
-    init(numberOfTaskGoal: Int, topicIDs: [Topic.ID]) {
+    init(numberOfTaskGoal: Int, subtopicsIDs: [Subtopic.ID]) {
         self.numberOfTaskGoal = numberOfTaskGoal
-        self.topicIDs = topicIDs
+        self.subtopicsIDs = subtopicsIDs
     }
 }
 

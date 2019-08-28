@@ -17,11 +17,7 @@ public struct MultipleChoiseTaskChoiseContent: Content {
 
 public struct MultipleChoiseTaskCreationContent: Content, TaskCreationContentable {
 
-    public let topicId: Topic.ID
-
-    public let difficulty: Double
-
-    public let estimatedTime: TimeInterval
+    public let subtopicId: Topic.ID
 
     public let description: String?
 
@@ -30,8 +26,6 @@ public struct MultipleChoiseTaskCreationContent: Content, TaskCreationContentabl
     public let solution: String?
 
     public let isMultipleSelect: Bool
-
-    public let examPaper: String?
 
     public let examPaperSemester: Task.ExamSemester?
 
@@ -86,12 +80,12 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     /// - Returns:          The task id of the created task
     static func create(
         with content: MultipleChoiseTaskCreationContent,
-        for topic: Topic,
+        for subtopic: Subtopic,
         user: User,
         connection: DatabaseConnectable
     ) throws -> Future<MultipleChoiseTask> {
 
-        return try Task(content: content, topic: topic, creator: user)
+        return try Task(content: content, subtopic: subtopic, creator: user)
             .create(on: connection)
             .flatMap { (task) in
                 try MultipleChoiseTask(
@@ -128,23 +122,6 @@ public final class MultipleChoiseTask: PostgreSQLModel {
                 }
         }
     }
-
-    /// Returns the next multiple choise task if it exists
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: The multiple choise task
-    /// - Throws: If there is no task relation for some reason
-    func next(on conn: DatabaseConnectable) throws -> Future<Task?> {
-        guard let task = task else {
-            throw Abort(.internalServerError, reason: "Missing Task.id referance")
-        }
-        return task.get(on: conn).flatMap { (task) in
-            Task.query(on: conn)
-                .filter(\.topicId == task.topicId)
-                .filter(\.id > task.id)
-                .first()
-        }
-    }
 }
 
 extension MultipleChoiseTask {
@@ -176,9 +153,18 @@ extension MultipleChoiseTask {
 //        }
 //    }
 
+    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
+        return try Task.query(on: conn)
+            .filter(\.subtopicId == subtopic.requireID())
+            .join(\MultipleChoiseTask.id, to: \Task.id)
+            .decode(MultipleChoiseTask.self)
+            .all()
+    }
+
     static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
         return try Task.query(on: conn)
-            .filter(\.topicId == topic.requireID())
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .filter(\Subtopic.topicId == topic.requireID())
             .join(\MultipleChoiseTask.id, to: \Task.id)
             .decode(MultipleChoiseTask.self)
             .all()

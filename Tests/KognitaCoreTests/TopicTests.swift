@@ -15,17 +15,17 @@ class TopicTests: VaporTestCase {
 
     func testTimlyTopics() throws {
 
-        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(on: conn)
 
-        _ = try Topic.create(on: conn)
+        _ = try Subtopic.create(on: conn)
 
         _ = try Task.create(on: conn)
         _ = try Task.create(on: conn)
 
-        _ = try Task.create(topic: topic, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
-        let outdated = try Task.create(topic: topic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        let outdated = try Task.create(subtopic: subtopic, on: conn)
         _ = try outdated.delete(on: conn).wait()
 
         let timely = try TopicRepository.shared
@@ -38,15 +38,15 @@ class TopicTests: VaporTestCase {
     }
 
     func testSoftDelete() throws {
-        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(on: conn)
 
-        _ = try Topic.create(on: conn)
+        _ = try Subtopic.create(on: conn)
 
         _ = try Task.create(on: conn)
         _ = try Task.create(on: conn)
 
-        _ = try Task.create(topic: topic, on: conn)
-        let outdated = try Task.create(topic: topic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        let outdated = try Task.create(subtopic: subtopic, on: conn)
         _ = try outdated.delete(on: conn)
             .wait()
 
@@ -58,6 +58,7 @@ class TopicTests: VaporTestCase {
     }
 
     static let allTests = [
-        ("testTimlyTopics", testTimlyTopics)
+        ("testTimlyTopics", testTimlyTopics),
+        ("testSoftDelete", testSoftDelete)
     ]
 }

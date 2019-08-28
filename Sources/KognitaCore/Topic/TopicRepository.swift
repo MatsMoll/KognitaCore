@@ -27,13 +27,6 @@ public class TopicRepository {
             .all()
     }
 
-    public func getAll(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic]> {
-        let subjectId = try subject.requireID()
-        return Topic.query(on: conn)
-            .filter(\.subjectId == subjectId)
-            .all()
-    }
-
     public func getTopics(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic]> {
         return try subject
             .topics
@@ -42,8 +35,18 @@ public class TopicRepository {
             .all()
     }
 
+    public func getTopicResponses(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic.Response]> {
+        return try getTopics(in: subject, conn: conn)
+            .flatMap { topics in
+                try topics.map {
+                    try $0.content(on: conn)
+                }
+                .flatten(on: conn)
+        }
+    }
+
     public func getTopic(for task: Task, on conn: DatabaseConnectable) -> Future<Topic> {
-        return task.topic.get(on: conn)
+        return task.topic(on: conn)
     }
 
     public func create(with content: TopicCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<Topic> {
@@ -97,7 +100,8 @@ public class TopicRepository {
                     .select(\Topic.id)
                     .select(.count(\Task.id), as: numberOfTasksKey)
                     .from(Topic.self)
-                    .join(.left, Task.self, where: \Task.topicId == \Topic.id)
+                    .join(.inner, Subtopic.self, where: \Subtopic.topicId == \Topic.id)
+                    .join(.left, Task.self, where: \Task.subtopicId == \Subtopic.id)
                     .where(
                         \Task.deletedAt == nil
                     )
@@ -110,7 +114,7 @@ public class TopicRepository {
     }
 
     public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
-        return try getAll(in: subject, conn: conn)
+        return try getTopics(in: subject, conn: conn)
             .flatMap { topics in
                 try topics.map { try TopicRepository.shared.exportTasks(in: $0, on: conn) }
                     .flatten(on: conn)
@@ -120,9 +124,27 @@ public class TopicRepository {
     }
 
     public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<TopicExportContent> {
+        return try Subtopic.query(on: conn)
+            .filter(\.topicId == topic.requireID())
+            .all()
+            .flatMap { subtopics in
+                try subtopics.map {
+                    try TopicRepository.shared.exportTasks(in: $0, on: conn)
+                }
+                .flatten(on: conn)
+                .map { subtopicContent in
+                    TopicExportContent(
+                        topic: topic,
+                        subtopics: subtopicContent
+                    )
+                }
+        }
+    }
+
+    public func exportTasks(in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<SubtopicExportContent> {
         return try MultipleChoiseTask.query(on: conn)
             .join(\Task.id, to: \MultipleChoiseTask.id)
-            .filter(\Task.topicId == topic.requireID())
+            .filter(\Task.subtopicId == subtopic.requireID())
             .all()
             .flatMap { tasks in
                 try tasks.map { try MultipleChoiseTaskRepository.shared.get(task: $0, conn: conn) }
@@ -130,7 +152,7 @@ public class TopicRepository {
         }.flatMap { multipleTasks in
             try NumberInputTask.query(on: conn)
                 .join(\Task.id, to: \NumberInputTask.id)
-                .filter(\Task.topicId == topic.requireID())
+                .filter(\Task.subtopicId == subtopic.requireID())
                 .all()
                 .flatMap { tasks in
                     try tasks.map { try NumberInputTaskRepository.shared.get(task: $0, conn: conn) }
@@ -138,14 +160,14 @@ public class TopicRepository {
             }.flatMap { numberTasks in
                 try FlashCardTask.query(on: conn)
                     .join(\Task.id, to: \FlashCardTask.id)
-                    .filter(\Task.topicId == topic.requireID())
+                    .filter(\Task.subtopicId == subtopic.requireID())
                     .all()
                     .flatMap { tasks in
                         try tasks.map { try FlashCardRepository.shared.get(task: $0, conn: conn) }
                             .flatten(on: conn)
                 }.map { flashCards in
-                    TopicExportContent(
-                        topic: topic,
+                    SubtopicExportContent(
+                        subtopic: subtopic,
                         multipleChoiseTasks: multipleTasks,
                         inputTasks: numberTasks,
                         flashCards: flashCards
@@ -163,20 +185,36 @@ public class TopicRepository {
         return content.topic
             .create(on: conn)
             .flatMap { topic in
+                try content.subtopics.map {
+                    try TopicRepository.shared.importContent(from: $0, in: topic, on: conn)
+                }
+                .flatten(on: conn)
+        }.transform(to: ())
+    }
+
+
+    public func importContent(from content: SubtopicExportContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+
+        content.subtopic.id = nil
+        content.subtopic.topicId = try topic.requireID()
+
+        return content.subtopic
+            .create(on: conn)
+            .flatMap { subtopic in
                 try content.multipleChoiseTasks
                     .map { task in
                         try MultipleChoiseTaskRepository.shared
-                            .importTask(from: task, in: topic, on: conn)
+                            .importTask(from: task, in: subtopic, on: conn)
                 }.flatten(on: conn).flatMap { _ in
                     try content.inputTasks
                     .map { task in
                         try NumberInputTaskRepository.shared
-                            .importTask(from: task, in: topic, on: conn)
+                            .importTask(from: task, in: subtopic, on: conn)
                     }.flatten(on: conn).flatMap { _ in
                         try content.flashCards
                         .map { task in
                             try FlashCardRepository.shared
-                                .importTask(from: task, in: topic, on: conn)
+                                .importTask(from: task, in: subtopic, on: conn)
                         }.flatten(on: conn)
                     }
                 }
@@ -184,11 +222,16 @@ public class TopicRepository {
     }
 }
 
-public struct TopicExportContent: Content {
-    let topic: Topic
+public struct SubtopicExportContent : Content {
+    let subtopic: Subtopic
     let multipleChoiseTasks: [MultipleChoiseTaskContent]
     let inputTasks: [NumberInputTaskContent]
     let flashCards: [Task]
+}
+
+public struct TopicExportContent: Content {
+    let topic: Topic
+    let subtopics: [SubtopicExportContent]
 }
 
 public struct SubjectExportContent: Content {

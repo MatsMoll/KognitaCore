@@ -26,11 +26,11 @@ public class MultipleChoiseTaskRepository {
             throw Abort(.forbidden)
         }
         try content.validate()
-        return Topic.find(content.topicId, on: conn)
+        return Subtopic.find(content.subtopicId, on: conn)
             .unwrap(or: TaskCreationError.invalidTopic)
-            .flatMap { topic in
+            .flatMap { subtopic in
                 conn.transaction(on: .psql) { conn in
-                    try Task(content: content, topic: topic, creator: user)
+                    try Task(content: content, subtopic: subtopic, creator: user)
                         .create(on: conn)
                         .flatMap { (task) in
                             try MultipleChoiseTask(
@@ -40,7 +40,7 @@ public class MultipleChoiseTaskRepository {
                         } .flatMap { (task) in
                             try content.choises.map { choise in
                                 try MultipleChoiseTaskChoise(content: choise, task: task)
-                                    .create(on: conn)
+                                    .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
                                 }
                                 .flatten(on: conn)
                                 .transform(to: task)
@@ -49,10 +49,10 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiseTaskContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public func importTask(from taskContent: MultipleChoiseTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
-        try taskContent.task.topicId = topic.requireID()
+        try taskContent.task.subtopicId = subtopic.requireID()
         return taskContent.task.create(on: conn).flatMap { task in
             try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
                 .create(on: conn)
@@ -89,17 +89,21 @@ public class MultipleChoiseTaskRepository {
         guard let task = multiple.task else {
             throw Abort(.internalServerError)
         }
+
         return try MultipleChoiseTaskRepository.shared
             .create(with: content, user: user, conn: conn)
             .flatMap { newTask in
+
                 task.get(on: conn)
                     .flatMap { task in
+
+                        task.deletedAt = Date() // Equilent to .delete(on: conn)
                         task.editedTaskID = newTask.id
                         return task
                             .save(on: conn)
                             .transform(to: newTask)
                 }
-        }
+            }
     }
 
     public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTaskContent> {
@@ -128,7 +132,8 @@ public class MultipleChoiseTaskRepository {
 
                 Task.query(on: conn)
                     .filter(\Task.id == multiple.id)
-                    .join(\Topic.id, to: \Task.topicId)
+                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Topic.id, to: \Subtopic.topicId)
                     .join(\Subject.id, to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
                     .alsoDecode(Subject.self)

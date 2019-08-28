@@ -13,11 +13,12 @@ public class TaskRepository {
 
     public static let shared = TaskRepository()
 
-    public func getTasks(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
         return try subject.topics
             .query(on: conn)
-            .join(\Task.topicId, to: \Topic.id)
+            .join(\Subtopic.topicId, to: \Topic.id)
+            .join(\Task.subtopicId, to: \Subtopic.id)
             .join(\User.id, to: \Task.creatorId)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
@@ -36,10 +37,18 @@ public class TaskRepository {
         }
     }
 
+    public func getTasks(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Task]> {
+        return try Task.query(on: conn)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .filter(\Subtopic.topicId == topic.requireID())
+            .all()
+    }
+
     public func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
         return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
-            .join(\Topic.id, to: \Task.topicId)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
             .join(\User.id, to: \Task.creatorId)
             .filter(filter)
@@ -95,9 +104,9 @@ public class TaskRepository {
         }
     }
 
-    public func getNumberOfTasks(in topicIDs: Topic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
+    public func getNumberOfTasks(in subtopicIDs: Subtopic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
         return Task.query(on: conn)
-            .filter(\.topicId ~~ topicIDs)
+            .filter(\.subtopicId ~~ subtopicIDs)
             .count()
     }
 

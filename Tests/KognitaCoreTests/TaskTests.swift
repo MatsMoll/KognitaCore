@@ -16,14 +16,15 @@ class TaskTests: VaporTestCase {
 
         let subject = try Subject.create(name: "test", on: conn)
         let topic = try Topic.create(subject: subject, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
-        _ = try Task.create(topic: topic, on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
+        _ = try Task.create(subtopic: subtopic, on: conn)
         _ = try Task.create(on: conn)
 
         let tasks = try TaskRepository.shared
-            .getTasks(in: subject, conn: conn)
+            .getTasks(in: subject, with: conn)
             .wait()
         XCTAssertEqual(tasks.count, 4)
     }
