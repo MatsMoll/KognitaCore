@@ -12,11 +12,11 @@ import FluentPostgreSQL
 extension FlashCardTask {
     
     static func create(creator:             User?       = nil,
-                       topic:               Topic?      = nil,
+                       subtopic:            Subtopic?      = nil,
                        task:                Task?       = nil,
                        on conn:             PostgreSQLConnection) throws -> FlashCardTask {
         
-        let usedTask = try task ?? Task.create(creator: creator, topic: topic, on: conn)
+        let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, on: conn)
         
         return try create(task: usedTask, on: conn)
     }

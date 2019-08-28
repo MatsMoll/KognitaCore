@@ -235,6 +235,21 @@ extension PracticeSession {
         return try PracticeSessionRepository.shared
             .getNextTaskPath(for: self, on: conn)
     }
+    
+    public func submit(_ content: NumberInputTaskSubmit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTaskSubmitResponse>> {
+        return try PracticeSessionRepository.shared
+            .submitInputTask(content, in: self, by: user, on: conn)
+    }
+    
+    public func submit(_ content: MultipleChoiseTaskSubmit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
+        return try PracticeSessionRepository.shared
+            .submitMultipleChoise(content, in: self, by: user, on: conn)
+    }
+    
+    public func submit(_ content: FlashCardTaskSubmit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTaskSubmit>> {
+        return try PracticeSessionRepository.shared
+            .submitFlashCard(content, in: self, by: user, on: conn)
+    }
 }
 
 extension PracticeSession {

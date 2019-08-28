@@ -22,33 +22,40 @@ public class PracticeSessionRepository {
 
         return conn.transaction(on: .psql) { conn in
 
-            try PracticeSession(user: user, numberOfTaskGoal: content.numberOfTaskGoal)
-                .create(on: conn)
+            try PracticeSessionRepository.shared
+                .create(for: user, subtopicIDs: content.subtopicsIDs, numberOfTaskGoal: content.numberOfTaskGoal, on: conn)
                 .flatMap { session in
-
-                    try content.subtopicsIDs.map {
-                        try PracticeSessionTopicPivot(subtopicID: $0, session: session)
-                            .create(on: conn)
+                    
+                        try session
+                            .getCurrentTaskPath(conn)
+                            .map { path in
+                                PracticeSessionCreateResponse(redirectionUrl: path)
                         }
-                        .flatten(on: conn)
-                        .flatMap { _ in
+            }
+        }
+    }
+    
+    public func create(for user: User, subtopicIDs: [Subtopic.ID], numberOfTaskGoal: Int, on conn: DatabaseConnectable) throws -> Future<PracticeSession> {
+        
+        return try PracticeSession(user: user, numberOfTaskGoal: numberOfTaskGoal)
+            .create(on: conn)
+            .flatMap { session in
 
-                            try session
-                                .assignNextTask(on: conn)
-                                .flatMap { _ in
-
-                                    try session
-                                        .assignNextTask(on: conn)
-                                        .flatMap { _ in
-
-                                            try session
-                                                .getCurrentTaskPath(conn)
-                                                .map { path in
-                                                    PracticeSessionCreateResponse(redirectionUrl: path)
-                                            }
-                                    }
-                            }
+                try subtopicIDs.map {
+                    try PracticeSessionTopicPivot(subtopicID: $0, session: session)
+                        .create(on: conn)
                     }
+                    .flatten(on: conn)
+                    .flatMap { _ in
+
+                        try session
+                            .assignNextTask(on: conn)
+                            .flatMap { _ in
+
+                                try session
+                                    .assignNextTask(on: conn)
+                                    .transform(to: session)
+                        }
                 }
         }
     }
