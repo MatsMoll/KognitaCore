@@ -98,32 +98,43 @@ public class PracticeSessionRepository {
         }
     }
 
-    public func submitFlashCard(_ submit: FlashCardTaskSubmit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTaskSubmit>> {
+    public func submitFlashCard(
+        _ submit: FlashCardTaskSubmit,
+        in session: PracticeSession,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> Future<PracticeSessionResult<FlashCardTaskSubmit>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
         }
 
-        return try getCurrent(FlashCardTask.self, for: session, on: conn).flatMap { task in
-
-            let score = ScoreEvaluater.shared
-                .compress(score: submit.knowledge, range: 0...4)
-
-            let result = PracticeSessionResult(
-                result: submit,
-                unforgivingScore: score,
-                forgivingScore: score,
-                progress: 0
-            )
-
-            let submitResult = try TaskSubmitResult(
-                submit: submit,
-                result: result,
-                taskID: task.requireID()
-            )
-
-            return try PracticeSessionRepository.shared
-                .register(submitResult, result: result, in: session, by: user, on: conn)
+        return try getCurrent(FlashCardTask.self, for: session, on: conn)
+            .flatMap { task in
+                
+                try session
+                    .numberOfCompletedTasks(with: conn)
+                    .flatMap { numberOfCompletedTasks in
+                        
+                        let score = ScoreEvaluater.shared
+                            .compress(score: submit.knowledge, range: 0...4)
+                        
+                        let result = PracticeSessionResult(
+                            result: submit,
+                            score: score,
+                            progress: 0,
+                            numberOfCompletedTasks: numberOfCompletedTasks
+                        )
+                        
+                        let submitResult = try TaskSubmitResult(
+                            submit: submit,
+                            result: result,
+                            taskID: task.requireID()
+                        )
+                        
+                        return try PracticeSessionRepository.shared
+                            .register(submitResult, result: result, in: session, by: user, on: conn)
+                }
         }
     }
 
@@ -231,7 +242,13 @@ public class PracticeSessionRepository {
             .all()
     }
 
-    func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<T>> {
+    func register<T: Content>(
+        _ submitResult: TaskSubmitResult,
+        result: PracticeSessionResult<T>,
+        in session: PracticeSession,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> Future<PracticeSessionResult<T>> {
 
 
         guard let taskID = session.currentTaskID else {
@@ -247,9 +264,16 @@ public class PracticeSessionRepository {
                         
                         try PracticeSessionRepository.shared
                             .goalProgress(in: session, on: conn)
-                            .map { progress in
-                                result.progress = Double(progress)
-                                return result
+                            .flatMap { progress in
+                                
+                                try session
+                                    .numberOfCompletedTasks(with: conn)
+                                    .map { numberOfCompletedTasks in
+                                        
+                                        result.numberOfCompletedTasks = numberOfCompletedTasks
+                                        result.progress = Double(progress)
+                                        return result
+                                }
                         }
                 }
         }
@@ -318,12 +342,17 @@ public class PracticeSessionRepository {
 
 /// The content needed to create a session
 public class PracticeSessionCreateContent: Decodable {
-
+    
     /// The number of task to complete in a session
     public let numberOfTaskGoal: Int
 
     /// The topic id's for the tasks to map
     public let topicIDs: [Topic.ID]
+    
+    init(numberOfTaskGoal: Int, topicIDs: [Topic.ID]) {
+        self.numberOfTaskGoal = numberOfTaskGoal
+        self.topicIDs = topicIDs
+    }
 }
 
 

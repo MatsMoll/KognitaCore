@@ -62,13 +62,17 @@ extension PracticeSession {
 
         let goal = Double(numberOfTaskGoal)
 
+        return try numberOfCompletedTasks(with: conn)
+            .map { (numberOfCompletedTasks) in
+                Int((Double(numberOfCompletedTasks * 100) / goal).rounded())
+        }
+    }
+    
+    func numberOfCompletedTasks(with conn: DatabaseConnectable) throws -> Future<Int> {
         return try assignedTasks
             .pivots(on: conn)
             .filter(\.isCompleted == true)
             .count()
-            .map { (numberOfCompletedTasks) in
-                Int((Double(numberOfCompletedTasks * 100) / goal).rounded())
-        }
     }
 
     /// Creates the necessary data for a `PracticeSession`

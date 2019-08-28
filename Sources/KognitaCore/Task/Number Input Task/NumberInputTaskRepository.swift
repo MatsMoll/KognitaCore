@@ -120,15 +120,16 @@ public class NumberInputTaskRepository {
     }
 
     public func evaluate(_ answer: NumberInputTaskSubmit, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTaskSubmitResponse> {
+        
         let wasCorrect = task.correctAnswer == answer.answer
-        return PracticeSessionResult(
-            result: .init(
+        return PracticeSessionResult.init(
+            result: NumberInputTaskSubmitResponse.init(
                 correctAnswer: task.correctAnswer,
                 wasCorrect: wasCorrect
             ),
-            unforgivingScore: wasCorrect ? 1 : 0,
-            forgivingScore: wasCorrect ? 1 : 0,
-            progress: 0
+            score: wasCorrect ? 1 : 0,
+            progress: 0,
+            numberOfCompletedTasks: 0
         )
     }
 }

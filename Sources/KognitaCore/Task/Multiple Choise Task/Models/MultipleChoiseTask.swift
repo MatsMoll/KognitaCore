@@ -145,59 +145,14 @@ public final class MultipleChoiseTask: PostgreSQLModel {
                 .first()
         }
     }
-
-    /// Evaluate the answer submitted, and returns the result
-    ///
-    /// - Parameters:
-    ///   - submit: The submitted answers
-    ///   - conn: A connection to the database
-    /// - Returns: The results
-    /// - Throws: If there was an error with the database query
-    func evaluateAnswer(_ submit: MultipleChoiseTaskSubmit,
-                        on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
-
-        return try choises
-            .query(on: conn)
-            .filter(\.isCorrect == true)
-            .all()
-            .map { (correctChoises) in
-
-                var numberOfCorrect = 0
-                var numberOfIncorrect = 0
-                var missingAnswers = correctChoises
-                var results = [MultipleChoiseTaskChoiseResult]()
-
-                for choise in submit.choises {
-                    if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
-                        numberOfCorrect += 1
-                        missingAnswers.remove(at: index)
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: true))
-                    } else {
-                        numberOfIncorrect += 1
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: false))
-                    }
-                }
-                try results += missingAnswers.map {
-                    try MultipleChoiseTaskChoiseResult(id: $0.requireID(), isCorrect: true)
-                }
-
-                let forgivingScore = Double(numberOfCorrect) / Double(correctChoises.count)
-                let unforgivingScore = Double(numberOfCorrect - numberOfIncorrect) / Double(correctChoises.count)
-
-                return PracticeSessionResult(
-                    result: results,
-                    unforgivingScore: unforgivingScore,
-                    forgivingScore: forgivingScore,
-                    progress: 0
-                )
-        }
-    }
 }
 
 extension MultipleChoiseTask {
-
-    func practiceResult(for submit: MultipleChoiseTaskSubmit, on connection: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
-        return try evaluateAnswer(submit, on: connection)
+    
+    func evaluateAnswer(for submit: MultipleChoiseTaskSubmit, on connection: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
+        
+        return try MultipleChoiseTaskRepository.shared
+            .evaluate(submit, for: self, on: connection)
     }
 }
 
