@@ -54,5 +54,4 @@ extension MultipleChoiseTaskChoise: Migration {
 }
 
 extension MultipleChoiseTaskChoise: Parameter { }
-
 extension MultipleChoiseTaskChoise: Content { }

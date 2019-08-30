@@ -7,7 +7,9 @@
 
 import Vapor
 
-public struct FlashCardTaskSubmit: Content, TaskSubmitable {
-    public let timeUsed: TimeInterval
-    public let knowledge: Double
+extension FlashCardTask {
+    public struct Submit: Content, TaskSubmitable {
+        public let timeUsed: TimeInterval
+        public let knowledge: Double
+    }
 }

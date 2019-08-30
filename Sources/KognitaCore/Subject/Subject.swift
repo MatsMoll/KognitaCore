@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Subject: PostgreSQLModel {
+public final class Subject : KognitaCRUDModel, KognitaModelUpdatable {
 
     public enum ColorClass: String, PostgreSQLEnum, PostgreSQLMigration {
         case primary
@@ -45,9 +45,6 @@ public final class Subject: PostgreSQLModel {
     /// Update date
     public var updatedAt: Date?
 
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
-
     init(name: String, category: String, colorClass: ColorClass, description: String, creatorId: User.ID) throws {
         self.colorClass = colorClass
         self.category = category
@@ -58,7 +55,7 @@ public final class Subject: PostgreSQLModel {
         try self.validateSubject()
     }
 
-    init(content: Request.Create, creator: User) throws {
+    init(content: Create.Data, creator: User) throws {
         self.creatorId = try creator.requireID()
         self.name = content.name
         self.description = content.description
@@ -68,6 +65,10 @@ public final class Subject: PostgreSQLModel {
         try self.validateSubject()
     }
 
+    public static func addTableConstraints(to builder: SchemaCreator<Subject>) {
+        builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+    }
+    
     /// Validates the subjects information
     ///
     /// - Throws:
@@ -86,11 +87,11 @@ public final class Subject: PostgreSQLModel {
     ///
     /// - Throws:
     ///     If invalid values
-    func updateValues(with content: Request.Create) throws {
-        colorClass = content.colorClass
-        name = content.name
-        category = content.category
-        description = content.description
+    public func updateValues(with content: Subject.Create.Data) throws {
+        self.colorClass     = content.colorClass
+        self.name           = content.name
+        self.category       = content.category
+        self.description    = content.description
 
         try validateSubject()
     }
@@ -107,19 +108,5 @@ extension Subject {
     }
 }
 
-extension Subject: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(Subject.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(Subject.self, on: connection)
-    }
-}
-
 extension Subject: Content { }
-
 extension Subject: Parameter { }

@@ -23,7 +23,7 @@ class TaskTests: VaporTestCase {
         _ = try Task.create(subtopic: subtopic, on: conn)
         _ = try Task.create(on: conn)
 
-        let tasks = try TaskRepository.shared
+        let tasks = try Task.repository
             .getTasks(in: subject, with: conn)
             .wait()
         XCTAssertEqual(tasks.count, 4)

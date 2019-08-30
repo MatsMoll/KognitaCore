@@ -28,7 +28,7 @@ class TopicTests: VaporTestCase {
         let outdated = try Task.create(subtopic: subtopic, on: conn)
         _ = try outdated.delete(on: conn).wait()
 
-        let timely = try TopicRepository.shared
+        let timely = try Topic.Repository.shared
             .timelyTopics(on: conn)
             .wait()
 

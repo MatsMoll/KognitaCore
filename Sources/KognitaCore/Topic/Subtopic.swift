@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Subtopic : PostgreSQLModel {
+public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
 
     public var id: Int?
 
@@ -18,15 +18,9 @@ public final class Subtopic : PostgreSQLModel {
 
     public var chapter: Int
 
-    /// Creation data
     public var createdAt: Date?
 
-    /// Update date
     public var updatedAt: Date?
-
-    
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
 
 
     init(name: String, chapter: Int, topicId: Topic.ID) {
@@ -41,38 +35,25 @@ public final class Subtopic : PostgreSQLModel {
         self.topicId = content.topicId
     }
 
-    func updateValues(with content: Create.Data) {
+    public func updateValues(with content: Create.Data) {
         self.name = content.name
         self.chapter = content.chapter
         self.topicId = content.topicId
     }
-}
-
-extension Subtopic: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(Subtopic.self, on: conn) { builder in
-
-            try addProperties(to: builder)
-
-            builder.unique(on: \.chapter, \.topicId)
-
-            builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(Subtopic.self, on: connection)
+    
+    public static func addTableConstraints(to builder: SchemaCreator<Subtopic>) {
+        builder.unique(on: \.chapter, \.topicId)
+        builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
     }
 }
 
 extension Subtopic: Content { }
-
 extension Subtopic: Parameter { }
 
 
 extension Subtopic {
 
-    public struct Create : Content {
+    public struct Create : KognitaRequestData {
         
         public struct Data : Content {
 
@@ -82,6 +63,8 @@ extension Subtopic {
 
             public var chapter: Int
         }
+        
+        public typealias Response = Subtopic
     }
 
     public typealias Edit = Create

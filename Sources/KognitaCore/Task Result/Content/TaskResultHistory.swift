@@ -7,11 +7,13 @@
 
 import Vapor
 
-public struct TaskResultHistory: Content {
+extension TaskResult {
+    public struct History: Content {
 
-    public let numberOfTasksCompleted: Int
+        public let numberOfTasksCompleted: Int
 
-    public let date: Date
+        public let date: Date
+    }
 }
 
 public struct UserResultOverview: Content {

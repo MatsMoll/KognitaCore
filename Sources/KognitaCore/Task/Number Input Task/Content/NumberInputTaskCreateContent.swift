@@ -8,7 +8,8 @@
 import Vapor
 
 extension NumberInputTask {
-    public struct Create {
+    public struct Create : KognitaRequestData {
+        
         public struct Data: Content, TaskCreationContentable {
             
             public let subtopicId: Subtopic.ID
@@ -29,7 +30,11 @@ extension NumberInputTask {
 
             public let unit: String?
         }
+        
+        public typealias Response = NumberInputTask
     }
+    
+    public typealias Edit = Create
 
     public struct Data: Content {
         public let task: Task

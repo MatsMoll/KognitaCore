@@ -112,7 +112,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfDays: Int = 7) throws -> Future<[TaskResultHistory]> {
+    public func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfDays: Int = 7) throws -> Future<[TaskResult.History]> {
 
         let weekAgo = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60) // One week back
@@ -124,20 +124,20 @@ public class TaskResultRepository {
             .where(\TaskResult.userID == user.requireID())
             .where(\TaskResult.createdAt, .greaterThanOrEqual, weekAgo)
             .groupBy(.function("date", [.expression(.column(.keyPath(\TaskResult.createdAt)))]))
-            .all(decoding: TaskResultHistory.self)
+            .all(decoding: TaskResult.History.self)
             .map { days in
                 // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
                 let now = Date()
                 let formatter = DateFormatter()
                 formatter.dateFormat = "dd-MM-yyyy"
 
-                var data = [String : TaskResultHistory]()
+                var data = [String : TaskResult.History]()
 
                 (0...(numberOfDays - 1)).forEach {
                     let date = Calendar.current.date(byAdding: .day, value: -$0, to: now) ??
                         now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60)
 
-                    data[formatter.string(from: date)] = TaskResultHistory(
+                    data[formatter.string(from: date)] = TaskResult.History(
                         numberOfTasksCompleted: 0,
                         date: date
                     )
@@ -156,7 +156,7 @@ public class TaskResultRepository {
             .save(on: conn)
     }
 
-    public func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: PostgreSQLConnection) throws -> Future<[UserLevel]> {
+    public func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: PostgreSQLConnection) throws -> Future<[User.TopicLevel]> {
 
         return conn.raw(getTasksQueryTopicFilter)
             .bind(userId)
@@ -185,7 +185,7 @@ public class TaskResultRepository {
                                 .filter(\Subtopic.topicId == topicID)
                                 .count()
                                 .map { maxScore in
-                                    UserLevel(
+                                    User.TopicLevel(
                                         topicID: topicID,
                                         correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
                                         maxScore: Double(maxScore)
@@ -196,7 +196,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getUserLevel(in subject: Subject, userId: User.ID, on conn: PostgreSQLConnection) throws -> Future<UserSubjectLevel> {
+    public func getUserLevel(in subject: Subject, userId: User.ID, on conn: PostgreSQLConnection) throws -> Future<User.SubjectLevel> {
 
         return try conn.raw(getTasksQuerySubjectFilter)
             .bind(userId)
@@ -208,7 +208,7 @@ public class TaskResultRepository {
 
                 guard ids.isEmpty == false else {
                     return conn.future(
-                        try UserSubjectLevel(subjectID: subject.requireID(), correctScore: 0, maxScore: 1)
+                        try User.SubjectLevel(subjectID: subject.requireID(), correctScore: 0, maxScore: 1)
                     )
                 }
 
@@ -224,7 +224,7 @@ public class TaskResultRepository {
                             .count()
                             .map { maxScore in
                                 
-                                try UserSubjectLevel(
+                                try User.SubjectLevel(
                                     subjectID: subject.requireID(),
                                     correctScore: score,
                                     maxScore: Double(maxScore)
@@ -263,25 +263,26 @@ struct TaskSubmitResult {
     public let taskID: Task.ID
 }
 
-public struct UserLevel {
-    public let topicID: Topic.ID
-    public let correctScore: Double
-    public let maxScore: Double
+extension User {
+    public struct TopicLevel {
+        public let topicID: Topic.ID
+        public let correctScore: Double
+        public let maxScore: Double
 
-    public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
-    public var correctProsentage: Double {
-        return (correctScore * 1000 / maxScore).rounded() / 10
+        public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
+        public var correctProsentage: Double {
+            return (correctScore * 1000 / maxScore).rounded() / 10
+        }
     }
-}
 
+    public struct SubjectLevel {
+        public let subjectID: Subject.ID
+        public let correctScore: Double
+        public let maxScore: Double
 
-public struct UserSubjectLevel {
-    public let subjectID: Subject.ID
-    public let correctScore: Double
-    public let maxScore: Double
-
-    public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
-    public var correctProsentage: Double {
-        return (correctScore * 1000 / maxScore).rounded() / 10
+        public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
+        public var correctProsentage: Double {
+            return (correctScore * 1000 / maxScore).rounded() / 10
+        }
     }
 }

@@ -31,7 +31,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTaskRepository.shared.create(with: content, user: user, conn: conn).wait()
+        let multiple = try MultipleChoiseTask.repository.create(from: content, by: user, on: conn).wait()
         let task = try multiple.task?.get(on: conn).wait()
         let choises = try multiple.choises.query(on: conn).all().wait()
 
@@ -58,7 +58,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        XCTAssertThrowsError(try MultipleChoiseTaskRepository.shared.create(with: content, user: user, conn: conn).wait())
+        XCTAssertThrowsError(try MultipleChoiseTask.repository.create(from: content, by: user, on: conn).wait())
     }
 
     func testEdit() throws {
@@ -81,7 +81,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTaskRepository.shared.edit(task: startingMultiple, with: content, user: user, conn: conn).wait()
+        let editedMultiple = try MultipleChoiseTask.repository.edit(startingMultiple, to: content, by: user, on: conn).wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)
@@ -112,7 +112,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
         )
 
-        let editedMultiple = try MultipleChoiseTaskRepository.shared.edit(task: startingMultiple, with: content, user: user, conn: conn).wait()
+        let editedMultiple = try MultipleChoiseTask.repository.edit(startingMultiple, to: content, by: user, on: conn).wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)

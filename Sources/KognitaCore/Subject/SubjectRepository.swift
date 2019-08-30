@@ -8,12 +8,21 @@
 import Vapor
 import FluentPostgreSQL
 
-public class SubjectRepository {
+extension Subject {
+    public final class Repository : KognitaRepository, KognitaRepositoryDeletable, KognitaRepositoryEditable {
+        
+        public typealias Model = Subject
+        
+        public static var shared = Repository()
+    }
+}
 
-    public static let shared = SubjectRepository()
+extension Subject.Repository {
 
-
-    public func createSubject(with content: Subject.Request.Create, for user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
+    public func create(from content: Subject.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject> {
+        guard let user = user, user.isCreator else {
+            throw Abort(.forbidden)
+        }
         return try Subject(content: content, creator: user)
             .create(on: conn)
     }
@@ -34,28 +43,12 @@ public class SubjectRepository {
             .all()
     }
 
-    public func edit(subject: Subject, with content: Subject.Request.Create, user: User, conn: DatabaseConnectable) throws -> Future<Subject> {
-        guard try subject.creatorId == user.requireID() else {
-            throw Abort(.forbidden, reason: "You are not the creator of this content")
-        }
-        try subject.updateValues(with: content)
-        return subject.save(on: conn)
-    }
-
-    public func delete(subject: Subject, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
-        guard try subject.creatorId == user.requireID() else {
-            throw Abort(.forbidden, reason: "You are not the creator of this content")
-        }
-        return subject
-            .delete(on: conn)
-    }
-
     public func importContent(_ content: SubjectExportContent, on conn: DatabaseConnectable) -> Future<Subject> {
         content.subject.id = nil
         content.subject.creatorId = 1
         return conn.transaction(on: .psql) { conn in
             content.subject.create(on: conn).flatMap { subject in
-                try content.topics.map { try TopicRepository.shared.importContent(from: $0, in: subject, on: conn) }
+                try content.topics.map { try Topic.Repository.shared.importContent(from: $0, in: subject, on: conn) }
                     .flatten(on: conn)
                     .transform(to: subject)
             }
@@ -65,12 +58,16 @@ public class SubjectRepository {
 
 
 extension Subject {
-    public struct Request {
-        public struct Create : Content {
+    public struct Create : KognitaRequestData {
+        public struct Data : Content {
             let name: String
             let colorClass: Subject.ColorClass
             let description: String
             let category: String
         }
+        
+        public typealias Response = Subject
     }
+    
+    public typealias Edit = Create
 }

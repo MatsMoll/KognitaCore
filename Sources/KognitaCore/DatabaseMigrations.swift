@@ -7,28 +7,6 @@
 
 import FluentPostgreSQL
 
-public protocol SoftDeleatableModel: PostgreSQLModel {
-    var createdAt: Date? { get set }
-    var updatedAt: Date? { get set }
-    var deletedAt: Date? { get set }
-}
-
-extension SoftDeleatableModel {
-    public static var createdAtKey: TimestampKey? { return \Self.createdAt }
-    public static var updatedAtKey: TimestampKey? { return \Self.updatedAt }
-    public static var deletedAtKey: TimestampKey? { return \Self.deletedAt }
-}
-
-final class TestModel: SoftDeleatableModel {
-    var id: Int?
-
-    var createdAt: Date?
-
-    var updatedAt: Date?
-
-    var deletedAt: Date?
-}
-
 public class DatabaseMigrations {
 
     public static func migrationConfig(enviroment: Environment) -> MigrationConfig {

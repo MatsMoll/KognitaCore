@@ -8,12 +8,16 @@
 import Vapor
 import FluentPostgreSQL
 
-public final class MultipleChoiseTask: PostgreSQLModel {
+public final class MultipleChoiseTask: KognitaCRUDModel {
 
     public var id: Int?
 
     /// A bool indicating if the user should be able to select one or more choises
     public var isMultipleSelect: Bool
+    
+    public var createdAt: Date?
+    
+    public var updatedAt: Date?
 
     public convenience init(isMultipleSelect: Bool, task: Task) throws {
         try self.init(isMultipleSelect: isMultipleSelect,
@@ -28,38 +32,14 @@ public final class MultipleChoiseTask: PostgreSQLModel {
         self.isMultipleSelect = isMultipleSelect
         self.id = taskID
     }
-
-    /// Creates and saves a multiple choise task
-    ///
-    /// - Parameters:
-    ///     - content:      The content to assign the task
-    ///     - user:         The user creating the task
-    ///     - connection:   A connection to the database
-    ///
-    /// - Returns:          The task id of the created task
-    static func create(
-        with content: MultipleChoiseTask.Create.Data,
-        for subtopic: Subtopic,
-        user: User,
-        connection: DatabaseConnectable
-    ) throws -> Future<MultipleChoiseTask> {
-
-        return try Task(content: content, subtopic: subtopic, creator: user)
-            .create(on: connection)
-            .flatMap { (task) in
-                try MultipleChoiseTask(
-                    isMultipleSelect: content.isMultipleSelect,
-                    task: task)
-                    .create(on: connection)
-            } .flatMap { (task) in
-                try content.choises.map { choise in
-                    try MultipleChoiseTaskChoise(content: choise, task: task)
-                        .create(on: connection)
-                }
-                    .flatten(on: connection)
-                    .transform(to: task)
-            }
+    
+    public static func addTableConstraints(to builder: SchemaCreator<MultipleChoiseTask>) {
+        builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
     }
+
+}
+
+extension MultipleChoiseTask {
 
     /// Fetches the relevant data used to present a task to the user
     ///
@@ -70,7 +50,8 @@ public final class MultipleChoiseTask: PostgreSQLModel {
 
         return try choises
             .query(on: conn)
-            .all().flatMap { choises in
+            .all()
+            .flatMap { choises in
                 Task.find(self.id ?? 0, on: conn)
                     .unwrap(or: Abort(.internalServerError)).map { task in
                         MultipleChoiseTask.Data(
@@ -107,50 +88,19 @@ public final class MultipleChoiseTask: PostgreSQLModel {
     ///   - conn: A connection to the database
     /// - Returns: The results
     /// - Throws: If there was an error with the database query
-    func evaluateAnswer(_ submit: MultipleChoiseTaskSubmit,
-                        on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
-
-        return try choises
-            .query(on: conn)
-            .filter(\.isCorrect == true)
-            .all()
-            .map { (correctChoises) in
-
-                var numberOfCorrect = 0
-                var numberOfIncorrect = 0
-                var missingAnswers = correctChoises
-                var results = [MultipleChoiseTaskChoiseResult]()
-
-                for choise in submit.choises {
-                    if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
-                        numberOfCorrect += 1
-                        missingAnswers.remove(at: index)
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: true))
-                    } else {
-                        numberOfIncorrect += 1
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: false))
-                    }
-                }
-                try results += missingAnswers.map {
-                    try MultipleChoiseTaskChoiseResult(id: $0.requireID(), isCorrect: true)
-                }
-
-                let forgivingScore = Double(numberOfCorrect) / Double(correctChoises.count)
-                let unforgivingScore = Double(numberOfCorrect - numberOfIncorrect) / Double(correctChoises.count)
-
-                return PracticeSessionResult(
-                    result: results,
-                    unforgivingScore: unforgivingScore,
-                    forgivingScore: forgivingScore,
-                    progress: 0
-                )
-        }
+    func evaluateAnswer(
+        _ submit: MultipleChoiseTask.Submit,
+        on conn: DatabaseConnectable
+    ) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+        
+        return try Repository.shared
+            .evaluate(submit, for: self, on: conn)
     }
 }
 
 extension MultipleChoiseTask {
 
-    func practiceResult(for submit: MultipleChoiseTaskSubmit, on connection: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
+    func practiceResult(for submit: MultipleChoiseTask.Submit, on connection: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
         return try evaluateAnswer(submit, on: connection)
     }
 }
@@ -183,19 +133,5 @@ extension MultipleChoiseTask {
     }
 }
 
-extension MultipleChoiseTask: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(MultipleChoiseTask.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(MultipleChoiseTask.self, on: connection)
-    }
-}
-
 extension MultipleChoiseTask: Parameter { }
-
 extension MultipleChoiseTask: Content { }

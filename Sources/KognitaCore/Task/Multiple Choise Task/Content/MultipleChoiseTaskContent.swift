@@ -8,6 +8,7 @@
 import Vapor
 
 extension MultipleChoiseTask {
+    
     public struct Data: Content {
 
         public let task: Task
@@ -23,7 +24,7 @@ extension MultipleChoiseTask {
         }
     }
     
-    public struct Create {
+    public struct Create : KognitaRequestData {
         
         public struct Data: Content, TaskCreationContentable {
 
@@ -58,7 +59,11 @@ extension MultipleChoiseTask {
                 }
             }
         }
+        
+        public typealias Response = MultipleChoiseTask
     }
+    
+    public typealias Edit = Create
 }
 
 extension MultipleChoiseTaskChoise {

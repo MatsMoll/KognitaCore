@@ -8,7 +8,7 @@
 import Vapor
 import FluentPostgreSQL
 
-public final class NumberInputTask: PostgreSQLModel {
+public final class NumberInputTask : KognitaCRUDModel {
 
     public static let actionDescription = "Skriv inn et svar"
 
@@ -19,6 +19,11 @@ public final class NumberInputTask: PostgreSQLModel {
 
     // The unit the answer is given in
     public var unit: String?
+    
+    public var createdAt: Date?
+    
+    public var updatedAt: Date?
+    
 
     init(correctAnswer: Double, unit: String? = nil, taskId: Task.ID? = nil) {
         self.correctAnswer = correctAnswer
@@ -31,18 +36,14 @@ public final class NumberInputTask: PostgreSQLModel {
         self.unit = content.unit
         self.id = try task.requireID()
     }
+    
+    public static func addTableConstraints(to builder: SchemaCreator<NumberInputTask>) {
+        builder.reference(from: \.id, to: \Task.id)
+    }
 }
 
 extension NumberInputTask: Parameter { }
-
-extension NumberInputTask: PostgreSQLMigration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(NumberInputTask.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.id, to: \Task.id)
-        }
-    }
-}
+extension NumberInputTask: Content { }
 
 extension NumberInputTask {
 
