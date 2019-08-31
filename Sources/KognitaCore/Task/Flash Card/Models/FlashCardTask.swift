@@ -8,27 +8,23 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class FlashCardTask: PostgreSQLModel {
+public final class FlashCardTask: KognitaCRUDModel {
 
     static let actionDescriptor = "Svar på oppgaven og se om du har riktig"
 
     public var id: Int?
+    
+    public var createdAt: Date?
+    
+    public var updatedAt: Date?
+    
 
     init(task: Task) throws {
         self.id = try task.requireID()
     }
-}
-
-extension FlashCardTask: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(FlashCardTask.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.id, to: \Task.id)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(FlashCardTask.self, on: connection)
+    
+    public static func addTableConstraints(to builder: SchemaCreator<FlashCardTask>) {
+        builder.reference(from: \.id, to: \Task.id)
     }
 }
 
@@ -41,6 +37,6 @@ extension FlashCardTask {
     }
 
     func content(on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
-        return FlashCardRepository.shared.content(for: self, on: conn)
+        return FlashCardTask.repository.content(for: self, on: conn)
     }
 }

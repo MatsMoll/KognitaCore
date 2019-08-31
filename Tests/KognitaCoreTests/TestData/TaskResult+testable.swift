@@ -15,6 +15,7 @@ extension TaskResult {
     static func create(task: Task, session: PracticeSession?, user: User, on conn: PostgreSQLConnection) throws -> TaskResult {
 
         let score = Double.random(in: -1...1)
+<<<<<<< HEAD
         let practiceResult = PracticeSessionResult(
             result: "",
             score: score,
@@ -22,6 +23,10 @@ extension TaskResult {
             numberOfCompletedTasks: 0
         )
         let submit = FlashCardTaskSubmit(timeUsed: .random(in: 10...60), knowledge: 0)
+=======
+        let practiceResult = PracticeSessionResult(result: "", unforgivingScore: score, forgivingScore: (score + 1) / 2, progress: 0)
+        let submit = FlashCardTask.Submit(timeUsed: .random(in: 10...60), knowledge: 0)
+>>>>>>> refactor/substructurs
 
         let submitResult = try TaskSubmitResult(submit: submit, result: practiceResult, taskID: task.requireID())
 

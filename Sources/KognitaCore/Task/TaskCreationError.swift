@@ -5,6 +5,8 @@
 //  Created by Mats Mollestad on 11/04/2019.
 //
 
-enum TaskCreationError: Error {
-    case invalidTopic
+extension Task.Create {
+    enum Errors : Error {
+        case invalidTopic
+    }
 }

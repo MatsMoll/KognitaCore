@@ -9,9 +9,32 @@ import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-public class TaskRepository {
+extension Task {
+    
+    public struct Create: KognitaRequestData {
+        public struct Data {
+            let content: TaskCreationContentable
+            let subtopic: Subtopic
+        }
+        public typealias Response = Task
+    }
+    
+    public final class Repository {
+        public typealias Model = Task
+        
+        public static let shared = Repository()
+    }
+}
 
-    public static let shared = TaskRepository()
+extension Task.Repository : KognitaRepository {
+    
+    public func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+        guard let user = user else { throw Abort(.forbidden) }
+        
+        return try Task(content: content.content, subtopic: content.subtopic, creator: user)
+            .save(on: conn)
+    }
+    
 
     public func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
@@ -80,7 +103,7 @@ public class TaskRepository {
     struct MultipleChoiseTaskKey: Content {
         let isMultipleSelect: Bool?  // MultipleChoiseTask
     }
-
+    
     public func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
 
         return Task.query(on: conn, withSoftDeleted: true)

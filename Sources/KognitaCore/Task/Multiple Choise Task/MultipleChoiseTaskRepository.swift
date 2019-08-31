@@ -8,35 +8,42 @@
 import FluentPostgreSQL
 import Vapor
 
+extension MultipleChoiseTask {
+    
+    public final class Repository : KognitaCRUDRepository {
+        
+        public typealias Model = MultipleChoiseTask
+        
+        public static var shared = Repository()
+    }
+}
 
-public class MultipleChoiseTaskRepository {
 
-    public static let shared = MultipleChoiseTaskRepository()
-
-    /// Creates and saves a multiple choise task
-    ///
-    /// - Parameters:
-    ///     - content:      The content to assign the task
-    ///     - user:         The user creating the task
-    ///     - conn:         A connection to the database
-    ///
-    /// - Returns:          The task id of the created task
-    public func create(with content: MultipleChoiseTaskCreationContent, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
-        guard user.isCreator else {
+extension MultipleChoiseTask.Repository {
+    
+    public func create(from content: MultipleChoiseTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
+        guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
-        return Subtopic.find(content.subtopicId, on: conn)
-            .unwrap(or: TaskCreationError.invalidTopic)
+        
+        return Subtopic.repository
+            .find(content.subtopicId, on: conn)
+            .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
+                
                 conn.transaction(on: .psql) { conn in
-                    try Task(content: content, subtopic: subtopic, creator: user)
-                        .create(on: conn)
+                    
+                    try Task.repository
+                        .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { (task) in
+                            
                             try MultipleChoiseTask(
                                 isMultipleSelect: content.isMultipleSelect,
-                                task: task)
+                                task: task
+                            )
                                 .create(on: conn)
+                            
                         } .flatMap { (task) in
                             try content.choises.map { choise in
                                 try MultipleChoiseTaskChoise(content: choise, task: task)
@@ -48,8 +55,48 @@ public class MultipleChoiseTaskRepository {
                 }
         }
     }
+    
+    public func edit(_ multiple: MultipleChoiseTask, to content: MultipleChoiseTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
+        
+        guard user.isCreator else {
+            throw Abort(.forbidden)
+        }
+        guard let task = multiple.task else {
+            throw Abort(.internalServerError)
+        }
 
-    public func importTask(from taskContent: MultipleChoiseTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        return try MultipleChoiseTask.Repository.shared
+            .create(from: content, by: user, on: conn)
+            .flatMap { newTask in
+
+                task.get(on: conn)
+                    .flatMap { task in
+
+                        task.deletedAt = Date() // Equilent to .delete(on: conn)
+                        task.editedTaskID = newTask.id
+                        return task
+                            .save(on: conn)
+                            .transform(to: newTask)
+                }
+            }
+    }
+    
+    public func delete(_ multiple: MultipleChoiseTask.Repository.Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard let user = user, user.isCreator else {
+            throw Abort(.forbidden)
+        }
+        guard let task = multiple.task else {
+            throw Abort(.internalServerError)
+        }
+        return task.get(on: conn)
+            .flatMap { task in
+                return task
+                    .delete(on: conn)
+                    .transform(to: ())
+        }
+    }
+
+    public func importTask(from taskContent: MultipleChoiseTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
@@ -67,46 +114,7 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
-    public func delete(task multiple: MultipleChoiseTask, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        guard let task = multiple.task else {
-            throw Abort(.internalServerError)
-        }
-        return task.get(on: conn)
-            .flatMap { task in
-                return task
-                    .delete(on: conn)
-                    .transform(to: ())
-        }
-    }
-
-    public func edit(task multiple: MultipleChoiseTask, with content: MultipleChoiseTaskCreationContent, user: User, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        guard let task = multiple.task else {
-            throw Abort(.internalServerError)
-        }
-
-        return try MultipleChoiseTaskRepository.shared
-            .create(with: content, user: user, conn: conn)
-            .flatMap { newTask in
-
-                task.get(on: conn)
-                    .flatMap { task in
-
-                        task.deletedAt = Date() // Equilent to .delete(on: conn)
-                        task.editedTaskID = newTask.id
-                        return task
-                            .save(on: conn)
-                            .transform(to: newTask)
-                }
-            }
-    }
-
-    public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTaskContent> {
+    public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
 
         return try task.choises
             .query(on: conn)
@@ -117,14 +125,14 @@ public class MultipleChoiseTaskRepository {
                 guard let first = choises.first else {
                     throw Abort(.noContent, reason: "Missing choises in task")
                 }
-                return MultipleChoiseTaskContent(
+                return MultipleChoiseTask.Data(
                     task: first.1,
                     multipleTask: task,
                     choises: choises.map { $0.0 }.shuffled())
         }
     }
 
-    public func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTaskContent)> {
+    public func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTask.Data)> {
 
         return try multiple
             .content(on: conn)
@@ -155,7 +163,7 @@ public class MultipleChoiseTaskRepository {
         }
     }
 
-    func evaluate(_ submit: MultipleChoiseTaskSubmit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
+    func evaluate(_ submit: MultipleChoiseTask.Submit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         return try task.choises
             .query(on: conn)
@@ -166,20 +174,20 @@ public class MultipleChoiseTaskRepository {
                 var numberOfCorrect = 0
                 var numberOfIncorrect = 0
                 var missingAnswers = correctChoises
-                var results = [MultipleChoiseTaskChoiseResult]()
+                var results = [MultipleChoiseTaskChoise.Result]()
 
                 for choise in submit.choises {
                     if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
                         numberOfCorrect += 1
                         missingAnswers.remove(at: index)
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: true))
+                        results.append(.init(id: choise, isCorrect: true))
                     } else {
                         numberOfIncorrect += 1
-                        results.append(MultipleChoiseTaskChoiseResult(id: choise, isCorrect: false))
+                        results.append(.init(id: choise, isCorrect: false))
                     }
                 }
                 try results += missingAnswers.map {
-                    try MultipleChoiseTaskChoiseResult(id: $0.requireID(), isCorrect: true)
+                    try .init(id: $0.requireID(), isCorrect: true)
                 }
 
                 let score = Double(numberOfCorrect) / Double(correctChoises.count)

@@ -9,36 +9,32 @@ import Foundation
 import Vapor
 import FluentPostgreSQL
 
-public final class SubtopicRepository {
+extension Subtopic {
+    public final class Repository: KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
+        
+        public typealias Model = Subtopic
+        
+        public static let shared = Repository()
+    }
+}
 
-    public static let shared = SubtopicRepository()
-
-    public func create(from content: Subtopic.Create.Data, user: User, with conn: DatabaseConnectable) throws -> Future<Subtopic> {
-        guard user.isCreator else {
-            throw Abort(.unauthorized)
-        }
+extension Subtopic.Repository {
+    
+    public func create(from content: Subtopic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subtopic> {
+        guard let user = user,
+            user.isCreator else { throw Abort(.unauthorized) }
+        
         return Subtopic(content: content)
             .save(on: conn)
     }
-
-    public func delete(_ subtopic: Subtopic, user: User, with conn: DatabaseConnectable) throws -> Future<Void> {
-        guard user.isCreator else {
-            throw Abort(.unauthorized)
-        }
-        return subtopic.delete(on: conn)
-    }
-
-    public func edit(_ subtopic: Subtopic, with content: Subtopic.Create.Data, user: User, conn: DatabaseConnectable) throws -> Future<Subtopic> {
-        guard user.isCreator else {
-           throw Abort(.unauthorized)
-        }
-        subtopic.updateValues(with: content)
-        return subtopic.save(on: conn)
-    }
-
+    
     public func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
         return try Subtopic.query(on: conn)
             .filter(\.topicId == topic.requireID())
             .all()
+    }
+    
+    public func find(_ subtopicID: Subtopic.ID, on conn: DatabaseConnectable) -> Future<Subtopic?> {
+        return Subtopic.find(subtopicID, on: conn)
     }
 }
