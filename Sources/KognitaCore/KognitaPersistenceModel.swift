@@ -29,6 +29,7 @@ public protocol KognitaRepository {
     
     func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
     func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<Model?>
+    func all(on conn: DatabaseConnectable) -> Future<[Model]>
     func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]>
     func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
     func find(_ id: Model.ID, on conn: DatabaseConnectable) -> Future<Model?>
@@ -47,6 +48,11 @@ extension KognitaRepository {
         return Model.query(on: conn)
             .filter(filter)
             .first()
+    }
+    
+    public func all(on conn: DatabaseConnectable) -> Future<[Model]> {
+        return Model.query(on: conn)
+            .all()
     }
     
     public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]> {

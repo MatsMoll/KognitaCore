@@ -37,12 +37,6 @@ extension Subject.Repository {
         return topic.subject.get(on: conn)
     }
 
-    public func getAll(on conn: DatabaseConnectable) -> Future<[Subject]> {
-        return Subject
-            .query(on: conn)
-            .all()
-    }
-
     public func importContent(_ content: SubjectExportContent, on conn: DatabaseConnectable) -> Future<Subject> {
         content.subject.id = nil
         content.subject.creatorId = 1

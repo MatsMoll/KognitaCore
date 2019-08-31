@@ -35,6 +35,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let task = try multiple.task?.get(on: conn).wait()
         let choises = try multiple.choises.query(on: conn).all().wait()
 
+        XCTAssertNotNil(multiple.createdAt)
         XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
         XCTAssertEqual(task?.id, multiple.id)
         XCTAssertEqual(choises.count, content.choises.count)
