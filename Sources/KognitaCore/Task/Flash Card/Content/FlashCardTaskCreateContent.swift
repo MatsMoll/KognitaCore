@@ -7,31 +7,42 @@
 
 import Vapor
 
-public struct FlashCardTaskCreateContent: Content, TaskCreationContentable {
 
-    public let subtopicId: Subtopic.ID
+extension FlashCardTask {
+    
+    public struct Create : KognitaRequestData {
+        
+        public struct Data: Content, TaskCreationContentable {
 
-    public let description: String?
+            public let subtopicId: Subtopic.ID
 
-    public let question: String
+            public let description: String?
 
-    public let solution: String?
+            public let question: String
 
-    public var isExaminable: Bool
+            public let solution: String?
 
-    public var examPaperSemester: Task.ExamSemester?
+            public var isExaminable: Bool
 
-    public var examPaperYear: Int?
+            public var examPaperSemester: Task.ExamSemester?
 
-    public mutating func validate() throws {
-        guard !question.isEmpty else {
-            throw Abort(.badRequest)
+            public var examPaperYear: Int?
+
+            public mutating func validate() throws {
+                guard !question.isEmpty else {
+                    throw Abort(.badRequest)
+                }
+                guard let solution = solution, !solution.isEmpty else {
+                    throw Abort(.badRequest)
+                }
+                examPaperYear = nil
+                examPaperSemester = nil
+                isExaminable = false
+            }
         }
-        guard let solution = solution, !solution.isEmpty else {
-            throw Abort(.badRequest)
-        }
-        examPaperYear = nil
-        examPaperSemester = nil
-        isExaminable = false
+        
+        public typealias Response = Task
     }
+    
+    public typealias Edit = Create
 }

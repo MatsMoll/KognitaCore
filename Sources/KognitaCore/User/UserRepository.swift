@@ -9,11 +9,18 @@ import Crypto
 import FluentPostgreSQL
 import Vapor
 
-public class UserRepository {
+extension User {
+    public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
+        
+        public typealias Model = User
+        
+        public static let shared = Repository()
+    }
+}
 
-    public static let shared = UserRepository()
+extension User.Repository {
 
-    public enum UserErrors: LocalizedError {
+    public enum Errors: LocalizedError {
         case passwordMismatch
         case missingInput
         case unauthorized
@@ -39,22 +46,27 @@ public class UserRepository {
         return token.save(on: conn)
     }
 
-    public func create(with userContent: CreateUserRequest, conn: DatabaseConnectable) throws -> Future<UserResponse> {
-
-        guard userContent.acceptedTerms else {
-            throw UserErrors.missingInput
+    public func create(from content: User.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
+        
+        guard content.acceptedTerms else {
+            throw Errors.missingInput
         }
-        guard !userContent.name.isEmpty, !userContent.email.isEmpty, !userContent.password.isEmpty else {
-            throw UserErrors.missingInput
+        guard !content.name.isEmpty, !content.email.isEmpty, !content.password.isEmpty else {
+            throw Errors.missingInput
         }
-        guard userContent.password == userContent.verifyPassword else {
-            throw UserErrors.passwordMismatch
+        guard content.password == content.verifyPassword else {
+            throw Errors.passwordMismatch
         }
 
         // hash user's password using BCrypt
-        let hash = try BCrypt.hash(userContent.password)
+        let hash = try BCrypt.hash(content.password)
         // save new user
-        let newUser = User(id: nil, name: userContent.name, email: userContent.email, passwordHash: hash)
+        let newUser = User(
+            id: nil,
+            name: content.name,
+            email: content.email,
+            passwordHash: hash
+        )
 
         return User.query(on: conn)
             .filter(\.email == newUser.email)
@@ -62,16 +74,23 @@ public class UserRepository {
             .flatMap { existingUser in
 
                 guard existingUser == nil else {
-                    throw UserErrors.existingUser(newUser.email)
+                    throw Errors.existingUser(newUser.email)
                 }
                 return newUser.save(on: conn)
-                    .map { user in
-                        try UserResponse(id: user.requireID(), name: user.name, email: user.email, registrationDate: Date())
-                }
+                    .map { try $0.content() }
         }
     }
+    
+    public func edit(_ model: User, to content: User.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
+        guard try model.requireID() == user.requireID() else {
+            throw Abort(.forbidden)
+        }
+        try model.updateValues(with: content)
+        return model.save(on: conn)
+            .map { try $0.content() }
+    }
 
-    public func getAll(on conn: DatabaseConnectable) -> Future<[UserResponse]> {
+    public func getAll(on conn: DatabaseConnectable) -> Future<[User.Response]> {
 
         return User.query(on: conn)
             .all()

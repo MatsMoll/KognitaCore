@@ -8,20 +8,37 @@
 import FluentPostgreSQL
 import Vapor
 
-public class FlashCardRepository {
+extension FlashCardTask {
+    
+    public final class Repository : KognitaCRUDRepository {
+        
+        public typealias Model = FlashCardTask
+        
+        public static var shared = Repository()
+    }
+}
 
-    public static let shared = FlashCardRepository()
 
-    public func create(with content: FlashCardTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<Task> {
+extension FlashCardTask.Repository {
+    
+    public func create(from content: FlashCardTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+        
+        guard let user = user, user.isCreator else {
+            throw Abort(.forbidden)
+        }
         try content.validate()
 
-        return Subtopic.find(content.subtopicId, on: conn)
-            .unwrap(or: TaskCreationError.invalidTopic)
+        return Subtopic.repository
+            .find(content.subtopicId, on: conn)
+            .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
+                
                 conn.transaction(on: .psql) { conn in
-                    try Task(content: content, subtopic: subtopic, creator: user)
-                        .create(on: conn)
+                    
+                    try Task.repository
+                        .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { task in
+                            
                             try FlashCardTask(task: task)
                                 .create(on: conn)
                                 .transform(to: task)
@@ -29,19 +46,8 @@ public class FlashCardRepository {
                 }
         }
     }
-
-    public func importTask(from task: Task, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
-        task.id = nil
-        task.creatorId = 1
-        try task.subtopicId = subtopic.requireID()
-        return task.create(on: conn).flatMap { task in
-            try FlashCardTask(task: task)
-                .create(on: conn)
-                .transform(to: ())
-        }
-    }
-
-    public func edit(task flashCard: FlashCardTask, with content: FlashCardTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<Task> {
+    
+    public func edit(_ flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -49,8 +55,8 @@ public class FlashCardRepository {
             throw Abort(.internalServerError)
         }
         try content.validate()
-        return try FlashCardRepository.shared
-            .create(with: content, user: user, conn: conn)
+        return try FlashCardTask.repository
+            .create(from: content, by: user, on: conn)
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
@@ -62,10 +68,10 @@ public class FlashCardRepository {
                 }
         }
     }
-
-    public func delete(task flashCard: FlashCardTask, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
-
-        guard user.isCreator else {
+    
+    public func delete(_ flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        
+        guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         guard let task = flashCard.task else {
@@ -74,6 +80,17 @@ public class FlashCardRepository {
         return task.get(on: conn)
             .flatMap { task in
                 return task.delete(on: conn)
+        }
+    }
+
+    public func importTask(from task: Task, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        task.id = nil
+        task.creatorId = 1
+        try task.subtopicId = subtopic.requireID()
+        return task.create(on: conn).flatMap { task in
+            try FlashCardTask(task: task)
+                .create(on: conn)
+                .transform(to: ())
         }
     }
 
