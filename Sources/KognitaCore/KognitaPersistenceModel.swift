@@ -131,8 +131,8 @@ extension KognitaPersistenceModel {
     
     public static var repository: Repository { return Repository.shared }
     
-    public static var createdAtKey: KeyPath<Self, Date?>? { return \Self.createdAt }
-    public static var updatedAtKey: KeyPath<Self, Date?>? { return \Self.updatedAt }
+    public static var createdAtKey: WritableKeyPath<Self, Date?>? { return \Self.createdAt }
+    public static var updatedAtKey: WritableKeyPath<Self, Date?>? { return \Self.updatedAt }
     
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.create(Self.self, on: conn) { builder in
@@ -158,5 +158,5 @@ public protocol SoftDeleatableModel : KognitaPersistenceModel where Repository :
 }
 
 extension SoftDeleatableModel {
-    public static var deletedAtKey: KeyPath<Self, Date?>? { return \Self.deletedAt }
+    public static var deletedAtKey: WritableKeyPath<Self, Date?>? { return \Self.deletedAt }
 }
