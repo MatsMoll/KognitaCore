@@ -13,8 +13,15 @@ extension PracticeSession {
     
     static func create(in subtopicIDs: [Subtopic.ID], for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> PracticeSession {
         
-        return try PracticeSessionRepository.shared
-            .create(for: user, subtopicIDs: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, on: conn)
-            .wait()
+        return try PracticeSession
+            .create(user, subtopics: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, on: conn)
+            .flatMap { session in
+                
+                try session.assignTask(in: subtopicIDs, on: conn)
+                    .flatMap { _ in
+                        try session.assignTask(in: subtopicIDs, on: conn)
+                            .transform(to: session)
+                }
+        }.wait()
     }
 }

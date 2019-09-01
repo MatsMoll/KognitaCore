@@ -116,6 +116,8 @@ extension PracticeSession {
     }
 
     func assignTask(in subtopicIDs: [Subtopic.ID], on conn: DatabaseConnectable) throws -> Future<Int?> {
+        
+        
         return try assignedTasks
             .query(on: conn)
             .all()
@@ -256,7 +258,7 @@ extension PracticeSession {
 extension PracticeSession {
 
     /// The topics being practiced
-    var topics: Siblings<PracticeSession, Topic, PracticeSessionTopicPivot> {
+    var topics: Siblings<PracticeSession, Subtopic, PracticeSessionTopicPivot> {
         return siblings()
     }
 

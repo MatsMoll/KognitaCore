@@ -22,10 +22,10 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
         _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
         _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-    
+        
         let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
         
-        let answer = FlashCardTaskSubmit(
+        let answer = FlashCardTask.Submit(
             timeUsed: 20,
             knowledge: 3
         )
@@ -38,7 +38,63 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
     }
     
+    func testNumberOfCompletedTasksMultipleChoice() throws {
+        
+        let user = try User.create(on: conn)
+        
+        let subtopic = try Subtopic.create(on: conn)
+        
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        
+        let answer = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: []
+        )
+        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        
+        XCTAssertEqual(firstResult.numberOfCompletedTasks, 1)
+        XCTAssertEqual(secondResult.numberOfCompletedTasks, 2)
+        XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
+    }
+    
+    func testNumberOfCompletedTasksNumberInput() throws {
+        
+        let user = try User.create(on: conn)
+        
+        let subtopic = try Subtopic.create(on: conn)
+        
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        
+        let answer = NumberInputTask.Submit.Data.init(
+            timeUsed: 45,
+            answer: 0
+        )
+        
+        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        
+        XCTAssertEqual(firstResult.numberOfCompletedTasks, 1)
+        XCTAssertEqual(secondResult.numberOfCompletedTasks, 2)
+        XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
+    }
+    
+    
     static let allTests = [
-        ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard)
+        ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
+        ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),
+        ("testNumberOfCompletedTasksNumberInput", testNumberOfCompletedTasksNumberInput),
     ]
 }

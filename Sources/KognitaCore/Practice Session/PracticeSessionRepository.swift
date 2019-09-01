@@ -43,10 +43,18 @@ extension PracticeSession {
 
 extension PracticeSession.Repository {
 
-    public enum PracticeSessionError: Error {
+    public enum PracticeSessionError: Error, LocalizedError {
         case noAssignedTask
         case nextTaskNotAssigned
         case incorrectTaskType
+        
+        public var localizedDescription: String {
+            switch self {
+            case .noAssignedTask: return "There does not exists any tasks to execute in the session"
+            case .nextTaskNotAssigned: return "There does not exists any tasks to execute next in the session"
+            case .incorrectTaskType: return "The task type was not the same as the current one"
+            }
+        }
     }
 
     public func create(from content: PracticeSession.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
