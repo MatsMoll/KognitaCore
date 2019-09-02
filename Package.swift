@@ -18,7 +18,7 @@ let package = Package(
         // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
         .package(url: "https://github.com/vapor/fluent-postgresql.git", from: "1.0.0"),
 
-        .package(url: "https://github.com/MihaelIsaev/FluentQuery.git", from: "0.4.30")
+        .package(url: "https://github.com/MihaelIsaev/SwifQL.git", from: "0.20.1")
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -28,7 +28,8 @@ let package = Package(
             dependencies: [
                 "Authentication",
                 "FluentPostgreSQL",
-                "FluentQuery"
+                "SwifQL",
+                "SwifQLVapor"
             ]
         ),
         .testTarget(

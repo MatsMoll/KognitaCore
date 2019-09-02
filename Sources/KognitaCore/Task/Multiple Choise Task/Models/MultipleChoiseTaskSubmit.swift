@@ -11,7 +11,7 @@ import Vapor
 extension MultipleChoiseTask {
     
     /// The content needed to submit a answer to a `MultipleChoiseTask`
-    public final class Submit: Content, TaskSubmitable {
+    public struct Submit: Content, TaskSubmitable {
 
         /// The time used to answer the question
         public let timeUsed: TimeInterval

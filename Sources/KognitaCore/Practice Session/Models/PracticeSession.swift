@@ -27,12 +27,6 @@ public final class PracticeSession : KognitaCRUDModel, SoftDeleatableModel {
     /// The number of task to complete in the session
     public private(set) var numberOfTaskGoal: Int
 
-    /// The current task if any
-    private(set) var currentTaskID: Task.ID?
-
-    /// The next task if it exists
-    private(set) var nextTaskID: Task.ID?
-
     /// The user owning the session
     public let userID: User.ID
     
@@ -54,8 +48,6 @@ public final class PracticeSession : KognitaCRUDModel, SoftDeleatableModel {
 
     public static func addTableConstraints(to builder: SchemaCreator<PracticeSession>) {
         builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-        builder.reference(from: \.currentTaskID, to: \Task.id, onUpdate: .cascade, onDelete: .setNull)
-        builder.reference(from: \.nextTaskID, to: \Task.id, onUpdate: .cascade, onDelete: .setNull)
     }
 }
 
@@ -79,20 +71,18 @@ extension PracticeSession {
     ///   - conn: A transaction connection to the database
     /// - Returns: A `PracticeSession` object
     /// - Throws: If any of the database queries fails
-    static func create(_ user: User, subtopics: [Subtopic.ID], numberOfTaskGoal: Int, on conn: DatabaseConnectable)
+    static func create(_ user: User, subtopics: Set<Subtopic.ID>, numberOfTaskGoal: Int, on conn: DatabaseConnectable)
         throws -> Future<PracticeSession> {
 
-        return try PracticeSession(user: user, numberOfTaskGoal: numberOfTaskGoal)
-            .create(on: conn)
-            .flatMap { (session) in
-                
-                try subtopics.map {
-                    try PracticeSessionTopicPivot(subtopicID: $0, session: session)
-                        .create(on: conn)
-                }
-                    .flatten(on: conn)
-                    .transform(to: session)
-        }
+        return try Repository.shared
+            .create(
+                from: .init(
+                    numberOfTaskGoal: numberOfTaskGoal,
+                    subtopicsIDs: subtopics
+                ),
+                by: user,
+                on: conn
+            )
     }
 
     /// Assigns a task to the session
@@ -100,79 +90,9 @@ extension PracticeSession {
     /// - Parameter conn: A connection to the database
     /// - Returns: An `Int` with the assigned `Task.ID`
     /// - Throws: If there was an error with the database queries
-    func assignNextTask(on conn: DatabaseConnectable) throws -> Future<Int?> {
-        return try topics.query(on: conn)
-            .all()
-            .map { topics in try topics.map { try $0.requireID() } }
-            .and(result: conn)
-            .flatMap(assignTask)
-    }
-
-    func assignTask(in subtopicIDs: [Subtopic.ID], on conn: DatabaseConnectable) throws -> Future<Int?> {
-        return try assignedTasks
-            .query(on: conn)
-            .all()
-            .flatMap { (completedTasks) in
-                Task.query(on: conn)
-                    .filter(
-                        FilterOperator.make(
-                            \Task.id,
-                            Database.queryFilterMethodNotInSubset,
-                            completedTasks.map { $0.id }
-                        )
-                    )
-                    .filter(\.subtopicId ~~ subtopicIDs)
-                    .all()
-            }.flatMap { (tasks) in
-                conn.databaseConnection(to: .psql)
-                    .flatMap { psqlConn in
-
-                        try TaskResultRepository.shared
-                            .getAllResults(for: self.userID, filter: \Subtopic.id ~~ subtopicIDs, with: psqlConn, maxRevisitDays: nil)
-                            .flatMap { results in
-
-                                self.currentTaskID = self.nextTaskID
-
-                                let completedTasks = Set(results.map { $0.taskID })
-                                let hardTasks = results.filter {
-                                    ($0.daysUntilRevisit ?? 30) < 6
-                                }
-                                let uncompletedTasks = tasks.filter { completedTasks.contains($0.id ?? 0) == false }
-
-                                for result in hardTasks {
-
-                                    if result.sessionID != self.id,
-                                        let task = tasks.first(where: { $0.id == result.taskID }) {
-
-                                        self.nextTaskID = try task.requireID()
-                                        return try PracticeSessionTaskPivot
-                                            .create(self, task, on: conn)
-                                            .transform(to: task.id)
-                                    }
-                                }
-
-                                for task in uncompletedTasks {
-                                    self.nextTaskID = try task.requireID()
-                                    return try PracticeSessionTaskPivot
-                                        .create(self, task, on: conn)
-                                        .transform(to: task.id)
-                                }
-
-                                guard let task = tasks.randomElement() else {
-                                    self.nextTaskID = nil
-                                    return conn.future()
-                                        .transform(to: nil)
-                                }
-                                self.nextTaskID = try task.requireID()
-                                return try PracticeSessionTaskPivot
-                                    .create(self, task, on: conn)
-                                    .transform(to: task.id)
-                        }
-                }
-            }.flatMap { [self] (taskID: Int?) in
-                self.save(on: conn)
-                    .transform(to: taskID)
-        }
+    func assignNextTask(on conn: DatabaseConnectable) throws -> Future<Void> {
+        return try Repository.shared
+            .assignTask(to: self, on: conn)
     }
 
     /// Finds the current task to be presented in a session
@@ -181,14 +101,8 @@ extension PracticeSession {
     /// - Returns: A `RenderTaskPracticing` object
     /// - Throws: Missing a task to present ext.
     func currentMultipleChoiseTask(on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
-        guard let currentID = currentTaskID else {
-            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-        }
-        return MultipleChoiseTask
-            .query(on: conn)
-            .filter(\.id == currentID)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
+        return try Repository.shared
+            .currentMultipleChoiseTask(in: self, on: conn)
     }
 
     /// Finds the current task to be presented in a session
@@ -197,14 +111,8 @@ extension PracticeSession {
     /// - Returns: A `RenderTaskPracticing` object
     /// - Throws: Missing a task to present ext.
     func currentInputTask(on conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
-        guard let currentID = currentTaskID else {
-            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-        }
-        return NumberInputTask
-            .query(on: conn)
-            .filter(\.id == currentID)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
+        return try Repository.shared
+            .currentInputTask(in: self, on: conn)
     }
 
     /// Finds the current task to be presented in a session
@@ -213,43 +121,39 @@ extension PracticeSession {
     /// - Returns: A `RenderTaskPracticing` object
     /// - Throws: Missing a task to present ext.
     func currentFlashCard(on conn: DatabaseConnectable) throws -> Future<FlashCardTask> {
-        guard let currentID = currentTaskID else {
-            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-        }
-        return FlashCardTask.repository
-            .first(where: \.id == currentID, or: Abort(.internalServerError), on: conn)
+        return try Repository.shared
+            .currentFlashCard(in: self, on: conn)
     }
 
     public func getCurrentTaskPath(_ conn: DatabaseConnectable) throws -> Future<String> {
-        return try PracticeSession.repository
+        return try Repository.shared
             .getCurrentTaskPath(for: self, on: conn)
     }
 
     public func getNextTaskPath(_ conn: DatabaseConnectable) throws -> Future<String?> {
-        return try PracticeSession.repository
+        return try Repository.shared
             .getNextTaskPath(for: self, on: conn)
+    }
+    
+    public func currentTask(_ conn: DatabaseConnectable) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
+        conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+                Repository.shared
+                    .currentActiveTask(on: psqlConn)
+        }
     }
 }
 
 extension PracticeSession {
 
     /// The topics being practiced
-    var topics: Siblings<PracticeSession, Topic, PracticeSessionTopicPivot> {
+    var subtopics: Siblings<PracticeSession, Subtopic, PracticeSession.Pivot.Subtopic> {
         return siblings()
     }
 
     /// The assigned tasks in the session
-    var assignedTasks: Siblings<PracticeSession, Task, PracticeSessionTaskPivot> {
+    var assignedTasks: Siblings<PracticeSession, Task, PracticeSession.Pivot.Task> {
         return siblings()
-    }
-
-    /// True if there is no more tasks, after completion
-    public var isLastTask: Bool {
-        return nextTaskID == nil
-    }
-
-    public var hasAssignedTask: Bool {
-        return currentTaskID != nil
     }
 
     public var timeUsed: TimeInterval? {
@@ -262,3 +166,4 @@ extension PracticeSession {
 }
 
 extension PracticeSession: Parameter {}
+extension PracticeSession: Content {}

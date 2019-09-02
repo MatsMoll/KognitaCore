@@ -42,7 +42,7 @@ extension Subject.Repository {
         content.subject.creatorId = 1
         return conn.transaction(on: .psql) { conn in
             content.subject.create(on: conn).flatMap { subject in
-                try content.topics.map { try Topic.Repository.shared.importContent(from: $0, in: subject, on: conn) }
+                try content.topics.map { try Topic.repository.importContent(from: $0, in: subject, on: conn) }
                     .flatten(on: conn)
                     .transform(to: subject)
             }

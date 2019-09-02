@@ -33,8 +33,4 @@ extension Subtopic.Repository {
             .filter(\.topicId == topic.requireID())
             .all()
     }
-    
-    public func find(_ subtopicID: Subtopic.ID, on conn: DatabaseConnectable) -> Future<Subtopic?> {
-        return Subtopic.find(subtopicID, on: conn)
-    }
 }

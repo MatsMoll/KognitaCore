@@ -144,6 +144,19 @@ extension Task.Repository : KognitaRepository {
             .groupBy(\User.id)
             .all(decoding: TaskCreators.self)
     }
+    
+    public func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)?> {
+        
+        return conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .all(table: NumberInputTask.self)
+            .from(Task.self)
+            .where(\Task.id == id)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .join(\Task.id, to: \NumberInputTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
+    }
 }
 
 

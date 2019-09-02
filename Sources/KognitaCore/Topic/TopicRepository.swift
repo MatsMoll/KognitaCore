@@ -203,7 +203,7 @@ extension Topic.Repository {
             .create(on: conn)
             .flatMap { topic in
                 try content.subtopics.map {
-                    try Topic.Repository.shared.importContent(from: $0, in: topic, on: conn)
+                    try Topic.repository.importContent(from: $0, in: topic, on: conn)
                 }
                 .flatten(on: conn)
         }.transform(to: ())
