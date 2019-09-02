@@ -95,52 +95,18 @@ extension PracticeSession {
             .assignTask(to: self, on: conn)
     }
 
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentMultipleChoiseTask(on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
+    public func getCurrentTaskIndex(_ conn: DatabaseConnectable) throws -> Future<Int> {
         return try Repository.shared
-            .currentMultipleChoiseTask(in: self, on: conn)
-    }
-
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentInputTask(on conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
-        return try Repository.shared
-            .currentInputTask(in: self, on: conn)
-    }
-
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentFlashCard(on conn: DatabaseConnectable) throws -> Future<FlashCardTask> {
-        return try Repository.shared
-            .currentFlashCard(in: self, on: conn)
-    }
-
-    public func getCurrentTaskPath(_ conn: DatabaseConnectable) throws -> Future<String> {
-        return try Repository.shared
-            .getCurrentTaskPath(for: self, on: conn)
-    }
-
-    public func getNextTaskPath(_ conn: DatabaseConnectable) throws -> Future<String?> {
-        return try Repository.shared
-            .getNextTaskPath(for: self, on: conn)
+            .getCurrentTaskIndex(for: self.requireID(), on: conn)
     }
     
-    public func currentTask(_ conn: DatabaseConnectable) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
-        conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-                Repository.shared
-                    .currentActiveTask(on: psqlConn)
-        }
+    public func currentTask(on conn: PostgreSQLConnection) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
+        return try Repository.shared
+            .currentActiveTask(in: self, on: conn)
+    }
+    
+    public func pathFor(index: Int) throws -> String {
+        return try "/practice-sessions/\(requireID())/tasks/\(index)"
     }
 }
 

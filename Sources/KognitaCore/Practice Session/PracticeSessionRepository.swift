@@ -147,60 +147,19 @@ extension PracticeSession.Repository {
         throw Abort(.internalServerError)
     }
     
-    public func currentActiveTask(on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
-        return conn.select()
+    public func currentActiveTask(in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
+        return try conn.select()
             .all(table: Task.self)
             .all(table: MultipleChoiseTask.self)
             .all(table: NumberInputTask.self)
             .from(PracticeSession.Pivot.Task.self)
+            .where(\PracticeSession.Pivot.Task.sessionID == session.requireID())
             .orderBy(\PracticeSession.Pivot.Task.index, .descending)
             .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
             .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
             .join(\Task.id, to: \NumberInputTask.id, method: .left)
             .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
             .unwrap(or: Abort(.internalServerError))
-    }
-    
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentMultipleChoiseTask(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask> {
-        throw Abort(.internalServerError)
-//        guard let currentID = session.currentTaskID else {
-//            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-//        }
-//        return MultipleChoiseTask.repository
-//            .first(where: \.id == currentID, or: Abort(.internalServerError), on: conn)
-    }
-
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentInputTask(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
-        throw Abort(.internalServerError)
-//        guard let currentID = session.currentTaskID else {
-//            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-//        }
-//        return NumberInputTask.repository
-//            .first(where: \.id == currentID, or: Abort(.internalServerError), on: conn)
-    }
-
-    /// Finds the current task to be presented in a session
-    ///
-    /// - Parameter conn: The database connection
-    /// - Returns: A `RenderTaskPracticing` object
-    /// - Throws: Missing a task to present ext.
-    func currentFlashCard(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<FlashCardTask> {
-        throw Abort(.internalServerError)
-//        guard let currentID = session.currentTaskID else {
-//            throw Abort(.internalServerError, reason: "Unable to find new tasks")
-//        }
-//        return FlashCardTask.repository
-//            .first(where: \.id == currentID, or: Abort(.internalServerError), on: conn)
     }
 }
 
@@ -319,8 +278,9 @@ extension PracticeSession.Repository {
 
     public func getCurrent<T: PostgreSQLModel>(_ taskType: T.Type, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
 
-        return PracticeSession.Pivot.Task
+        return try PracticeSession.Pivot.Task
             .query(on: conn)
+            .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
             .sort(\PracticeSession.Pivot.Task.index, .descending)
             .join(\T.id, to: \PracticeSession.Pivot.Task.taskID)
             .decode(T.self)
@@ -372,7 +332,7 @@ extension PracticeSession.Repository {
         }
     }
 
-    public func getCurrentTaskPath(for sessionId: PracticeSession.ID, on conn: DatabaseConnectable) throws -> Future<String> {
+    public func getCurrentTaskIndex(for sessionId: PracticeSession.ID, on conn: DatabaseConnectable) throws -> Future<Int> {
         
         return PracticeSession.Pivot.Task
             .query(on: conn)
@@ -381,7 +341,7 @@ extension PracticeSession.Repository {
             .first()
             .unwrap(or: Abort(.badRequest))
             .map { task in
-                return "practice-session/\(task.sessionID)/task/\(task.index)"
+                task.index
         }
     }
 
@@ -468,24 +428,22 @@ extension PracticeSession.Repository {
 
     public func getLatestUnfinnishedSessionPath(for user: User, on conn: DatabaseConnectable) throws -> Future<String?> {
 
-        throw Abort(.internalServerError)
-//        return try PracticeSession.query(on: conn)
-//            .filter(\PracticeSession.userID == user.requireID())
-//            .filter(\PracticeSession.endedAt == nil)
-//            .filter(\PracticeSession.currentTaskID != nil)
-//            .sort(\.createdAt, .descending)
-//            .first()
-//            .flatMap { session in
-//
-//                if let session = session {
-//                    return try PracticeSession.repository
-//                            .getCurrentTaskPath(for: session, on: conn)
-//                            .map(to: String?.self) { $0 }
-//                } else {
-//                    return conn.future(nil)
-//                }
-//
-//        }
+        return try PracticeSession.query(on: conn)
+            .filter(\PracticeSession.userID == user.requireID())
+            .filter(\PracticeSession.endedAt == nil)
+            .sort(\.createdAt, .descending)
+            .first()
+            .flatMap { session in
+
+                if let session = session {
+                    return try session
+                        .getCurrentTaskIndex(conn)
+                        .map(to: String?.self) { try session.pathFor(index: $0) }
+                } else {
+                    return conn.future(nil)
+                }
+
+        }
     }
 
     /// Returns the number of tasks in a session
