@@ -8,8 +8,6 @@
 import FluentPostgreSQL
 import FluentSQL
 import Vapor
-import SwifQLVapor
-import SwifQL
 
 extension PracticeSession {
     

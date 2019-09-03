@@ -85,4 +85,9 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertNotNil(secondTask.1)
         try XCTAssertNotEqual(secondTask.0.requireID(), firstTask.0.requireID())
     }
+
+    static let allTests = [
+        ("testPracticeSessionAssignment", testPracticeSessionAssignment),
+        ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple)
+    ]
 }
