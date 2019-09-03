@@ -96,36 +96,19 @@ extension Topic.Repository {
 
     public func timelyTopics(on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
 
-        return conn.future([])
-//        let numberOfTasksKey = "numberOfTasks"
-//        let alias = Topic.alias(short: "sub")
-//
-//        return try FQL()
-//            .select(\Subject.name, as: "subjectName")
-//            .select(alias.k(\.name), as: "topicName")
-//            .select(alias.k(\.id), as: "topicID")
-//            .select("\"sub\".\"\(numberOfTasksKey)\" as \"\(numberOfTasksKey)\"")
-//            .from(Subject.self)
-//            .orderBy(.asc(numberOfTasksKey))
-//            .limit(12)
-//            .join(
-//                .inner,
-//                subquery: FQL()
-//                    .select(\Topic.subjectId)
-//                    .select(\Topic.name)
-//                    .select(\Topic.id)
-//                    .select(.count(\Task.id), as: numberOfTasksKey)
-//                    .from(Topic.self)
-//                    .join(.inner, Subtopic.self, where: \Subtopic.topicId == \Topic.id)
-//                    .join(.left, Task.self, where: \Task.subtopicId == \Subtopic.id)
-//                    .where(
-//                        \Task.deletedAt == nil
-//                    )
-//                    .groupBy(\Topic.id),
-//                alias: alias,
-//                where: \Subject.id == alias.k(\.subjectId)
-//            )
-//            .execute(on: conn, andDecode: TimelyTopic.self)
+        return conn.select()
+            .column(\Subject.name,      as: "subjectName")
+            .column(\Topic.name,        as: "topicName")
+            .column(\Topic.id,          as: "topicID")
+            .column(.count(\Task.id),   as: "numberOfTasks")
+            .from(Subject.self)
+            .join(\Subject.id,          to: \Topic.subjectId)
+            .join(\Topic.id,            to: \Subtopic.topicId, method: .left)
+            .join(\Subtopic.id,         to: \Task.subtopicId,  method: .left)
+            .where(\Task.deletedAt == nil)
+            .groupBy(\Topic.id)
+            .groupBy(\Subject.id)
+            .all(decoding: TimelyTopic.self)
     }
 
     public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {

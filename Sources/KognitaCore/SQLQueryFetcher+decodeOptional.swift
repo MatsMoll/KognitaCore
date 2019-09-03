@@ -8,18 +8,6 @@
 import SQL
 import PostgreSQL
 
-extension PostgreSQLConnection {
-    
-    /// See `SQLConnection`.
-    public func decode<D>(_ type: Optional<D>.Type, from row: [PostgreSQLColumn : PostgreSQLData], table: GenericSQLTableIdentifier<PostgreSQLIdentifier>?) throws -> D? where D : Decodable {
-        do {
-            return try self.decode(D.self, from: row, table: table)
-        } catch {
-            return nil
-        }
-    }
-}
-
 extension SQLQueryFetcher {
     
     /// Collects the first decoded output and returns it.
@@ -306,6 +294,16 @@ extension SQLQueryFetcher {
                 try handler(aValue, bValue, cValue)
             }
         }
+    }
+}
+
+extension SQLSelectBuilder {
+
+    func column<M, V>(
+        _ keyPath: KeyPath<M, V>,
+        as alias: Connectable.Connection.Query.Select.SelectExpression.Identifier? = nil
+    ) -> Self where M : SQLTable {
+        return column(.column(keyPath), as: alias)
     }
 }
 
