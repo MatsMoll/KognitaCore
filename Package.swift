@@ -28,8 +28,8 @@ let package = Package(
             dependencies: [
                 "Authentication",
                 "FluentPostgreSQL",
-                "SwifQL",
-                "SwifQLVapor"
+//                "SwifQL",
+//                "SwifQLVapor"
             ]
         ),
         .testTarget(
