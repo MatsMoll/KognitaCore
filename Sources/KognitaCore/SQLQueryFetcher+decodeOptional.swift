@@ -116,7 +116,7 @@ extension SQLQueryFetcher {
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> Future<[(A?, B?)]>
+    public func all<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> Future<[(A, B?)]>
         where A: Decodable, B: Decodable
     {
         var all: [(A, B?)] = []

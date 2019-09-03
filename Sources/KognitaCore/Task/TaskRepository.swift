@@ -17,6 +17,10 @@ extension Task {
             let subtopic: Subtopic
         }
         public typealias Response = Task
+
+        public enum Errors : Error {
+            case invalidTopic
+        }
     }
     
     public final class Repository {
