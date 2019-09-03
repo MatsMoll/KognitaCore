@@ -51,6 +51,10 @@ public final class User: KognitaCRUDModel {
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
         builder.unique(on: \.email)
     }
+    
+    public func update(password: String) throws {
+        passwordHash = try BCrypt.hash(password)
+    }
 }
 
 /// Allows users to be verified by basic / password auth middleware.

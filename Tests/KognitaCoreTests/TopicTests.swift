@@ -17,7 +17,7 @@ class TopicTests: VaporTestCase {
 
         let subtopic = try Subtopic.create(on: conn)
 
-        _ = try Subtopic.create(on: conn)
+        _ = try Topic.create(on: conn)
 
         _ = try Task.create(on: conn)
         _ = try Task.create(on: conn)
