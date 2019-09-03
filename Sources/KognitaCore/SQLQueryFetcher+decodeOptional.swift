@@ -36,50 +36,50 @@ extension SQLQueryFetcher {
     ///
     ///     builder.first(decoding: Planet.self)
     ///
-    public func first<A, B>(decoding a: Optional<A>.Type, _ b: Optional<B>.Type) -> Future<(A?, B?)?>
+    public func first<A, B>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type) -> Future<(A?, B?)?>
         where A: Decodable, B: Decodable
     {
-        return self.all(decoding: a, b).map { $0.first }
+        return self.all(decoding: typeA, typeB).map { $0.first }
     }
     
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
-    public func first<A, B>(decoding a: A.Type, _ b: Optional<B>.Type) -> Future<(A, B?)?>
+    public func first<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> Future<(A, B?)?>
         where A: Decodable, B: Decodable
     {
-        return self.all(decoding: a, b).map { $0.first }
+        return self.all(decoding: typeA, typeB).map { $0.first }
+    }
+
+    /// Collects the first decoded output and returns it.
+    ///
+    ///     builder.first(decoding: Planet.self)
+    ///
+    public func first<A, B, C>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> Future<(A?, B?, C?)?>
+        where A: Decodable, B: Decodable, C: Decodable
+    {
+        return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
     
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
-    public func first<A, B, C>(decoding a: Optional<A>.Type, _ b: Optional<B>.Type, _ c: Optional<C>.Type) -> Future<(A?, B?, C?)?>
+    public func first<A, B, C>(decoding typeA: A.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> Future<(A, B?, C?)?>
         where A: Decodable, B: Decodable, C: Decodable
     {
-        return self.all(decoding: a, b, c).map { $0.first }
+        return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
     
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
-    public func first<A, B, C>(decoding a: A.Type, _ b: Optional<B>.Type, _ c: Optional<C>.Type) -> Future<(A, B?, C?)?>
+    public func first<A, B, C>(decoding typeA: A.Type, _ typeB: B.Type, _ typeC: Optional<C>.Type) -> Future<(A, B, C?)?>
         where A: Decodable, B: Decodable, C: Decodable
     {
-        return self.all(decoding: a, b, c).map { $0.first }
-    }
-    
-    /// Collects the first decoded output and returns it.
-    ///
-    ///     builder.first(decoding: Planet.self)
-    ///
-    public func first<A, B, C>(decoding a: A.Type, _ b: B.Type, _ c: Optional<C>.Type) -> Future<(A, B, C?)?>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
-        return self.all(decoding: a, b, c).map { $0.first }
+        return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
     
     /// Collects all decoded output into an array and returns it.
@@ -101,13 +101,13 @@ extension SQLQueryFetcher {
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B>(decoding a: Optional<A>.Type, _ b: Optional<B>.Type) -> Future<[(A?, B?)]>
+    public func all<A, B>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type) -> Future<[(A?, B?)]>
         where A: Decodable, B: Decodable
     {
         var all: [(A?, B?)] = []
-        return run(decoding: a, b) { a, b in
-            if a != nil || b != nil {
-                all.append((a, b))
+        return run(decoding: typeA, typeB) { aValue, bValue in
+            if aValue != nil || bValue != nil {
+                all.append((aValue, bValue))
             }
         }.map { all }
     }
@@ -116,24 +116,24 @@ extension SQLQueryFetcher {
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B>(decoding a: A.Type, _ b: Optional<B>.Type) -> Future<[(A?, B?)]>
+    public func all<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> Future<[(A?, B?)]>
         where A: Decodable, B: Decodable
     {
         var all: [(A, B?)] = []
-        return run(decoding: a, b) { a, b in all.append((a, b)) }.map { all }
+        return run(decoding: typeA, typeB) { aValue, bValue in all.append((aValue, bValue)) }.map { all }
     }
     
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B, C>(decoding a: Optional<A>.Type, _ b: Optional<B>.Type, _ c: Optional<C>.Type) -> Future<[(A?, B?, C?)]>
+    public func all<A, B, C>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> Future<[(A?, B?, C?)]>
         where A: Decodable, B: Decodable, C: Decodable
     {
         var all: [(A?, B?, C?)] = []
-        return run(decoding: a, b, c) { a, b, c in
-            if a != nil || b != nil || c != nil {
-                all.append((a, b, c))
+        return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in
+            if aValue != nil || bValue != nil || cValue != nil {
+                all.append((aValue, bValue, cValue))
             }
         }.map { all }
     }
@@ -142,22 +142,22 @@ extension SQLQueryFetcher {
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B, C>(decoding a: A.Type, _ b: Optional<B>.Type, _ c: Optional<C>.Type) -> Future<[(A, B?, C?)]>
+    public func all<A, B, C>(decoding typeA: A.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> Future<[(A, B?, C?)]>
         where A: Decodable, B: Decodable, C: Decodable
     {
         var all: [(A, B?, C?)] = []
-        return run(decoding: a, b, c) { a, b, c in all.append((a, b, c)) }.map { all }
+        return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in all.append((aValue, bValue, cValue)) }.map { all }
     }
     
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
-    public func all<A, B, C>(decoding a: A.Type, _ b: B.Type, _ c: Optional<C>.Type) -> Future<[(A, B, C?)]>
+    public func all<A, B, C>(decoding typeA: A.Type, _ typeB: B.Type, _ typeC: Optional<C>.Type) -> Future<[(A, B, C?)]>
         where A: Decodable, B: Decodable, C: Decodable
     {
         var all: [(A, B, C?)] = []
-        return run(decoding: a, b, c) { a, b, c in all.append((a, b, c)) }.map { all }
+        return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in all.append((aValue, bValue, cValue)) }.map { all }
     }
     
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
@@ -176,8 +176,8 @@ extension SQLQueryFetcher {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifier = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
-                let d = conn.decodeOptional(type, from: row, table: identifier)
-                try handler(d)
+                let dValue = conn.decodeOptional(type, from: row, table: identifier)
+                try handler(dValue)
             }
         }
     }
@@ -199,9 +199,9 @@ extension SQLQueryFetcher {
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
-                let a = conn.decodeOptional(aType, from: row, table: identifierA)
-                let b = conn.decodeOptional(bType, from: row, table: identifierB)
-                try handler(a, b)
+                let aValue = conn.decodeOptional(aType, from: row, table: identifierA)
+                let bValue = conn.decodeOptional(bType, from: row, table: identifierB)
+                try handler(aValue, bValue)
             }
         }
     }
@@ -223,9 +223,9 @@ extension SQLQueryFetcher {
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
-                let a = try conn.decode(aType, from: row, table: identifierA)
-                let b = conn.decodeOptional(bType, from: row, table: identifierB)
-                try handler(a, b)
+                let aValue = try conn.decode(aType, from: row, table: identifierA)
+                let bValue = conn.decodeOptional(bType, from: row, table: identifierB)
+                try handler(aValue, bValue)
             }
         }
     }
@@ -248,10 +248,10 @@ extension SQLQueryFetcher {
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
                 let identifierC = Connectable.Connection.Query.Select.TableIdentifier.table(any: C.self)
-                let a = conn.decodeOptional(aType, from: row, table: identifierA)
-                let b = conn.decodeOptional(bType, from: row, table: identifierB)
-                let c = conn.decodeOptional(cType, from: row, table: identifierC)
-                try handler(a, b, c)
+                let aValue = conn.decodeOptional(aType, from: row, table: identifierA)
+                let bValue = conn.decodeOptional(bType, from: row, table: identifierB)
+                let cValue = conn.decodeOptional(cType, from: row, table: identifierC)
+                try handler(aValue, bValue, cValue)
             }
         }
     }
@@ -274,10 +274,10 @@ extension SQLQueryFetcher {
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
                 let identifierC = Connectable.Connection.Query.Select.TableIdentifier.table(any: C.self)
-                let a = try conn.decode(aType, from: row, table: identifierA)
-                let b = conn.decodeOptional(bType, from: row, table: identifierB)
-                let c = conn.decodeOptional(cType, from: row, table: identifierC)
-                try handler(a, b, c)
+                let aValue = try conn.decode(aType, from: row, table: identifierA)
+                let bValue = conn.decodeOptional(bType, from: row, table: identifierB)
+                let cValue = conn.decodeOptional(cType, from: row, table: identifierC)
+                try handler(aValue, bValue, cValue)
             }
         }
     }
@@ -300,10 +300,10 @@ extension SQLQueryFetcher {
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
                 let identifierC = Connectable.Connection.Query.Select.TableIdentifier.table(any: C.self)
-                let a = try conn.decode(aType, from: row, table: identifierA)
-                let b = try conn.decode(bType, from: row, table: identifierB)
-                let c = conn.decodeOptional(cType, from: row, table: identifierC)
-                try handler(a, b, c)
+                let aValue = try conn.decode(aType, from: row, table: identifierA)
+                let bValue = try conn.decode(bType, from: row, table: identifierB)
+                let cValue = conn.decodeOptional(cType, from: row, table: identifierC)
+                try handler(aValue, bValue, cValue)
             }
         }
     }
