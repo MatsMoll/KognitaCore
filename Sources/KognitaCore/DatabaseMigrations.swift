@@ -19,24 +19,25 @@ public class DatabaseMigrations {
 
     static func setupTables(_ migrations: inout MigrationConfig) {
 
-        migrations.add(migration: Task.ExamSemester.self, database: .psql)
-        migrations.add(migration: Subject.ColorClass.self, database: .psql)
-        migrations.add(migration: User.Role.self, database: .psql)
+        migrations.add(migration: Task.ExamSemester.self,           database: .psql)
+        migrations.add(migration: Subject.ColorClass.self,          database: .psql)
+        migrations.add(migration: User.Role.self,                   database: .psql)
 
-        migrations.add(model: User.self, database: .psql)
-        migrations.add(model: UserToken.self, database: .psql)
-        migrations.add(model: Subject.self, database: .psql)
-        migrations.add(model: Topic.self, database: .psql)
-        migrations.add(model: Subtopic.self, database: .psql)
-        migrations.add(model: Task.self, database: .psql)
-        migrations.add(model: MultipleChoiseTask.self, database: .psql)
-        migrations.add(model: MultipleChoiseTaskChoise.self, database: .psql)
-        migrations.add(model: PracticeSession.self, database: .psql)
-        migrations.add(model: PracticeSessionTaskPivot.self, database: .psql)
-        migrations.add(model: PracticeSessionTopicPivot.self, database: .psql)
-        migrations.add(model: NumberInputTask.self, database: .psql)
-        migrations.add(model: FlashCardTask.self, database: .psql)
-        migrations.add(model: TaskResult.self, database: .psql)
+        migrations.add(model: User.self,                            database: .psql)
+        migrations.add(model: UserToken.self,                       database: .psql)
+        migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
+        migrations.add(model: Subject.self,                         database: .psql)
+        migrations.add(model: Topic.self,                           database: .psql)
+        migrations.add(model: Subtopic.self,                        database: .psql)
+        migrations.add(model: Task.self,                            database: .psql)
+        migrations.add(model: MultipleChoiseTask.self,              database: .psql)
+        migrations.add(model: MultipleChoiseTaskChoise.self,        database: .psql)
+        migrations.add(model: PracticeSession.self,                 database: .psql)
+        migrations.add(model: PracticeSession.Pivot.Task.self,      database: .psql)
+        migrations.add(model: PracticeSession.Pivot.Subtopic.self,  database: .psql)
+        migrations.add(model: NumberInputTask.self,                 database: .psql)
+        migrations.add(model: FlashCardTask.self,                   database: .psql)
+        migrations.add(model: TaskResult.self,                      database: .psql)
     }
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {

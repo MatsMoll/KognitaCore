@@ -19,7 +19,11 @@ public final class FlashCardTask: KognitaCRUDModel {
     public var updatedAt: Date?
     
 
-    init(task: Task) throws {
+    public init(taskId: Task.ID? = nil) {
+        self.id = taskId
+    }
+    
+    public init(task: Task) throws {
         self.id = try task.requireID()
     }
     

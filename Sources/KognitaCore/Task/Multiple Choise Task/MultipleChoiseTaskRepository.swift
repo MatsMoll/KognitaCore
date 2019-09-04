@@ -106,6 +106,7 @@ extension MultipleChoiseTask.Repository {
         }.flatMap { task in
             try taskContent.choises
                 .map { choise in
+                    choise.id = nil
                     try choise.taskId = task.requireID()
                     return choise.create(on: conn)
                         .transform(to: ())
