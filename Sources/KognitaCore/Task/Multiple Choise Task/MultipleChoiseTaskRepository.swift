@@ -196,8 +196,7 @@ extension MultipleChoiseTask.Repository {
                 return PracticeSessionResult(
                     result: results,
                     score: score,
-                    progress: 0,
-                    numberOfCompletedTasks: 0
+                    progress: 0
                 )
         }
     }

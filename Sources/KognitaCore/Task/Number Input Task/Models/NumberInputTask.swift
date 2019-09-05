@@ -59,8 +59,7 @@ extension NumberInputTask {
                 wasCorrect: wasCorrect
             ),
             score: wasCorrect ? 1 : 0,
-            progress: 0,
-            numberOfCompletedTasks: 0
+            progress: 0
         )
     }
 }

@@ -32,8 +32,6 @@ public final class PracticeSessionResult<T: Content>: Content, TaskSubmitResulta
     public let score: Double
 
     public var progress: Double
-    
-    public var numberOfCompletedTasks: Int
 
     public let result: T
 
@@ -42,14 +40,11 @@ public final class PracticeSessionResult<T: Content>: Content, TaskSubmitResulta
         result: T,
         score: Double,
         progress: Double,
-        numberOfCompletedTasks: Int,
         change: Double? = nil
     ) {
         self.result = result
         self.score = score
         self.progress = progress
-        self.numberOfCompletedTasks = numberOfCompletedTasks
-        self.change = change
-        
+        self.change = change        
     }
 }

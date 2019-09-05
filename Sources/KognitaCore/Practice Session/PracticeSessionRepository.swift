@@ -250,41 +250,36 @@ extension PracticeSession.Repository {
         
         return try getCurrent(FlashCardTask.self, for: session, on: conn).flatMap { task in
 
-            try session
-                .numberOfCompletedTasks(with: conn)
-                .flatMap { numberOfCompletedTasks in
-                    
-                    let score = ScoreEvaluater.shared
-                        .compress(score: submit.knowledge, range: 0...4)
+            let score = ScoreEvaluater.shared
+                .compress(score: submit.knowledge, range: 0...4)
 
-                    let result = PracticeSessionResult(
-                        result:                 submit,
-                        score:                  score,
-                        progress:               0,
-                        numberOfCompletedTasks: numberOfCompletedTasks
-                    )
+            let result = PracticeSessionResult(
+                result:                 submit,
+                score:                  score,
+                progress:               0
+            )
 
-                    let submitResult = try TaskSubmitResult(
-                        submit: submit,
-                        result: result,
-                        taskID: task.requireID()
-                    )
+            let submitResult = try TaskSubmitResult(
+                submit: submit,
+                result: result,
+                taskID: task.requireID()
+            )
 
             return try PracticeSession.repository
                 .register(submitResult, result: result, in: session, by: user, on: conn)
                 .flatMap { _ in
-                        
-                        try session.goalProgress(on: conn)
-                            .map { progress in
-                                result.progress = Double(progress)
-                                return result
-                        }
-                }
+
+                    try session.goalProgress(on: conn)
+                        .map { progress in
+                            result.progress = Double(progress)
+                            return result
+                    }
             }
         }
     }
 
     public func getCurrent<T: PostgreSQLModel>(_ taskType: T.Type, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
+        
 
         return try PracticeSession.Pivot.Task
             .query(on: conn)

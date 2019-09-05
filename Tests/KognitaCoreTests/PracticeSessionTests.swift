@@ -31,10 +31,7 @@ final class PracticeSessionTests: VaporTestCase {
         let firstResult     = try session.submit(answer, by: user, with: conn).wait()
         let secondResult    = try session.submit(answer, by: user, with: conn).wait()
         let lastResult      = try session.submit(answer, by: user, with: conn).wait()
-        
-        XCTAssertEqual(firstResult.numberOfCompletedTasks, 1)
-        XCTAssertEqual(secondResult.numberOfCompletedTasks, 2)
-        XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
+
         XCTAssertEqual(firstResult.progress, 20)
         XCTAssertEqual(secondResult.progress, 40)
         XCTAssertEqual(lastResult.progress, 60)
@@ -61,14 +58,11 @@ final class PracticeSessionTests: VaporTestCase {
         let secondResult    = try session.submit(answer, by: user, with: conn).wait()
         let lastResult      = try session.submit(answer, by: user, with: conn).wait()
         
-        XCTAssertEqual(firstResult.numberOfCompletedTasks, 1)
-        XCTAssertEqual(secondResult.numberOfCompletedTasks, 2)
-        XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
         XCTAssertEqual(firstResult.progress, 20)
         XCTAssertEqual(secondResult.progress, 40)
         XCTAssertEqual(lastResult.progress, 60)
     }
-    
+
     func testNumberOfCompletedTasksNumberInput() throws {
         
         let user = try User.create(on: conn)
@@ -91,9 +85,6 @@ final class PracticeSessionTests: VaporTestCase {
         let secondResult    = try session.submit(answer, by: user, with: conn).wait()
         let lastResult      = try session.submit(answer, by: user, with: conn).wait()
         
-        XCTAssertEqual(firstResult.numberOfCompletedTasks, 1)
-        XCTAssertEqual(secondResult.numberOfCompletedTasks, 2)
-        XCTAssertEqual(lastResult.numberOfCompletedTasks, 3)
         XCTAssertEqual(firstResult.progress, 20)
         XCTAssertEqual(secondResult.progress, 40)
         XCTAssertEqual(lastResult.progress, 60)

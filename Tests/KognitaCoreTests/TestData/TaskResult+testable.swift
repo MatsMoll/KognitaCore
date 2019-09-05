@@ -18,8 +18,7 @@ extension TaskResult {
         let practiceResult = PracticeSessionResult(
             result: "",
             score: score,
-            progress: 0,
-            numberOfCompletedTasks: 0
+            progress: 0
         )
         let submit = FlashCardTask.Submit(timeUsed: .random(in: 10...60), knowledge: 0)
 

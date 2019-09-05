@@ -45,4 +45,8 @@ class SubjectTests: VaporTestCase {
         
         XCTAssertEqual(try Task.repository.all(on: conn).wait().count, 12)
     }
+
+    static let allTests = [
+        ("testExportAndImport", testExportAndImport)
+    ]
 }
