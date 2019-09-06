@@ -288,9 +288,9 @@ extension SQLQueryFetcher {
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
                 let identifierB = Connectable.Connection.Query.Select.TableIdentifier.table(any: B.self)
                 let identifierC = Connectable.Connection.Query.Select.TableIdentifier.table(any: C.self)
-                let aValue = try conn.decode(aType, from: row, table: identifierA)
-                let bValue = try conn.decode(bType, from: row, table: identifierB)
-                let cValue = conn.decodeOptional(cType, from: row, table: identifierC)
+                let aValue = try    conn.decode(A.self, from: row, table: identifierA)
+                let bValue = try    conn.decode(B.self, from: row, table: identifierB)
+                let cValue = try?   conn.decode(C.self, from: row, table: identifierC)
                 try handler(aValue, bValue, cValue)
             }
         }
@@ -313,10 +313,6 @@ extension SQLConnection {
     /// If a table is specified, values should come only from columns in that table.
     public func decodeOptional<D>(_ type: Optional<D>.Type, from row: Output, table: Query.Select.TableIdentifier?) -> D?
         where D: Decodable {
-            do {
-                return try self.decode(D.self, from: row, table: table)
-            } catch {
-                return nil
-            }
+            return try? self.decode(D.self, from: row, table: table)
     }
 }

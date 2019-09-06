@@ -30,7 +30,7 @@ extension User {
             init(userId: User.ID) throws {
                 self.userId = userId
                 self.deletedAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
-                self.string = try CryptoRandom().generateData(count: 16).base64EncodedString()
+                self.string = try CryptoRandom().generateData(count: 16).base64URLEncodedString(options: .init())
             }
         }
     }
@@ -50,6 +50,8 @@ extension User.ResetPassword.Token {
             public let token: String
         }
     }
+
+    public typealias Data = Create.Response
 }
 
 extension User.ResetPassword {
@@ -95,7 +97,7 @@ extension User.ResetPassword.Token.Repository {
             .transform(to: ())
     }
     
-    public func reset(to content: User.ResetPassword.Data, with token: String, by user: User, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> Future<Void> {
         
         guard content.password == content.verifyPassword else { throw User.Repository.Errors.passwordMismatch }
         
@@ -103,11 +105,14 @@ extension User.ResetPassword.Token.Repository {
             .first(where: \.string == token, or: Errors.incorrectOrExpiredToken, on: conn)
             .flatMap { tokenModel in
                 
-                guard try user.requireID() == tokenModel.userId else { throw Abort(.forbidden) }
-                
-                try user.update(password: content.password)
-                return user.save(on: conn)
-                    .transform(to: ())
+                User.repository
+                    .find(tokenModel.userId, or: Abort(.internalServerError), on: conn)
+                    .flatMap { user in
+
+                        try user.update(password: content.password)
+                        return user.save(on: conn)
+                            .transform(to: ())
+                }
         }
     }
 }

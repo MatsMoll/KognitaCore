@@ -22,7 +22,7 @@ class UserTests: VaporTestCase {
         )
         
         try User.ResetPassword.Token.repository
-            .reset(to: resetRequest, with: tokenResponse.token, by: user, on: conn).wait()
+            .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         
         let savedUser = try User.repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
@@ -45,30 +45,7 @@ class UserTests: VaporTestCase {
         
         XCTAssertThrowsError(
             try User.ResetPassword.Token.repository
-                .reset(to: resetRequest, with: tokenResponse.token, by: user, on: conn).wait()
-        )
-        let savedUser = try User.repository
-            .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
-        XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
-    }
-    
-    func testResetPasswordUserMismatch() throws {
-        let user = try User.create(on: conn)
-        let otherUser = try User.create(on: conn)
-        
-        let tokenResponse = try User.ResetPassword.Token.repository
-            .create(by: user, on: conn).wait()
-        
-        let newPassword = "p1234"
-        
-        let resetRequest = User.ResetPassword.Data(
-            password:       newPassword,
-            verifyPassword: newPassword
-        )
-        
-        XCTAssertThrowsError(
-            try User.ResetPassword.Token.repository
-                .reset(to: resetRequest, with: tokenResponse.token, by: otherUser, on: conn).wait()
+                .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
         let savedUser = try User.repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
@@ -94,7 +71,7 @@ class UserTests: VaporTestCase {
         
         XCTAssertThrowsError(
             try User.ResetPassword.Token.repository
-                .reset(to: resetRequest, with: tokenResponse.token, by: user, on: conn).wait()
+                .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
         let savedUser = try User.repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
@@ -104,7 +81,6 @@ class UserTests: VaporTestCase {
     static let allTests = [
         ("testResetPassword", testResetPassword),
         ("testResetPasswordPasswordMismatch", testResetPasswordPasswordMismatch),
-        ("testResetPasswordUserMismatch", testResetPasswordUserMismatch),
         ("testResetPasswordExpiredToken", testResetPasswordExpiredToken)
     ]
 }

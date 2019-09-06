@@ -28,7 +28,7 @@ public class TaskResultRepository {
         let topicID: Int
     }
 
-    private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
     private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
@@ -50,8 +50,10 @@ public class TaskResultRepository {
 
     public func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> Future<[TaskResult]> {
 
+        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         return conn.raw(getTasksQuery)
             .bind(userId)
+            .bind(oneDayAgo)
             .all(decoding: SubqueryResult.self)
             .flatMap { result in
 
@@ -75,11 +77,14 @@ public class TaskResultRepository {
         }
     }
 
-    public func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 6) throws -> Future<[TopicResultContent]> {
+    public func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> Future<[TopicResultContent]> {
 
+        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         return try conn.raw(getTasksQuery)
             .bind(user.requireID())
-            .all(decoding: SubqueryResult.self).flatMap { result in
+            .bind(oneDayAgo)
+            .all(decoding: SubqueryResult.self)
+            .flatMap { result in
 
                 let ids = result.map { $0.id }
                 return TaskResult.query(on: conn)
@@ -107,7 +112,8 @@ public class TaskResultRepository {
                                 try responses[topic.requireID()] = TopicResultContent(results: [result], topic: topic, subject: content.1)
                             }
                         }
-                        return responses.map { $0.value }.sorted(by: { $0.revisitDate < $1.revisitDate })
+                        return responses.map { $0.value }
+                            .sorted(by: { $0.revisitDate < $1.revisitDate })
                 }
         }
     }
