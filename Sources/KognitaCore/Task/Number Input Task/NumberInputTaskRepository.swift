@@ -135,14 +135,14 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
     }
 
     public func evaluate(_ answer: NumberInputTask.Submit.Data, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
+        
         let wasCorrect = task.correctAnswer == answer.answer
-        return PracticeSessionResult(
-            result: .init(
+        return PracticeSessionResult.init(
+            result: NumberInputTask.Submit.Response.init(
                 correctAnswer: task.correctAnswer,
                 wasCorrect: wasCorrect
             ),
-            unforgivingScore: wasCorrect ? 1 : 0,
-            forgivingScore: wasCorrect ? 1 : 0,
+            score: wasCorrect ? 1 : 0,
             progress: 0
         )
     }

@@ -53,13 +53,12 @@ extension NumberInputTask {
 
     func evaluate(for answer: NumberInputTask.Submit.Data) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
         let wasCorrect = correctAnswer == answer.answer
-        return PracticeSessionResult(
+        return PracticeSessionResult.init(
             result: .init(
                 correctAnswer: correctAnswer,
                 wasCorrect: wasCorrect
             ),
-            unforgivingScore: wasCorrect ? 1 : -1,
-            forgivingScore: wasCorrect ? 1 : 0,
+            score: wasCorrect ? 1 : 0,
             progress: 0
         )
     }

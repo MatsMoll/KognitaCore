@@ -5,17 +5,98 @@
 //  Created by Mats Mollestad on 22/01/2019.
 //
 
+import Vapor
 import XCTest
 @testable import KognitaCore
 
 final class PracticeSessionTests: VaporTestCase {
+
+    func testNumberOfCompletedTasksFlashCard() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        
+        let answer = FlashCardTask.Submit(
+            timeUsed: 20,
+            knowledge: 3
+        )
+        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+
+        XCTAssertEqual(firstResult.progress, 20)
+        XCTAssertEqual(secondResult.progress, 40)
+        XCTAssertEqual(lastResult.progress, 60)
+    }
     
-    func testPracticeSessionAssignment() throws {
+    func testNumberOfCompletedTasksMultipleChoice() throws {
         
         let user = try User.create(on: conn)
         
         let subtopic = try Subtopic.create(on: conn)
         
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        
+        let answer = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: []
+        )
+        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        
+        XCTAssertEqual(firstResult.progress, 20)
+        XCTAssertEqual(secondResult.progress, 40)
+        XCTAssertEqual(lastResult.progress, 60)
+    }
+
+    func testNumberOfCompletedTasksNumberInput() throws {
+        
+        let user = try User.create(on: conn)
+        
+        let subtopic = try Subtopic.create(on: conn)
+        
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        _ = try NumberInputTask.create(subtopic: subtopic, on: conn)
+        
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        
+        let answer = NumberInputTask.Submit.Data.init(
+            timeUsed: 45,
+            answer: 0
+        )
+        
+        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        
+        XCTAssertEqual(firstResult.progress, 20)
+        XCTAssertEqual(secondResult.progress, 40)
+        XCTAssertEqual(lastResult.progress, 60)
+    }
+
+
+    func testPracticeSessionAssignment() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
         let taskOne = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
         let taskTwo = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
         
@@ -88,6 +169,9 @@ final class PracticeSessionTests: VaporTestCase {
 
     static let allTests = [
         ("testPracticeSessionAssignment", testPracticeSessionAssignment),
-        ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple)
+        ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple),
+        ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
+        ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),
+        ("testNumberOfCompletedTasksNumberInput", testNumberOfCompletedTasksNumberInput),
     ]
 }
