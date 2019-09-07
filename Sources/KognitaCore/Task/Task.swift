@@ -8,7 +8,7 @@
 import Vapor
 import FluentPostgreSQL
 
-public final class Task: PostgreSQLModel {
+public final class Task: KognitaPersistenceModel {
 
     /// The semester a exam was taken
     ///
@@ -67,8 +67,6 @@ public final class Task: PostgreSQLModel {
     /// The id of the new edited task if there exists one
     public var editedTaskID: Task.ID?
 
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
     public static var deletedAtKey: TimestampKey? = \.deletedAt
 
 
@@ -114,6 +112,22 @@ public final class Task: PostgreSQLModel {
         validate()
     }
 
+    public static func addTableConstraints(to builder: SchemaCreator<Task>) {
+        builder.reference(from: \.subtopicId, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
+        builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+    }
+}
+
+extension Task {
+
+    var subtopic: Parent<Task, Subtopic> {
+        return parent(\.subtopicId)
+    }
+
+    var creator: Parent<Task, User> {
+        return parent(\.creatorId)
+    }
+    
     func validate() {
         description?.makeHTMLSafe()
         question.makeHTMLSafe()
@@ -151,7 +165,7 @@ public final class Task: PostgreSQLModel {
     }
 
     func getTaskTypePath(_ conn: DatabaseConnectable) throws -> Future<String> {
-        return try TaskRepository.shared
+        return try Task.Repository.shared
             .getTaskTypePath(for: requireID(), conn: conn)
     }
 
@@ -161,32 +175,6 @@ public final class Task: PostgreSQLModel {
             .filter(\Subtopic.id == subtopicId)
             .first()
             .unwrap(or: Abort(.internalServerError))
-    }
-}
-
-extension Task {
-
-    var subtopic: Parent<Task, Subtopic> {
-        return parent(\.subtopicId)
-    }
-
-    var creator: Parent<Task, User> {
-        return parent(\.creatorId)
-    }
-}
-
-extension Task: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(Task.self, on: conn) { builder in
-            try addProperties(to: builder)
-
-            builder.reference(from: \.subtopicId, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(Task.self, on: connection)
     }
 }
 

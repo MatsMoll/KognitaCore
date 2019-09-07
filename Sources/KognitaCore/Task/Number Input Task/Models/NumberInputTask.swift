@@ -8,7 +8,7 @@
 import Vapor
 import FluentPostgreSQL
 
-public final class NumberInputTask: PostgreSQLModel {
+public final class NumberInputTask : KognitaCRUDModel {
 
     public static let actionDescription = "Skriv inn et svar"
 
@@ -19,6 +19,11 @@ public final class NumberInputTask: PostgreSQLModel {
 
     // The unit the answer is given in
     public var unit: String?
+    
+    public var createdAt: Date?
+    
+    public var updatedAt: Date?
+    
 
     init(correctAnswer: Double, unit: String? = nil, taskId: Task.ID? = nil) {
         self.correctAnswer = correctAnswer
@@ -26,23 +31,19 @@ public final class NumberInputTask: PostgreSQLModel {
         self.id = taskId
     }
 
-    init(content: NumberInputTaskCreateContent, task: Task) throws {
+    init(content: Create.Data, task: Task) throws {
         self.correctAnswer = content.correctAnswer
         self.unit = content.unit
         self.id = try task.requireID()
     }
+    
+    public static func addTableConstraints(to builder: SchemaCreator<NumberInputTask>) {
+        builder.reference(from: \.id, to: \Task.id)
+    }
 }
 
 extension NumberInputTask: Parameter { }
-
-extension NumberInputTask: PostgreSQLMigration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(NumberInputTask.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.id, to: \Task.id)
-        }
-    }
-}
+extension NumberInputTask: Content { }
 
 extension NumberInputTask {
 
@@ -50,32 +51,16 @@ extension NumberInputTask {
         return parent(\.id)
     }
 
-
-    func evaluate(for answer: NumberInputTaskSubmit) -> PracticeSessionResult<NumberInputTaskSubmitResponse> {
+    func evaluate(for answer: NumberInputTask.Submit.Data) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
         let wasCorrect = correctAnswer == answer.answer
-        return PracticeSessionResult(
+        return PracticeSessionResult.init(
             result: .init(
                 correctAnswer: correctAnswer,
                 wasCorrect: wasCorrect
             ),
-            unforgivingScore: wasCorrect ? 1 : -1,
-            forgivingScore: wasCorrect ? 1 : 0,
+            score: wasCorrect ? 1 : 0,
             progress: 0
         )
     }
 }
 
-public struct NumberInputTaskContent: Content {
-    public let task: Task
-    public let input: NumberInputTask
-}
-
-public struct NumberInputTaskSubmit: Content, TaskSubmitable {
-    public let timeUsed: TimeInterval
-    public let answer: Double
-}
-
-public struct NumberInputTaskSubmitResponse: Content {
-    public let correctAnswer: Double
-    public let wasCorrect: Bool
-}

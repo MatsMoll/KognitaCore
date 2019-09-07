@@ -14,9 +14,7 @@ public protocol TaskSubmitable {
 
 public protocol TaskSubmitResultable {
 
-    var unforgivingScore: Double { get }
-
-    var forgivingScore: Double { get }
+    var score: Double { get }
 }
 
 
@@ -49,7 +47,7 @@ public final class TaskResult: PostgreSQLModel {
         self.taskID = result.taskID
         self.userID = userID
         self.timeUsed = result.submit.timeUsed
-        self.resultScore = result.result.unforgivingScore.clamped(to: 0...1)
+        self.resultScore = result.result.score.clamped(to: 0...1)
         self.sessionID = session?.id
 
         let referanceDate = session?.createdAt ?? Date()

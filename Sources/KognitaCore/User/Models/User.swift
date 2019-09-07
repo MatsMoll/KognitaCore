@@ -3,7 +3,7 @@ import FluentPostgreSQL
 import Vapor
 
 /// A registered user, capable of owning todo items.
-public final class User: PostgreSQLModel {
+public final class User: KognitaCRUDModel {
 
     public enum Role: String, PostgreSQLEnum, PostgreSQLMigration {
         case none
@@ -28,9 +28,6 @@ public final class User: PostgreSQLModel {
     /// The role of the User
     public private(set) var role: Role
 
-    /// A bool indicating if the user is a creator
-    public var isCreator: Bool { return role == .creator || role == .admin }
-
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
 
@@ -39,12 +36,8 @@ public final class User: PostgreSQLModel {
 
     /// A token used to activate other users
     public var loseAccessDate: Date?
-
-
-    public static var createdAtKey: TimestampKey? = \.createdAt
-    public static var updatedAtKey: TimestampKey? = \.updatedAt
+    
     public static var deletedAtKey: TimestampKey? = \.loseAccessDate
-
 
     /// Creates a new `User`.
     init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role = .creator) {
@@ -53,6 +46,14 @@ public final class User: PostgreSQLModel {
         self.email = email.lowercased()
         self.passwordHash = passwordHash
         self.role = role
+    }
+    
+    public static func addTableConstraints(to builder: SchemaCreator<User>) {
+        builder.unique(on: \.email)
+    }
+    
+    public func update(password: String) throws {
+        passwordHash = try BCrypt.hash(password)
     }
 }
 
@@ -74,30 +75,27 @@ extension User: TokenAuthenticatable {
 
 extension User: SessionAuthenticatable { }
 
-/// Allows `User` to be used as a Fluent migration.
-extension User: Migration {
-    /// See `Migration`.
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(User.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.unique(on: \.email)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(User.self, on: connection)
-    }
-}
-
 /// Allows `User` to be used as a dynamic parameter in route definitions.
 extension User: Parameter { }
 
-extension User {
-    func content() throws -> UserResponse {
 
-        guard let registrationDate = createdAt else {
-            throw Abort(.internalServerError)
-        }
-        return try UserResponse(id: requireID(), name: name, email: email, registrationDate: registrationDate)
+extension User {
+    /// A bool indicating if the user is a creator
+    public var isCreator: Bool { return role == .creator || role == .admin }
+    
+    func content() throws -> User.Response {
+        return try User.Response(
+            id:                 requireID(),
+            name:               name,
+            email:              email,
+            registrationDate:   createdAt ?? Date()
+        )
+    }
+}
+
+extension User : KognitaModelUpdatable {
+    
+    public func updateValues(with content: User.Edit.Data) throws {
+        self.name = content.name
     }
 }

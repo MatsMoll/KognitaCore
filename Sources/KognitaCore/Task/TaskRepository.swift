@@ -9,9 +9,36 @@ import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-public class TaskRepository {
+extension Task {
+    
+    public struct Create: KognitaRequestData {
+        public struct Data {
+            let content: TaskCreationContentable
+            let subtopic: Subtopic
+        }
+        public typealias Response = Task
 
-    public static let shared = TaskRepository()
+        public enum Errors : Error {
+            case invalidTopic
+        }
+    }
+    
+    public final class Repository {
+        public typealias Model = Task
+        
+        public static let shared = Repository()
+    }
+}
+
+extension Task.Repository : KognitaRepository {
+    
+    public func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+        guard let user = user else { throw Abort(.forbidden) }
+        
+        return try Task(content: content.content, subtopic: content.subtopic, creator: user)
+            .save(on: conn)
+    }
+    
 
     public func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
@@ -80,7 +107,7 @@ public class TaskRepository {
     struct MultipleChoiseTaskKey: Content {
         let isMultipleSelect: Bool?  // MultipleChoiseTask
     }
-
+    
     public func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
 
         return Task.query(on: conn, withSoftDeleted: true)
@@ -120,6 +147,19 @@ public class TaskRepository {
             .join(\Task.creatorId, to: \User.id)
             .groupBy(\User.id)
             .all(decoding: TaskCreators.self)
+    }
+    
+    public func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)?> {
+        
+        return conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .all(table: NumberInputTask.self)
+            .from(Task.self)
+            .where(\Task.id == id)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .join(\Task.id, to: \NumberInputTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
     }
 }
 

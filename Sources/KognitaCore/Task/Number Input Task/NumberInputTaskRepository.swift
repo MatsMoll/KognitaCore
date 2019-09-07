@@ -9,29 +9,34 @@ import FluentPostgreSQL
 import Vapor
 
 
-public class NumberInputTaskRepository {
+extension NumberInputTask {
+    
+    public final class Repository {
+            
+        public typealias Model = NumberInputTask
+        
+        public static let shared = Repository()
+    }
+}
 
-    public static let shared = NumberInputTaskRepository()
-
-    /// Creates and saves a multiple choise task
-    ///
-    /// - Parameters:
-    ///     - content:      The content to assign the task
-    ///     - user:         The user creating the task
-    ///     - conn:         A connection to the database
-    ///
-    /// - Returns:          The task id of the created task
-    public func create(with content: NumberInputTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
-        guard user.isCreator else {
+extension NumberInputTask.Repository : KognitaCRUDRepository {
+    
+    public func create(from content: NumberInputTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Create.Response> {
+        
+        guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
-        return Subtopic.find(content.subtopicID, on: conn)
-            .unwrap(or: TaskCreationError.invalidTopic)
+        
+        return Subtopic.repository
+            .find(content.subtopicId, on: conn)
+            .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
+                
                 conn.transaction(on: .psql) { conn in
-                    try Task(content: content, subtopic: subtopic, creator: user)
-                        .create(on: conn)
+                    
+                    try Task.repository
+                        .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { (task) in
                             try NumberInputTask(content: content, task: task)
                                 .create(on: conn)
@@ -39,40 +44,17 @@ public class NumberInputTaskRepository {
                 }
         }
     }
-
-    public func importTask(from taskContent: NumberInputTaskContent, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
-        taskContent.task.id = nil
-        taskContent.task.creatorId = 1
-        try taskContent.task.subtopicId = subtopic.requireID()
-        return taskContent.task.create(on: conn).flatMap { task in
-            try NumberInputTask(correctAnswer: taskContent.input.correctAnswer, unit: taskContent.input.unit, taskId: task.requireID())
-                .create(on: conn)
-                .transform(to: ())
-        }
-    }
-
-    public func delete(task number: NumberInputTask, user: User, conn: DatabaseConnectable) throws -> Future<Void> {
+    
+    public func edit(_ number: NumberInputTask, to content: NumberInputTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Edit.Response> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
         guard let task = number.task else {
             throw Abort(.internalServerError)
         }
-        return task.get(on: conn)
-            .flatMap { task in
-                return task.delete(on: conn)
-        }
-    }
-
-    public func edit(task number: NumberInputTask, with content: NumberInputTaskCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<NumberInputTask> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        guard let task = number.task else {
-            throw Abort(.internalServerError)
-        }
-        return try NumberInputTaskRepository.shared
-            .create(with: content, user: user, conn: conn)
+        
+        return try NumberInputTask.repository
+            .create(from: content, by: user, on: conn)
             .flatMap { newTask in
                 task.get(on: conn)
                     .flatMap { task in
@@ -84,14 +66,46 @@ public class NumberInputTaskRepository {
                 }
         }
     }
+    
+    public func delete(_ multiple: NumberInputTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard let user = user, user.isCreator else {
+            throw Abort(.forbidden)
+        }
+        guard let task = multiple.task else {
+            throw Abort(.internalServerError)
+        }
+        return task.get(on: conn)
+            .flatMap { task in
+                return task
+                    .delete(on: conn)
+                    .transform(to: ())
+        }
+    }
+    
 
-    public func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTaskContent> {
+    public func importTask(from taskContent: NumberInputTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+        
+        taskContent.task.id = nil
+        taskContent.task.creatorId = 1
+        try taskContent.task.subtopicId = subtopic.requireID()
+        
+        return taskContent.task
+            .create(on: conn)
+            .flatMap { task in
+                
+                try NumberInputTask(correctAnswer: taskContent.input.correctAnswer, unit: taskContent.input.unit, taskId: task.requireID())
+                    .create(on: conn)
+                    .transform(to: ())
+        }
+    }
+
+    public func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTask.Data> {
         guard let task = number.task else {
             throw Abort(.internalServerError)
         }
         return task.get(on: conn)
             .map { task in
-            NumberInputTaskContent(task: task, input: number)
+                NumberInputTask.Data(task: task, input: number)
         }
     }
 
@@ -120,15 +134,15 @@ public class NumberInputTaskRepository {
         }
     }
 
-    public func evaluate(_ answer: NumberInputTaskSubmit, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTaskSubmitResponse> {
+    public func evaluate(_ answer: NumberInputTask.Submit.Data, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
+        
         let wasCorrect = task.correctAnswer == answer.answer
-        return PracticeSessionResult(
-            result: .init(
+        return PracticeSessionResult.init(
+            result: NumberInputTask.Submit.Response.init(
                 correctAnswer: task.correctAnswer,
                 wasCorrect: wasCorrect
             ),
-            unforgivingScore: wasCorrect ? 1 : 0,
-            forgivingScore: wasCorrect ? 1 : 0,
+            score: wasCorrect ? 1 : 0,
             progress: 0
         )
     }

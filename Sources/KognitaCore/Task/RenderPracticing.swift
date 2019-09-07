@@ -29,20 +29,22 @@ public final class PracticeSessionResult<T: Content>: Content, TaskSubmitResulta
 
     public var change: Double?
 
-    public let unforgivingScore: Double
-
-    public let forgivingScore: Double
+    public let score: Double
 
     public var progress: Double
 
     public let result: T
 
 
-    init(result: T, unforgivingScore: Double, forgivingScore: Double, progress: Double, change: Double? = nil) {
+    init(
+        result: T,
+        score: Double,
+        progress: Double,
+        change: Double? = nil
+    ) {
         self.result = result
-        self.unforgivingScore = unforgivingScore
-        self.forgivingScore = forgivingScore
+        self.score = score
         self.progress = progress
-        self.change = change
+        self.change = change        
     }
 }

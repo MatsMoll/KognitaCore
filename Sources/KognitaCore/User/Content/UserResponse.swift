@@ -8,17 +8,21 @@
 import Vapor
 
 /// Public representation of user data.
-public struct UserResponse: Content {
-    /// User's unique identifier.
-    /// Not optional since we only return users that exist in the DB.
-    public let id: Int
+extension User {
+    
+    public struct Response : Content {
 
-    /// User's full name.
-    public let name: String
+        /// User's unique identifier.
+        /// Not optional since we only return users that exist in the DB.
+        public let id: Int
 
-    /// User's email address.
-    public let email: String
+        /// User's full name.
+        public let name: String
 
-    /// The User's registration date
-    public let registrationDate: Date
+        /// User's email address.
+        public let email: String
+
+        /// The User's registration date
+        public let registrationDate: Date
+    }
 }

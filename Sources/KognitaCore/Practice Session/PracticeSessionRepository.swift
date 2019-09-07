@@ -6,20 +6,65 @@
 //
 
 import FluentPostgreSQL
+import FluentSQL
 import Vapor
 
-public class PracticeSessionRepository {
+extension PracticeSession {
+    
+    public struct Create : KognitaRequestData {
+        
+        public struct Data : Decodable {
+            /// The number of task to complete in a session
+            public let numberOfTaskGoal: Int
 
-    public enum PracticeSessionError: Error {
+            /// The topic id's for the tasks to map
+            public let subtopicsIDs: Set<Subtopic.ID>
+        }
+        
+        public typealias Response = PracticeSession
+        
+        public struct WebResponse : Content {
+            /// A redirection to the session
+            public let redirectionUrl: String
+            
+            public init(redirectionUrl: String) {
+                self.redirectionUrl = redirectionUrl
+            }
+        }
+    }
+    
+    public typealias Edit = Create
+}
+
+
+extension PracticeSession {
+    
+    public final class Repository : KognitaCRUDRepository {
+        
+        public typealias Model = PracticeSession
+        
+        public static var shared = Repository()
+    }
+}
+
+
+extension PracticeSession.Repository {
+
+    public enum Errors: Error {
         case noAssignedTask
         case nextTaskNotAssigned
         case incorrectTaskType
+        case noMoreTasks
     }
 
-    public static let shared = PracticeSessionRepository()
-
-    public func create(for user: User, with content: PracticeSessionCreateContent, on conn: DatabaseConnectable) -> Future<PracticeSessionCreateResponse> {
-
+    public func create(from content: PracticeSession.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
+        
+        guard content.subtopicsIDs.count > 0 else {
+            throw Abort(.badRequest)
+        }
+        guard let user = user else {
+            throw Abort(.unauthorized)
+        }
         return conn.transaction(on: .psql) { conn in
 
             try PracticeSession(user: user, numberOfTaskGoal: content.numberOfTaskGoal)
@@ -27,7 +72,7 @@ public class PracticeSessionRepository {
                 .flatMap { session in
 
                     try content.subtopicsIDs.map {
-                        try PracticeSessionTopicPivot(subtopicID: $0, session: session)
+                        try PracticeSession.Pivot.Subtopic(subtopicID: $0, session: session)
                             .create(on: conn)
                         }
                         .flatten(on: conn)
@@ -35,32 +80,132 @@ public class PracticeSessionRepository {
 
                             try session
                                 .assignNextTask(on: conn)
-                                .flatMap { _ in
-
-                                    try session
-                                        .assignNextTask(on: conn)
-                                        .flatMap { _ in
-
-                                            try session
-                                                .getCurrentTaskPath(conn)
-                                                .map { path in
-                                                    PracticeSessionCreateResponse(redirectionUrl: path)
-                                            }
-                                    }
-                            }
+                                .transform(to: session)
                     }
                 }
         }
     }
+    
+    public func subtopics(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+        return try session.subtopics
+            .query(on: conn)
+            .all()
+    }
+    
+    public func assignedTasks(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<[Task]> {
+        return try session.assignedTasks
+            .query(on: conn)
+            .all()
+    }
+    
+    func uncompletedTasks(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<SessionTasks> {
+        return try subtopics(in: session, on: conn)
+            .flatMap { subtopics in
+            
+                try PracticeSession.repository
+                    .assignedTasks(in: session, on: conn)
+                    .flatMap { assignedTasks in
+                        
+                        try Task.query(on: conn)
+                            .filter(
+                                FilterOperator.make(
+                                    \Task.id,
+                                    PostgreSQLDatabase.queryFilterMethodNotInSubset,
+                                    assignedTasks.map { try $0.requireID() }
+                                )
+                            )
+                            .filter(\.subtopicId ~~ subtopics.map { try $0.requireID() })
+                            .all()
+                            .map { uncompletedTasks in
+                                
+                                return SessionTasks(
+                                    uncompletedTasks: uncompletedTasks,
+                                    assignedTasks: assignedTasks
+                                )
+                        }
+                }
+        }
+    }
+    
+    public func assignTask(to session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Void> {
+        return try uncompletedTasks(in: session, on: conn)
+            .flatMap { tasks in
 
-    public func submitInputTask(_ submit: NumberInputTaskSubmit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTaskSubmitResponse>> {
+                guard let task = tasks.uncompletedTasks.randomElement() else {
+                    throw Errors.noMoreTasks
+                }
+                
+                return try PracticeSession.Pivot.Task
+                    .create(session: session, task: task, index: tasks.assignedTasks.count + 1, on: conn)
+                    .transform(to: ())
+        }
+    }
+    
+    public func edit(_ model: PracticeSession, to content: PracticeSession.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
+        throw Abort(.internalServerError)
+    }
+    
+    public func currentActiveTask(in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
+        return try conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .all(table: NumberInputTask.self)
+            .from(PracticeSession.Pivot.Task.self)
+            .where(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .orderBy(\PracticeSession.Pivot.Task.index, .descending)
+            .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .join(\Task.id, to: \NumberInputTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
+            .unwrap(or: Abort(.internalServerError))
+            .map { taskContent in
+                TaskType(content: taskContent)
+        }
+    }
+
+    public func taskAt(index: Int, in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
+        return try conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .all(table: NumberInputTask.self)
+            .from(PracticeSession.Pivot.Task.self)
+            .where(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .where(\PracticeSession.Pivot.Task.index == index)
+            .orderBy(\PracticeSession.Pivot.Task.index, .descending)
+            .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .join(\Task.id, to: \NumberInputTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
+            .unwrap(or: Abort(.badRequest))
+            .map { taskContent in
+                TaskType(content: taskContent)
+        }
+    }
+}
+
+extension PracticeSession.Repository {
+    
+    public func goalProgress(for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Int> {
+
+        let goal = Double(session.numberOfTaskGoal)
+
+        return try session.assignedTasks
+            .pivots(on: conn)
+            .filter(\.isCompleted == true)
+            .count()
+            .map { (numberOfCompletedTasks) in
+                Int((Double(numberOfCompletedTasks * 100) / goal).rounded())
+        }
+    }
+
+    public func submitInputTask(_ submit: NumberInputTask.Submit.Data, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTask.Submit.Response>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
         }
 
         return try getCurrent(NumberInputTask.self, for: session, on: conn).flatMap { task in
-            let result = NumberInputTaskRepository.shared
+            let result = NumberInputTask.Repository.shared
                 .evaluate(submit, for: task)
 
             let submitResult = try TaskSubmitResult(
@@ -69,12 +214,20 @@ public class PracticeSessionRepository {
                 taskID: task.requireID()
             )
 
-            return try PracticeSessionRepository.shared
+            return try PracticeSession.repository
                 .register(submitResult, result: result, in: session, by: user, on: conn)
+                .flatMap { _ in
+                        
+                        try session.goalProgress(on: conn)
+                            .map { progress in
+                                result.progress = Double(progress)
+                                return result
+                        }
+                }
         }
     }
 
-    public func submitMultipleChoise(_ submit: MultipleChoiseTaskSubmit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoiseResult]>> {
+    public func submitMultipleChoise(_ submit: MultipleChoiseTask.Submit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
@@ -82,7 +235,7 @@ public class PracticeSessionRepository {
 
         return try getCurrent(MultipleChoiseTask.self, for: session, on: conn).flatMap { task in
 
-            try MultipleChoiseTaskRepository.shared
+            try MultipleChoiseTask.repository
                 .evaluate(submit, for: task, on: conn)
                 .flatMap { result in
 
@@ -92,28 +245,40 @@ public class PracticeSessionRepository {
                         taskID: task.requireID()
                     )
 
-                    return try PracticeSessionRepository.shared
+                    return try PracticeSession.repository
                         .register(submitResult, result: result, in: session, by: user, on: conn)
+                        .flatMap { _ in
+                            
+                            try session.goalProgress(on: conn)
+                                .map { progress in
+                                    result.progress = Double(progress)
+                                    return result
+                            }
+                    }
             }
         }
     }
 
-    public func submitFlashCard(_ submit: FlashCardTaskSubmit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTaskSubmit>> {
+    public func submitFlashCard(
+        _ submit: FlashCardTask.Submit,
+        in session: PracticeSession,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> Future<PracticeSessionResult<FlashCardTask.Submit>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
         }
-
+        
         return try getCurrent(FlashCardTask.self, for: session, on: conn).flatMap { task in
 
             let score = ScoreEvaluater.shared
                 .compress(score: submit.knowledge, range: 0...4)
 
             let result = PracticeSessionResult(
-                result: submit,
-                unforgivingScore: score,
-                forgivingScore: score,
-                progress: 0
+                result:                 submit,
+                score:                  score,
+                progress:               0
             )
 
             let submitResult = try TaskSubmitResult(
@@ -122,26 +287,37 @@ public class PracticeSessionRepository {
                 taskID: task.requireID()
             )
 
-            return try PracticeSessionRepository.shared
+            return try PracticeSession.repository
                 .register(submitResult, result: result, in: session, by: user, on: conn)
+                .flatMap { _ in
+
+                    try session.goalProgress(on: conn)
+                        .map { progress in
+                            result.progress = Double(progress)
+                            return result
+                    }
+            }
         }
     }
 
     public func getCurrent<T: PostgreSQLModel>(_ taskType: T.Type, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
+        
 
-        guard let taskID = session.currentTaskID else {
-            throw PracticeSessionError.noAssignedTask
-        }
-
-        return T.find(taskID, on: conn)
-            .unwrap(or: PracticeSessionError.incorrectTaskType)
+        return try PracticeSession.Pivot.Task
+            .query(on: conn)
+            .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .sort(\PracticeSession.Pivot.Task.index, .descending)
+            .join(\T.id, to: \PracticeSession.Pivot.Task.taskID)
+            .decode(T.self)
+            .first()
+            .unwrap(or: Abort(.badRequest))
     }
 
-    func markAsComplete(taskID: Task.ID, in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<PracticeSessionTaskPivot> {
+    func markAsComplete(taskID: Task.ID, in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<PracticeSession.Pivot.Task> {
 
         return try session.assignedTasks
             .pivots(on: conn)
-            .filter(\PracticeSessionTaskPivot.taskID == taskID)
+            .filter(\PracticeSession.Pivot.Task.taskID == taskID)
             .first()
             .unwrap(or: Abort(.internalServerError, reason: "Unable to find pivot when registering submit"))
             .flatMap { pivot in
@@ -181,31 +357,16 @@ public class PracticeSessionRepository {
         }
     }
 
-    public func getCurrentTaskPath(for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<String> {
-
-        guard let currentTaskID = session.currentTaskID,
-            let sessionID = session.id else {
-
-            throw Abort(.internalServerError)
-        }
-        return try TaskRepository.shared
-            .getTaskTypePath(for: currentTaskID, conn: conn)
-            .map { path in
-                return "/practice-sessions/\(sessionID)/" + path + "/current"
-        }
-    }
-
-    public func getNextTaskPath(for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<String?> {
-
-        guard let nextTaskID = session.nextTaskID,
-            let sessionID = session.id else {
-
-            return conn.future(nil)
-        }
-        return try TaskRepository.shared
-            .getTaskTypePath(for: nextTaskID, conn: conn)
-            .map { path in
-                return "/practice-sessions/\(sessionID)/" + path + "/current"
+    public func getCurrentTaskIndex(for sessionId: PracticeSession.ID, on conn: DatabaseConnectable) throws -> Future<Int> {
+        
+        return PracticeSession.Pivot.Task
+            .query(on: conn)
+            .filter(\PracticeSession.Pivot.Task.sessionID == sessionId)
+            .sort(\PracticeSession.Pivot.Task.index, .descending)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .map { task in
+                task.index
         }
     }
 
@@ -232,28 +393,35 @@ public class PracticeSessionRepository {
             .all()
     }
 
-    func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<T>> {
+    func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult> {
 
-
-        guard let taskID = session.currentTaskID else {
-            throw Abort(.internalServerError)
-        }
-        return try PracticeSessionRepository.shared
-            .markAsComplete(taskID: taskID, in: session, on: conn)
+        return try PracticeSession.repository
+            .markAsComplete(taskID: submitResult.taskID, in: session, on: conn)
             .flatMap { _ in
-
+                
                 try TaskResultRepository.shared
                     .createResult(from: submitResult, by: user, on: conn, in: session)
-                    .flatMap { _ in
-                        
-                        try PracticeSessionRepository.shared
-                            .goalProgress(in: session, on: conn)
-                            .map { progress in
-                                result.progress = Double(progress)
-                                return result
-                        }
-                }
         }
+        
+//        guard let taskID = session.currentTaskID else {
+//            throw Abort(.internalServerError)
+//        }
+//        return try PracticeSession.repository
+//            .markAsComplete(taskID: taskID, in: session, on: conn)
+//            .flatMap { _ in
+//
+//                try TaskResultRepository.shared
+//                    .createResult(from: submitResult, by: user, on: conn, in: session)
+//                    .flatMap { _ in
+//
+//                        try PracticeSession.repository
+//                            .goalProgress(in: session, on: conn)
+//                            .map { progress in
+//                                result.progress = Double(progress)
+//                                return result
+//                        }
+//                }
+//        }
     }
 
 
@@ -263,7 +431,6 @@ public class PracticeSessionRepository {
 
         return PracticeSession.query(on: conn)
             .filter(\.endedAt == nil)
-//            .filter(\.createdAt < maxSessionLimit)
             .all()
             .flatMap { sessions in
                 sessions.map { session in
@@ -289,15 +456,14 @@ public class PracticeSessionRepository {
         return try PracticeSession.query(on: conn)
             .filter(\PracticeSession.userID == user.requireID())
             .filter(\PracticeSession.endedAt == nil)
-            .filter(\PracticeSession.currentTaskID != nil)
             .sort(\.createdAt, .descending)
             .first()
             .flatMap { session in
-                
+
                 if let session = session {
-                    return try PracticeSessionRepository.shared
-                            .getCurrentTaskPath(for: session, on: conn)
-                            .map(to: Optional<String>.self) { $0 }
+                    return try session
+                        .getCurrentTaskIndex(conn)
+                        .map(to: String?.self) { try session.pathFor(index: $0) }
                 } else {
                     return conn.future(nil)
                 }
@@ -309,28 +475,14 @@ public class PracticeSessionRepository {
     ///
     public func getNumberOfTasks(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Int> {
 
-        return try PracticeSessionTopicPivot.query(on: conn)
-            .join(\Task.subtopicId, to: \PracticeSessionTopicPivot.subtopicID)
-            .filter(\PracticeSessionTopicPivot.sessionID == session.requireID())
+        return try PracticeSession.Pivot.Subtopic.query(on: conn)
+            .join(\Task.subtopicId, to: \PracticeSession.Pivot.Subtopic.subtopicID)
+            .filter(\PracticeSession.Pivot.Subtopic.sessionID == session.requireID())
             .count()
     }
 }
 
-
-/// The content needed to create a session
-public class PracticeSessionCreateContent: Decodable {
-
-    /// The number of task to complete in a session
-    public let numberOfTaskGoal: Int
-
-    /// The topic id's for the tasks to map
-    public let subtopicsIDs: [Subtopic.ID]
-}
-
-
-/// The response when creating a new session
-public struct PracticeSessionCreateResponse: Content {
-
-    /// A redirection to the session
-    public let redirectionUrl: String
+struct SessionTasks {
+    let uncompletedTasks: [Task]
+    let assignedTasks: [Task]
 }

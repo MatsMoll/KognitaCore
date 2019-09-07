@@ -11,7 +11,7 @@ import FluentPostgreSQL
 public final class PracticeSessionTopicPivot: PostgreSQLPivot {
 
     public typealias Left = PracticeSession
-    public typealias Right = Topic
+    public typealias Right = Subtopic
 
     public static var leftIDKey: LeftIDKey = \.sessionID
     public static var rightIDKey: RightIDKey = \.subtopicID

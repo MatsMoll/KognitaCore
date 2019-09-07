@@ -7,8 +7,6 @@
 
 import FluentPostgreSQL
 import Vapor
-import FluentQuery
-
 
 public struct TimelyTopic: Codable {
     public let subjectName: String
@@ -17,10 +15,57 @@ public struct TimelyTopic: Codable {
     public let numberOfTasks: Int
 }
 
-public class TopicRepository {
+extension Topic {
+    public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
+        
+        public typealias Model = Topic
+        
+        public static let shared = Repository()
+    }
+}
 
-    public static let shared = TopicRepository()
+extension Topic.Repository {
+    
+    public func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
+        
+        guard let user = user,
+            user.isCreator else { throw Abort(.forbidden) }
 
+        return Subject.Repository
+            .shared
+            .getSubjectWith(id: content.subjectId, on: conn)
+            .flatMap { subject in
+                try Topic(content: content, subject: subject, creator: user)
+                    .create(on: conn)
+        }
+    }
+
+    public func numberOfTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Int> {
+        return try Task.query(on: conn)
+            .join(\Subtopic.id, to: \Task.subtopic)
+            .filter(\Subtopic.topicId == topic.requireID())
+            .count()
+    }
+    
+    public func tasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Task]> {
+        return try Task.query(on: conn)
+            .join(\Subtopic.id, to: \Task.subtopic)
+            .filter(\Subtopic.topicId == topic.requireID())
+            .all()
+    }
+    
+    public func subtopics(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+        return try Subtopic.Repository.shared
+            .getSubtopics(in: topic, with: conn)
+    }
+
+    public func content(for topic: Topic, on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
+        return try subtopics(in: topic, on: conn)
+            .map { subtopics in
+                Topic.Response(topic: topic, subtopics: subtopics)
+        }
+    }
+    
     public func getAll(on conn: DatabaseConnectable) -> Future<[Topic]> {
         return Topic
             .query(on: conn)
@@ -49,74 +94,28 @@ public class TopicRepository {
         return task.topic(on: conn)
     }
 
-    public func create(with content: TopicCreateContent, user: User, conn: DatabaseConnectable) throws -> Future<Topic> {
+    public func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
 
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-
-        return SubjectRepository
-            .shared
-            .getSubjectWith(id: content.subjectId, on: conn)
-            .flatMap { subject in
-                try Topic(content: content, subject: subject, creator: user)
-                    .create(on: conn)
-        }
-    }
-
-    public func delete(topic: Topic, user: User, on conn: DatabaseConnectable) throws -> Future<Void> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        return topic.delete(on: conn)
-    }
-
-    public func edit(topic: Topic, with content: TopicCreateContent, user: User, on conn: DatabaseConnectable) throws -> Future<Topic> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        try topic.updateValues(with: content)
-        return topic.save(on: conn)
-    }
-
-    public func timelyTopics(on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
-
-        let numberOfTasksKey = "numberOfTasks"
-        let alias = Topic.alias(short: "sub")
-
-        return try FQL()
-            .select(\Subject.name, as: "subjectName")
-            .select(alias.k(\.name), as: "topicName")
-            .select(alias.k(\.id), as: "topicID")
-            .select("\"sub\".\"\(numberOfTasksKey)\" as \"\(numberOfTasksKey)\"")
+        return conn.select()
+            .column(\Subject.name,      as: "subjectName")
+            .column(\Topic.name,        as: "topicName")
+            .column(\Topic.id,          as: "topicID")
+            .column(.count(\Task.id),   as: "numberOfTasks")
             .from(Subject.self)
-            .orderBy(.asc(numberOfTasksKey))
-            .limit(12)
-            .join(
-                .inner,
-                subquery: FQL()
-                    .select(\Topic.subjectId)
-                    .select(\Topic.name)
-                    .select(\Topic.id)
-                    .select(.count(\Task.id), as: numberOfTasksKey)
-                    .from(Topic.self)
-                    .join(.inner, Subtopic.self, where: \Subtopic.topicId == \Topic.id)
-                    .join(.left, Task.self, where: \Task.subtopicId == \Subtopic.id)
-                    .where(
-                        \Task.deletedAt == nil
-                    )
-                    .groupBy(\Topic.id),
-                alias: alias,
-                where: \Subject.id == alias.k(\.subjectId)
-            )
-            .execute(on: conn, andDecode: TimelyTopic.self)
-
+            .join(\Subject.id,          to: \Topic.subjectId)
+            .join(\Topic.id,            to: \Subtopic.topicId, method: .left)
+            .join(\Subtopic.id,         to: \Task.subtopicId,  method: .left)
+            .where(\Task.deletedAt == nil)
+            .groupBy(\Topic.id)
+            .groupBy(\Subject.id)
+            .limit(limit)
+            .all(decoding: TimelyTopic.self)
     }
 
     public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
         return try getTopics(in: subject, conn: conn)
             .flatMap { topics in
-                try topics.map { try TopicRepository.shared.exportTasks(in: $0, on: conn) }
+                try topics.map { try Topic.Repository.shared.exportTasks(in: $0, on: conn) }
                     .flatten(on: conn)
         }.map { topicContent in
             SubjectExportContent(subject: subject, topics: topicContent)
@@ -129,7 +128,7 @@ public class TopicRepository {
             .all()
             .flatMap { subtopics in
                 try subtopics.map {
-                    try TopicRepository.shared.exportTasks(in: $0, on: conn)
+                    try Topic.Repository.shared.exportTasks(in: $0, on: conn)
                 }
                 .flatten(on: conn)
                 .map { subtopicContent in
@@ -147,7 +146,7 @@ public class TopicRepository {
             .filter(\Task.subtopicId == subtopic.requireID())
             .all()
             .flatMap { tasks in
-                try tasks.map { try MultipleChoiseTaskRepository.shared.get(task: $0, conn: conn) }
+                try tasks.map { try MultipleChoiseTask.repository.get(task: $0, conn: conn) }
                     .flatten(on: conn)
         }.flatMap { multipleTasks in
             try NumberInputTask.query(on: conn)
@@ -155,7 +154,7 @@ public class TopicRepository {
                 .filter(\Task.subtopicId == subtopic.requireID())
                 .all()
                 .flatMap { tasks in
-                    try tasks.map { try NumberInputTaskRepository.shared.get(task: $0, conn: conn) }
+                    try tasks.map { try NumberInputTask.repository.get(task: $0, conn: conn) }
                         .flatten(on: conn)
             }.flatMap { numberTasks in
                 try FlashCardTask.query(on: conn)
@@ -163,7 +162,7 @@ public class TopicRepository {
                     .filter(\Task.subtopicId == subtopic.requireID())
                     .all()
                     .flatMap { tasks in
-                        try tasks.map { try FlashCardRepository.shared.get(task: $0, conn: conn) }
+                        try tasks.map { try FlashCardTask.repository.get(task: $0, conn: conn) }
                             .flatten(on: conn)
                 }.map { flashCards in
                     SubtopicExportContent(
@@ -186,7 +185,7 @@ public class TopicRepository {
             .create(on: conn)
             .flatMap { topic in
                 try content.subtopics.map {
-                    try TopicRepository.shared.importContent(from: $0, in: topic, on: conn)
+                    try Topic.repository.importContent(from: $0, in: topic, on: conn)
                 }
                 .flatten(on: conn)
         }.transform(to: ())
@@ -203,17 +202,17 @@ public class TopicRepository {
             .flatMap { subtopic in
                 try content.multipleChoiseTasks
                     .map { task in
-                        try MultipleChoiseTaskRepository.shared
+                        try MultipleChoiseTask.repository
                             .importTask(from: task, in: subtopic, on: conn)
                 }.flatten(on: conn).flatMap { _ in
                     try content.inputTasks
                     .map { task in
-                        try NumberInputTaskRepository.shared
+                        try NumberInputTask.repository
                             .importTask(from: task, in: subtopic, on: conn)
                     }.flatten(on: conn).flatMap { _ in
                         try content.flashCards
                         .map { task in
-                            try FlashCardRepository.shared
+                            try FlashCardTask.repository
                                 .importTask(from: task, in: subtopic, on: conn)
                         }.flatten(on: conn)
                     }
@@ -224,8 +223,8 @@ public class TopicRepository {
 
 public struct SubtopicExportContent : Content {
     let subtopic: Subtopic
-    let multipleChoiseTasks: [MultipleChoiseTaskContent]
-    let inputTasks: [NumberInputTaskContent]
+    let multipleChoiseTasks: [MultipleChoiseTask.Data]
+    let inputTasks: [NumberInputTask.Data]
     let flashCards: [Task]
 }
 

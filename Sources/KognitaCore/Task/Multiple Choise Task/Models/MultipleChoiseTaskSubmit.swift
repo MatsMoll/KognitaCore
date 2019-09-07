@@ -7,22 +7,23 @@
 
 import Vapor
 
-/// The content needed to submit a answer to a `MultipleChoiseTask`
-public final class MultipleChoiseTaskSubmit: Content, TaskSubmitable {
 
-    /// The time used to answer the question
-    public let timeUsed: TimeInterval
+extension MultipleChoiseTask {
+    
+    /// The content needed to submit a answer to a `MultipleChoiseTask`
+    public struct Submit: Content, TaskSubmitable {
 
-    /// The choise id's
-    public let choises: [MultipleChoiseTaskChoise.ID]
+        /// The time used to answer the question
+        public let timeUsed: TimeInterval
+
+        /// The choise id's
+        public let choises: [MultipleChoiseTaskChoise.ID]
+    }
 }
 
-public final class MultipleChoiseTaskChoiseResult: Content {
-    public let id: MultipleChoiseTaskChoise.ID
-    public let isCorrect: Bool
-
-    init(id: MultipleChoiseTaskChoise.ID, isCorrect: Bool) {
-        self.id = id
-        self.isCorrect = isCorrect
+extension MultipleChoiseTaskChoise {
+    public struct Result: Content {
+        public let id: MultipleChoiseTaskChoise.ID
+        public let isCorrect: Bool
     }
 }
