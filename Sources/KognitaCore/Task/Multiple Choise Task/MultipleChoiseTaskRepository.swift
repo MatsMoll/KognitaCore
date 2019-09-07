@@ -191,16 +191,11 @@ extension MultipleChoiseTask.Repository {
                     try .init(id: $0.requireID(), isCorrect: true)
                 }
 
-                let forgivingScore = Double(numberOfCorrect) / Double(correctChoises.count)
-
-                let unforgivingScore = ScoreEvaluater.shared.compress(
-                        score: Double(numberOfCorrect - numberOfIncorrect),
-                        range: Double(-correctChoises.count)...Double(correctChoises.count))
+                let score = Double(numberOfCorrect) / Double(correctChoises.count)
 
                 return PracticeSessionResult(
                     result: results,
-                    unforgivingScore: unforgivingScore,
-                    forgivingScore: forgivingScore,
+                    score: score,
                     progress: 0
                 )
         }

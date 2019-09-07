@@ -259,22 +259,26 @@ extension PracticeSession.Repository {
         }
     }
 
-    public func submitFlashCard(_ submit: FlashCardTask.Submit, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTask.Submit>> {
+    public func submitFlashCard(
+        _ submit: FlashCardTask.Submit,
+        in session: PracticeSession,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> Future<PracticeSessionResult<FlashCardTask.Submit>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
         }
-
+        
         return try getCurrent(FlashCardTask.self, for: session, on: conn).flatMap { task in
 
             let score = ScoreEvaluater.shared
                 .compress(score: submit.knowledge, range: 0...4)
 
             let result = PracticeSessionResult(
-                result: submit,
-                unforgivingScore: score,
-                forgivingScore: score,
-                progress: 0
+                result:                 submit,
+                score:                  score,
+                progress:               0
             )
 
             let submitResult = try TaskSubmitResult(
@@ -286,17 +290,18 @@ extension PracticeSession.Repository {
             return try PracticeSession.repository
                 .register(submitResult, result: result, in: session, by: user, on: conn)
                 .flatMap { _ in
-                        
-                        try session.goalProgress(on: conn)
-                            .map { progress in
-                                result.progress = Double(progress)
-                                return result
-                        }
-                }
+
+                    try session.goalProgress(on: conn)
+                        .map { progress in
+                            result.progress = Double(progress)
+                            return result
+                    }
+            }
         }
     }
 
     public func getCurrent<T: PostgreSQLModel>(_ taskType: T.Type, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
+        
 
         return try PracticeSession.Pivot.Task
             .query(on: conn)
@@ -389,7 +394,7 @@ extension PracticeSession.Repository {
     }
 
     func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult> {
-        
+
         return try PracticeSession.repository
             .markAsComplete(taskID: submitResult.taskID, in: session, on: conn)
             .flatMap { _ in

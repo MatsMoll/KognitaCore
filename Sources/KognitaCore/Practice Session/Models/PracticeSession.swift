@@ -60,7 +60,14 @@ extension PracticeSession {
     /// - Throws: Database error
     func goalProgress(on conn: DatabaseConnectable) throws -> Future<Int> {
         return try Repository.shared
-            .goalProgress(in: self, on: conn)
+            .goalProgress(for: self, on: conn)
+    }
+    
+    func numberOfCompletedTasks(with conn: DatabaseConnectable) throws -> Future<Int> {
+        return try assignedTasks
+            .pivots(on: conn)
+            .filter(\.isCompleted == true)
+            .count()
     }
 
     /// Creates the necessary data for a `PracticeSession`
@@ -113,11 +120,26 @@ extension PracticeSession {
     public func pathFor(index: Int) throws -> String {
         return try "/practice-sessions/\(requireID())/tasks/\(index)"
     }
+    
+    public func submit(_ content: NumberInputTask.Submit.Data, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTask.Submit.Response>> {
+        return try PracticeSession.repository
+            .submitInputTask(content, in: self, by: user, on: conn)
+    }
+    
+    public func submit(_ content: MultipleChoiseTask.Submit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+        return try PracticeSession.repository
+            .submitMultipleChoise(content, in: self, by: user, on: conn)
+    }
+    
+    public func submit(_ content: FlashCardTask.Submit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTask.Submit>> {
+        return try PracticeSession.repository
+            .submitFlashCard(content, in: self, by: user, on: conn)
+    }
 }
 
 extension PracticeSession {
 
-    /// The topics being practiced
+    /// The subtopics being practiced
     var subtopics: Siblings<PracticeSession, Subtopic, PracticeSession.Pivot.Subtopic> {
         return siblings()
     }
