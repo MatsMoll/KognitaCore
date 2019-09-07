@@ -111,9 +111,9 @@ final class PracticeSessionTests: VaporTestCase {
             .create(from: create, by: user, on: conn).wait()
         
         let firstTask = try session.currentTask(on: conn).wait()
-        
-        XCTAssertNotNil(firstTask.1)
-        XCTAssert(try firstTask.0.requireID() == taskOne.requireID() || firstTask.0.requireID() == taskTwo.requireID())
+
+        XCTAssertNotNil(firstTask.multipleChoise)
+        XCTAssert(try firstTask.task.requireID() == taskOne.requireID() || firstTask.task.requireID() == taskTwo.requireID())
         
         let submit = MultipleChoiseTask.Submit(
             timeUsed: 20,
@@ -124,8 +124,8 @@ final class PracticeSessionTests: VaporTestCase {
         
         let secondTask = try session.currentTask(on: conn).wait()
         
-        XCTAssertNotNil(secondTask.1)
-        try XCTAssertNotEqual(secondTask.0.requireID(), firstTask.0.requireID())
+        XCTAssertNotNil(secondTask.multipleChoise)
+        try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
     }
     
     func testPracticeSessionAssignmentMultiple() throws {
@@ -151,8 +151,8 @@ final class PracticeSessionTests: VaporTestCase {
         
         let firstTask = try session.currentTask(on: conn).wait()
         
-        XCTAssertNotNil(firstTask.1)
-        XCTAssert(try firstTask.0.requireID() == taskOne.requireID() || firstTask.0.requireID() == taskTwo.requireID())
+        XCTAssertNotNil(firstTask.multipleChoise)
+        XCTAssert(try firstTask.task.requireID() == taskOne.requireID() || firstTask.task.requireID() == taskTwo.requireID())
         
         let submit = MultipleChoiseTask.Submit(
             timeUsed: 20,
@@ -163,8 +163,8 @@ final class PracticeSessionTests: VaporTestCase {
         
         let secondTask = try session.currentTask(on: conn).wait()
         
-        XCTAssertNotNil(secondTask.1)
-        try XCTAssertNotEqual(secondTask.0.requireID(), firstTask.0.requireID())
+        XCTAssertNotNil(secondTask.multipleChoise)
+        try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
     }
 
     static let allTests = [
