@@ -94,7 +94,7 @@ extension Topic.Repository {
         return task.topic(on: conn)
     }
 
-    public func timelyTopics(on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
+    public func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
 
         return conn.select()
             .column(\Subject.name,      as: "subjectName")
@@ -108,6 +108,7 @@ extension Topic.Repository {
             .where(\Task.deletedAt == nil)
             .groupBy(\Topic.id)
             .groupBy(\Subject.id)
+            .limit(limit)
             .all(decoding: TimelyTopic.self)
     }
 

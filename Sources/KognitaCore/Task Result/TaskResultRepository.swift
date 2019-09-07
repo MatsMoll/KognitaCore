@@ -79,10 +79,9 @@ public class TaskResultRepository {
 
     public func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> Future<[TopicResultContent]> {
 
-        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         return try conn.raw(getTasksQuery)
             .bind(user.requireID())
-            .bind(oneDayAgo)
+            .bind(Date())
             .all(decoding: SubqueryResult.self)
             .flatMap { result in
 
@@ -90,10 +89,10 @@ public class TaskResultRepository {
                 return TaskResult.query(on: conn)
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
-                    .join(\Task.id, to: \TaskResult.taskID)
+                    .join(\Task.id,     to: \TaskResult.taskID)
                     .join(\Subtopic.id, to: \Task.subtopicId)
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .join(\Subject.id, to: \Topic.subjectId)
+                    .join(\Topic.id,    to: \Subtopic.topicId)
+                    .join(\Subject.id,  to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
                     .alsoDecode(Subject.self)
                     .range(...limit)

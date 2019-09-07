@@ -145,7 +145,7 @@ extension PracticeSession.Repository {
         throw Abort(.internalServerError)
     }
     
-    public func currentActiveTask(in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
+    public func currentActiveTask(in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
         return try conn.select()
             .all(table: Task.self)
             .all(table: MultipleChoiseTask.self)
@@ -158,6 +158,28 @@ extension PracticeSession.Repository {
             .join(\Task.id, to: \NumberInputTask.id, method: .left)
             .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
             .unwrap(or: Abort(.internalServerError))
+            .map { taskContent in
+                TaskType(content: taskContent)
+        }
+    }
+
+    public func taskAt(index: Int, in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
+        return try conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .all(table: NumberInputTask.self)
+            .from(PracticeSession.Pivot.Task.self)
+            .where(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .where(\PracticeSession.Pivot.Task.index == index)
+            .orderBy(\PracticeSession.Pivot.Task.index, .descending)
+            .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .join(\Task.id, to: \NumberInputTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
+            .unwrap(or: Abort(.badRequest))
+            .map { taskContent in
+                TaskType(content: taskContent)
+        }
     }
 }
 

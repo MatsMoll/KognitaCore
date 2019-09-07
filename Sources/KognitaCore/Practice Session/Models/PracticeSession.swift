@@ -100,9 +100,14 @@ extension PracticeSession {
             .getCurrentTaskIndex(for: self.requireID(), on: conn)
     }
     
-    public func currentTask(on conn: PostgreSQLConnection) throws -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)> {
+    public func currentTask(on conn: PostgreSQLConnection) throws -> Future<TaskType> {
         return try Repository.shared
             .currentActiveTask(in: self, on: conn)
+    }
+
+    public func taskAt(index: Int, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
+        return try Repository.shared
+            .taskAt(index: index, in: self, on: conn)
     }
     
     public func pathFor(index: Int) throws -> String {
@@ -133,3 +138,17 @@ extension PracticeSession {
 
 extension PracticeSession: Parameter {}
 extension PracticeSession: Content {}
+
+
+public struct TaskType {
+
+    public let task: Task
+    public let multipleChoise: MultipleChoiseTask?
+    public let numberInputTask: NumberInputTask?
+
+    init(content: (task: Task, chosie: MultipleChoiseTask?, input: NumberInputTask?)) {
+        self.task = content.task
+        self.multipleChoise = content.chosie
+        self.numberInputTask = content.input
+    }
+}
