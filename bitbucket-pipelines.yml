@@ -23,7 +23,7 @@ pipelines:
     - <<: *test
     branches:
         '**-rc':
-            - <<: *static-test
+#            - <<: *static-test
             - <<: *test
             - step:
                 name: Release
@@ -31,7 +31,7 @@ pipelines:
                     - chmod +x ./CI/release-version.sh
                     - ./CI/release-version.sh
         'master':
-            - <<: *static-test
+#            - <<: *static-test
             - <<: *test
             - step:
                 name: Release
