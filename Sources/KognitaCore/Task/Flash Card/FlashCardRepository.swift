@@ -125,7 +125,7 @@ extension FlashCardTask.Repository {
                     subject: preview.1,
                     topic: preview.0.1,
                     task: preview.0.0,
-                    actionDescription: NumberInputTask.actionDescription
+                    actionDescription: FlashCardTask.actionDescriptor
                 )
         }
     }

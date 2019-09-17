@@ -10,7 +10,7 @@ import Vapor
 
 public final class FlashCardTask: KognitaCRUDModel {
 
-    static let actionDescriptor = "Svar på oppgaven og se om du har riktig"
+    static let actionDescriptor = "Tenk på svaret og se hvor godt du kan stoffet"
 
     public var id: Int?
     

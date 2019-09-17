@@ -69,6 +69,8 @@ extension TaskResult: Migration {
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
             builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .setNull)
+
+            builder.unique(on: \.sessionID, \.taskID)
         }
     }
 
@@ -87,5 +89,16 @@ extension TaskResult {
 
     public var content: TaskResultContent {
         return TaskResultContent(result: self, daysUntilRevisit: daysUntilRevisit)
+    }
+}
+
+struct UniqueMigraiont: PostgreSQLMigration {
+    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
+            builder.unique(on: \.sessionID, \.taskID)
+        }
+    }
+    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        conn.future()
     }
 }

@@ -18,6 +18,8 @@ extension MultipleChoiseTask {
 
         /// The choise id's
         public let choises: [MultipleChoiseTaskChoise.ID]
+
+        public internal(set) var taskIndex: Int
     }
 }
 
