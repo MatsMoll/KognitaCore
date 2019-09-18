@@ -62,10 +62,10 @@ extension User.Repository {
         let hash = try BCrypt.hash(content.password)
         // save new user
         let newUser = User(
-            id: nil,
             name: content.name,
             email: content.email,
-            passwordHash: hash
+            passwordHash: hash,
+            role: .user
         )
 
         return User.query(on: conn)

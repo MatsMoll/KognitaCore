@@ -38,16 +38,23 @@ extension PracticeSession.Pivot {
         public static var createdAtKey: TimestampKey? = \.createdAt
 
 
-        init(session: PracticeSession, task: KognitaCore.Task, index: Int) throws {
-            self.sessionID = try session.requireID()
-            self.taskID = try task.requireID()
+        init(sessionID: PracticeSession.ID, taskID: KognitaCore.Task.ID, index: Int) {
+            self.sessionID = sessionID
+            self.taskID = taskID
             self.index = index
         }
 
         static func create(session: PracticeSession, task: KognitaCore.Task, index: Int, on conn: DatabaseConnectable)
             throws -> Future<PracticeSession.Pivot.Task> {
                 
-            return try PracticeSession.Pivot.Task(session: session, task: task, index: index)
+            return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: task.requireID(), index: index)
+                .create(on: conn)
+        }
+
+        static func create(session: PracticeSession, taskID: KognitaCore.Task.ID, index: Int, on conn: DatabaseConnectable)
+            throws -> Future<PracticeSession.Pivot.Task> {
+
+            return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: taskID, index: index)
                 .create(on: conn)
         }
     }

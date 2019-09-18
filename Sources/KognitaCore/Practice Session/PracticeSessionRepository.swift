@@ -128,13 +128,37 @@ extension PracticeSession.Repository {
     }
     
     public func assignTask(to session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Void> {
+
+        return conn.databaseConnection(to: .psql).flatMap { psqlConn in
+            try TaskResultRepository.shared
+                .getFlowZoneTasks(for: session, on: psqlConn)
+                .flatMap { flowTask in
+
+                    guard let task = flowTask else {
+                        return try PracticeSession.repository
+                            .assignUncompletedTask(to: session, on: psqlConn)
+                    }
+
+                    return try PracticeSession.repository
+                        .currentTaskIndex(in: session, on: psqlConn)
+                        .flatMap { taskIndex in
+
+                            try PracticeSession.Pivot.Task
+                                .create(session: session, taskID: task.taskID, index: taskIndex + 1, on: psqlConn)
+                                .transform(to: ())
+                    }
+            }
+        }
+    }
+
+    public func assignUncompletedTask(to session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Void> {
         return try uncompletedTasks(in: session, on: conn)
             .flatMap { tasks in
 
                 guard let task = tasks.uncompletedTasks.randomElement() else {
                     throw Errors.noMoreTasks
                 }
-                
+
                 return try PracticeSession.Pivot.Task
                     .create(session: session, task: task, index: tasks.assignedTasks.count + 1, on: conn)
                     .transform(to: ())
@@ -143,6 +167,12 @@ extension PracticeSession.Repository {
     
     public func edit(_ model: PracticeSession, to content: PracticeSession.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
         throw Abort(.internalServerError)
+    }
+
+    public func currentTaskIndex(in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Int> {
+        return try TaskResult.query(on: conn)
+            .filter(\.sessionID == session.requireID())
+            .count()
     }
     
     public func currentActiveTask(in session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
@@ -204,7 +234,7 @@ extension PracticeSession.Repository {
             throw Abort(.forbidden)
         }
 
-        return try getCurrent(NumberInputTask.self, for: session, on: conn).flatMap { task in
+        return try get(NumberInputTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
             let result = NumberInputTask.Repository.shared
                 .evaluate(submit, for: task)
 
@@ -233,7 +263,7 @@ extension PracticeSession.Repository {
             throw Abort(.forbidden)
         }
 
-        return try getCurrent(MultipleChoiseTask.self, for: session, on: conn).flatMap { task in
+        return try get(MultipleChoiseTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
             try MultipleChoiseTask.repository
                 .evaluate(submit, for: task, on: conn)
@@ -270,7 +300,7 @@ extension PracticeSession.Repository {
             throw Abort(.forbidden)
         }
         
-        return try getCurrent(FlashCardTask.self, for: session, on: conn).flatMap { task in
+        return try get(FlashCardTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
             let score = ScoreEvaluater.shared
                 .compress(score: submit.knowledge, range: 0...4)
@@ -300,12 +330,13 @@ extension PracticeSession.Repository {
         }
     }
 
-    public func getCurrent<T: PostgreSQLModel>(_ taskType: T.Type, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
+    public func get<T: PostgreSQLModel>(_ taskType: T.Type, at index: Int, for session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<T> {
         
 
         return try PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .filter(\PracticeSession.Pivot.Task.index == index)
             .sort(\PracticeSession.Pivot.Task.index, .descending)
             .join(\T.id, to: \PracticeSession.Pivot.Task.taskID)
             .decode(T.self)
@@ -313,7 +344,7 @@ extension PracticeSession.Repository {
             .unwrap(or: Abort(.badRequest))
     }
 
-    func markAsComplete(taskID: Task.ID, in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<PracticeSession.Pivot.Task> {
+    func markAsComplete(taskID: Task.ID, in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Void> {
 
         return try session.assignedTasks
             .pivots(on: conn)
@@ -324,11 +355,10 @@ extension PracticeSession.Repository {
                 pivot.isCompleted = true
                 return pivot
                     .save(on: conn)
-                    .flatMap { pivot in
+                    .flatMap { _ in
 
                         try session
                             .assignNextTask(on: conn)
-                            .transform(to: pivot)
                 }
         }
     }
@@ -395,12 +425,18 @@ extension PracticeSession.Repository {
 
     func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult> {
 
-        return try PracticeSession.repository
-            .markAsComplete(taskID: submitResult.taskID, in: session, on: conn)
-            .flatMap { _ in
-                
-                try TaskResultRepository.shared
-                    .createResult(from: submitResult, by: user, on: conn, in: session)
+        return try TaskResultRepository.shared
+            .createResult(from: submitResult, by: user, on: conn, in: session)
+            .flatMap { result in
+
+                try PracticeSession.repository
+                    .markAsComplete(taskID: submitResult.taskID, in: session, on: conn)
+                    .catchFlatMap { error in
+                        switch error {
+                        case PracticeSession.Repository.Errors.noMoreTasks: return conn.future()
+                        default: return conn.future(error: error)
+                        }
+                }.transform(to: result)
         }
         
 //        guard let taskID = session.currentTaskID else {
