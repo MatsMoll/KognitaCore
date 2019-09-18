@@ -66,6 +66,7 @@ class TaskResultRepoTests: VaporTestCase {
     }
 
     static var allTests = [
-        ("testHistogramRoute", testHistogramRoute)
+        ("testHistogramRoute", testHistogramRoute),
+        ("testFlowZoneTasks", testFlowZoneTasks)
     ]
 }

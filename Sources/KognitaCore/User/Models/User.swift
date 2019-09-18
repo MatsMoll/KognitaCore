@@ -40,7 +40,7 @@ public final class User: KognitaCRUDModel {
     public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role = .creator) {
+    init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role) {
         self.id = id
         self.name = name
         self.email = email.lowercased()

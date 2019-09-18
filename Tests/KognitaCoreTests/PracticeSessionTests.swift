@@ -11,6 +11,31 @@ import XCTest
 
 final class PracticeSessionTests: VaporTestCase {
 
+    func testIncorrectTaskIndex() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+
+        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+
+        var answer = FlashCardTask.Submit(
+            timeUsed: 20,
+            knowledge: 3,
+            taskIndex: 1
+        )
+        XCTAssertNoThrow(try session.submit(answer, by: user, with: conn).wait())
+        answer.taskIndex = 2
+        XCTAssertNoThrow(try session.submit(answer, by: user, with: conn).wait())
+        answer.taskIndex = 2
+        XCTAssertThrowsError(try session.submit(answer, by: user, with: conn).wait())
+    }
+
     func testNumberOfCompletedTasksFlashCard() throws {
 
         let user = try User.create(on: conn)
@@ -229,10 +254,12 @@ final class PracticeSessionTests: VaporTestCase {
     }
 
     static let allTests = [
+        ("testIncorrectTaskIndex", testIncorrectTaskIndex),
         ("testPracticeSessionAssignment", testPracticeSessionAssignment),
         ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple),
         ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
         ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),
         ("testNumberOfCompletedTasksNumberInput", testNumberOfCompletedTasksNumberInput),
+        ("testAsignTaskWithTaskResult", testAsignTaskWithTaskResult)
     ]
 }
