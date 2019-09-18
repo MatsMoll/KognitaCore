@@ -92,13 +92,13 @@ extension TaskResult {
     }
 }
 
-struct UniqueMigraiont: PostgreSQLMigration {
+struct TaskResultUniqueMigration: PostgreSQLMigration {
     static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
             builder.unique(on: \.sessionID, \.taskID)
         }
     }
     static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        conn.future()
+        return conn.future()
     }
 }
