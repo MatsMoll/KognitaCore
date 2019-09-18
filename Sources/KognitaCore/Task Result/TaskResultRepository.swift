@@ -12,6 +12,10 @@ public class TaskResultRepository {
 
     public static let shared = TaskResultRepository()
 
+    public struct FlowZoneTaskResult: Codable {
+        public let taskID: Task.ID
+    }
+
     private struct SubqueryResult: Codable {
         let id: Int
         let taskID: Int
@@ -27,6 +31,12 @@ public class TaskResultRepository {
         let resultScore: Double
         let topicID: Int
     }
+
+    private let getSubtopicsQuery = "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($3)"
+
+    private let getTaskResults = "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+
+    lazy private var getFlowTasksQuery = "SELECT * FROM (\(self.getTaskResults)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($3) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($4) AND \"Task\".\"subtopicId\" = ANY (\(self.getSubtopicsQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
 
     private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
@@ -46,6 +56,19 @@ public class TaskResultRepository {
             )
             .orderBy(\TaskResult.revisitDate)
             .all(decoding: TaskResult.self)
+    }
+
+    public func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
+
+        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
+        let scoreThreshold: Double = 0.6
+
+        return try conn.raw(getFlowTasksQuery)
+            .bind(session.userID)
+            .bind(oneDayAgo)
+            .bind(session.requireID())
+            .bind(scoreThreshold)
+            .first(decoding: FlowZoneTaskResult.self)
     }
 
     public func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> Future<[TaskResult]> {

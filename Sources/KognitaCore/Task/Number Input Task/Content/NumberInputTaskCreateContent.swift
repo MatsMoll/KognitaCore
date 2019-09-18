@@ -45,6 +45,7 @@ extension NumberInputTask {
         public struct Data: Content, TaskSubmitable {
             public let timeUsed: TimeInterval
             public let answer: Double
+            public internal(set) var taskIndex: Int
         }
         
         public struct Response: Content {
