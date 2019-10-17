@@ -21,20 +21,20 @@ extension MultipleChoiseTask {
 
 extension MultipleChoiseTask.Repository {
     
-    public func create(from content: MultipleChoiseTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
+    public static func create(from content: MultipleChoiseTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
         
-        return Subtopic.repository
+        return Subtopic.Repository
             .find(content.subtopicId, on: conn)
             .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
                 
                 conn.transaction(on: .psql) { conn in
                     
-                    try Task.repository
+                    try Task.Repository
                         .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { (task) in
                             
@@ -56,7 +56,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
     
-    public func edit(_ multiple: MultipleChoiseTask, to content: MultipleChoiseTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
+    public static func edit(_ multiple: MultipleChoiseTask, to content: MultipleChoiseTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
         
         guard user.isCreator else {
             throw Abort(.forbidden)
@@ -65,7 +65,7 @@ extension MultipleChoiseTask.Repository {
             throw Abort(.internalServerError)
         }
 
-        return try MultipleChoiseTask.Repository.shared
+        return try MultipleChoiseTask.Repository
             .create(from: content, by: user, on: conn)
             .flatMap { newTask in
 
@@ -81,7 +81,7 @@ extension MultipleChoiseTask.Repository {
             }
     }
     
-    public func delete(_ multiple: MultipleChoiseTask.Repository.Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public static func delete(_ multiple: MultipleChoiseTask.Repository.Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -96,7 +96,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiseTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func importTask(from taskContent: MultipleChoiseTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
@@ -115,7 +115,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
+    public static func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
 
         return try task.choises
             .query(on: conn)
@@ -133,7 +133,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTask.Data)> {
+    public static func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTask.Data)> {
 
         return try multiple
             .content(on: conn)
@@ -164,7 +164,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    func evaluate(_ submit: MultipleChoiseTask.Submit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    static func evaluate(_ submit: MultipleChoiseTask.Submit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         return try task.choises
             .query(on: conn)

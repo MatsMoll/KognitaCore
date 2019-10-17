@@ -93,7 +93,7 @@ extension MultipleChoiseTask {
         on conn: DatabaseConnectable
     ) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
         
-        return try Repository.shared
+        return try Repository
             .evaluate(submit, for: self, on: conn)
     }
 }

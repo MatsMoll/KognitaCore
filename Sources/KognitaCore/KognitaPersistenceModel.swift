@@ -17,56 +17,53 @@ public protocol KognitaRequestData {
 public protocol KognitaRepository {
     associatedtype Model where Model : KognitaPersistenceModel
     
-    /// A shared instance of the repo
-    static var shared: Self { get }
-    
     /// Creates a Model
     ///
     /// - Parameter content: The data defining the model
     /// - Parameter user: The user creating the model
     /// - Parameter conn: The database connection
-    func create(from content: Model.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> Future<Model.Create.Response>
+    static func create(from content: Model.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> Future<Model.Create.Response>
     
-    func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
-    func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<Model?>
-    func all(on conn: DatabaseConnectable) -> Future<[Model]>
-    func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]>
-    func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
-    func find(_ id: Model.ID, on conn: DatabaseConnectable) -> Future<Model?>
+    static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
+    static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<Model?>
+    static func all(on conn: DatabaseConnectable) -> Future<[Model]>
+    static func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]>
+    static func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> Future<Model>
+    static func find(_ id: Model.ID, on conn: DatabaseConnectable) -> Future<Model?>
 }
 
 extension KognitaRepository {
     
-    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> Future<Model> {
+    static public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> Future<Model> {
         return Model.query(on: conn)
             .filter(filter)
             .first()
             .unwrap(or: error)
     }
     
-    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<Model?> {
+    static public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<Model?> {
         return Model.query(on: conn)
             .filter(filter)
             .first()
     }
     
-    public func all(on conn: DatabaseConnectable) -> Future<[Model]> {
+    static public func all(on conn: DatabaseConnectable) -> Future<[Model]> {
         return Model.query(on: conn)
             .all()
     }
     
-    public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]> {
+    static public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> Future<[Model]> {
         return Model.query(on: conn)
             .filter(filter)
             .all()
     }
     
-    public func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> Future<Model> {
+    static public func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> Future<Model> {
         return Model.find(id, on: conn)
             .unwrap(or: error)
     }
     
-    public func find(_ id: Model.ID, on conn: DatabaseConnectable) -> Future<Model?> {
+    static public func find(_ id: Model.ID, on conn: DatabaseConnectable) -> Future<Model?> {
         return Model.find(id, on: conn)
     }
 }
@@ -77,11 +74,11 @@ public protocol KognitaRepositoryDeletable : KognitaRepository {
     /// - Parameter model: The model to delete
     /// - Parameter user: The used that is deleting the model
     /// - Parameter conn: The database connection
-    func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void>
+    static func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void>
 }
 
 extension KognitaRepositoryDeletable {
-    public func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void> {
+    static public func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void> {
         guard let user = user,
             user.isCreator else { throw Abort(.forbidden) }
         return model.delete(on: conn)
@@ -99,11 +96,11 @@ public protocol KognitaRepositoryEditable : KognitaRepository where Model : Kogn
     /// - Parameter content: The data defining the new Model
     /// - Parameter user: The user editing
     /// - Parameter conn: The database connection
-    func edit(_ model: Model, to content: Model.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> Future<Model.Edit.Response>
+    static func edit(_ model: Model, to content: Model.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> Future<Model.Edit.Response>
 }
 
 extension KognitaRepositoryEditable where Model : KognitaModelUpdatable, Model.Edit.Response == Model {
-    public func edit(_ model: Model, to content: Model.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> Future<Model.Edit.Response> {
+    static public func edit(_ model: Model, to content: Model.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> Future<Model.Edit.Response> {
                     
         guard user.isCreator else { throw Abort(.forbidden) }
         
@@ -118,9 +115,6 @@ public protocol KognitaPersistenceModel : PostgreSQLModel, Migration {
     associatedtype Create where Create : KognitaRequestData
     associatedtype Repository where Repository : KognitaRepository, Repository.Model == Self
     
-    /// The repository for the model
-    static var repository: Repository { get }
-    
     /// Creation at data
     var createdAt: Date? { get set }
     
@@ -134,8 +128,6 @@ public protocol KognitaPersistenceModel : PostgreSQLModel, Migration {
 }
 
 extension KognitaPersistenceModel {
-    
-    public static var repository: Repository { return Repository.shared }
     
     public static var createdAtKey: WritableKeyPath<Self, Date?>? { return \Self.createdAt }
     public static var updatedAtKey: WritableKeyPath<Self, Date?>? { return \Self.updatedAt }

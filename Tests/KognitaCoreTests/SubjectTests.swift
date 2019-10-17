@@ -28,7 +28,7 @@ class SubjectTests: VaporTestCase {
         _ = try MultipleChoiseTask.create(subtopic: subtopicTwo, on: conn)
         _ = try MultipleChoiseTask.create(subtopic: subtopicTwo, on: conn)
         
-        let subjectExport = try Topic.repository
+        let subjectExport = try Topic.Repository
             .exportTopics(in: subject, on: conn).wait()
         
         XCTAssertEqual(subjectExport.subject.id, subject.id)
@@ -41,9 +41,9 @@ class SubjectTests: VaporTestCase {
         XCTAssertEqual(topicExport.subtopics.count, 2)
         XCTAssertEqual(topicExport.subtopics.first?.multipleChoiseTasks.count, 3)
         
-        _ = try Subject.repository.importContent(subjectExport, on: conn).wait()
+        _ = try Subject.Repository.importContent(subjectExport, on: conn).wait()
         
-        XCTAssertEqual(try Task.repository.all(on: conn).wait().count, 12)
+        XCTAssertEqual(try Task.Repository.all(on: conn).wait().count, 12)
     }
 
     static let allTests = [

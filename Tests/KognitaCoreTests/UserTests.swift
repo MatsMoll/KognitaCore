@@ -3,13 +3,14 @@ import Vapor
 import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class UserTests: VaporTestCase {
 
     func testResetPassword() throws {
         let user = try User.create(on: conn)
         
-        let tokenResponse = try User.ResetPassword.Token.repository
+        let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
         
         let newPassword = "p1234"
@@ -21,10 +22,10 @@ class UserTests: VaporTestCase {
             verifyPassword: newPassword
         )
         
-        try User.ResetPassword.Token.repository
+        try User.ResetPassword.Token.Repository
             .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         
-        let savedUser = try User.repository
+        let savedUser = try User.Repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         
         XCTAssert(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
@@ -33,7 +34,7 @@ class UserTests: VaporTestCase {
     func testResetPasswordPasswordMismatch() throws {
         let user = try User.create(on: conn)
         
-        let tokenResponse = try User.ResetPassword.Token.repository
+        let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
         
         let newPassword = "p1234"
@@ -44,10 +45,10 @@ class UserTests: VaporTestCase {
         )
         
         XCTAssertThrowsError(
-            try User.ResetPassword.Token.repository
+            try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
-        let savedUser = try User.repository
+        let savedUser = try User.Repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }
@@ -55,9 +56,9 @@ class UserTests: VaporTestCase {
     func testResetPasswordExpiredToken() throws {
         let user = try User.create(on: conn)
         
-        let tokenResponse = try User.ResetPassword.Token.repository
+        let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
-        var token = try User.ResetPassword.Token.repository
+        var token = try User.ResetPassword.Token.Repository
             .first(where: \.string == tokenResponse.token, or: Abort(.internalServerError), on: conn).wait()
         token.deletedAt = Date()
         _ = try token.save(on: conn).wait()
@@ -70,10 +71,10 @@ class UserTests: VaporTestCase {
         )
         
         XCTAssertThrowsError(
-            try User.ResetPassword.Token.repository
+            try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
-        let savedUser = try User.repository
+        let savedUser = try User.Repository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }

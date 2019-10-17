@@ -19,20 +19,17 @@ extension Topic {
     public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
         
         public typealias Model = Topic
-        
-        public static let shared = Repository()
     }
 }
 
 extension Topic.Repository {
     
-    public func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
+    public static func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
         
         guard let user = user,
             user.isCreator else { throw Abort(.forbidden) }
 
         return Subject.Repository
-            .shared
             .getSubjectWith(id: content.subjectId, on: conn)
             .flatMap { subject in
                 try Topic(content: content, subject: subject, creator: user)
@@ -40,39 +37,39 @@ extension Topic.Repository {
         }
     }
 
-    public func numberOfTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Int> {
+    public static func numberOfTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Int> {
         return try Task.query(on: conn)
             .join(\Subtopic.id, to: \Task.subtopic)
             .filter(\Subtopic.topicId == topic.requireID())
             .count()
     }
     
-    public func tasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Task]> {
+    public static func tasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Task]> {
         return try Task.query(on: conn)
             .join(\Subtopic.id, to: \Task.subtopic)
             .filter(\Subtopic.topicId == topic.requireID())
             .all()
     }
     
-    public func subtopics(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
-        return try Subtopic.Repository.shared
+    public static func subtopics(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+        return try Subtopic.Repository
             .getSubtopics(in: topic, with: conn)
     }
 
-    public func content(for topic: Topic, on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
+    public static func content(for topic: Topic, on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
         return try subtopics(in: topic, on: conn)
             .map { subtopics in
                 Topic.Response(topic: topic, subtopics: subtopics)
         }
     }
     
-    public func getAll(on conn: DatabaseConnectable) -> Future<[Topic]> {
+    public static func getAll(on conn: DatabaseConnectable) -> Future<[Topic]> {
         return Topic
             .query(on: conn)
             .all()
     }
 
-    public func getTopics(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic]> {
+    public static func getTopics(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic]> {
         return try subject
             .topics
             .query(on: conn)
@@ -80,7 +77,7 @@ extension Topic.Repository {
             .all()
     }
 
-    public func getTopicResponses(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic.Response]> {
+    public static func getTopicResponses(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic.Response]> {
         return try getTopics(in: subject, conn: conn)
             .flatMap { topics in
                 try topics.map {
@@ -90,11 +87,11 @@ extension Topic.Repository {
         }
     }
 
-    public func getTopic(for task: Task, on conn: DatabaseConnectable) -> Future<Topic> {
+    public static func getTopic(for task: Task, on conn: DatabaseConnectable) -> Future<Topic> {
         return task.topic(on: conn)
     }
 
-    public func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
+    public static func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> Future<[TimelyTopic]> {
 
         return conn.select()
             .column(\Subject.name,      as: "subjectName")
@@ -112,23 +109,23 @@ extension Topic.Repository {
             .all(decoding: TimelyTopic.self)
     }
 
-    public func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
+    public static func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
         return try getTopics(in: subject, conn: conn)
             .flatMap { topics in
-                try topics.map { try Topic.Repository.shared.exportTasks(in: $0, on: conn) }
+                try topics.map { try Topic.Repository.exportTasks(in: $0, on: conn) }
                     .flatten(on: conn)
         }.map { topicContent in
             SubjectExportContent(subject: subject, topics: topicContent)
         }
     }
 
-    public func exportTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<TopicExportContent> {
+    public static func exportTasks(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<TopicExportContent> {
         return try Subtopic.query(on: conn)
             .filter(\.topicId == topic.requireID())
             .all()
             .flatMap { subtopics in
                 try subtopics.map {
-                    try Topic.Repository.shared.exportTasks(in: $0, on: conn)
+                    try Topic.Repository.exportTasks(in: $0, on: conn)
                 }
                 .flatten(on: conn)
                 .map { subtopicContent in
@@ -140,13 +137,13 @@ extension Topic.Repository {
         }
     }
 
-    public func exportTasks(in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<SubtopicExportContent> {
+    public static func exportTasks(in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<SubtopicExportContent> {
         return try MultipleChoiseTask.query(on: conn)
             .join(\Task.id, to: \MultipleChoiseTask.id)
             .filter(\Task.subtopicId == subtopic.requireID())
             .all()
             .flatMap { tasks in
-                try tasks.map { try MultipleChoiseTask.repository.get(task: $0, conn: conn) }
+                try tasks.map { try MultipleChoiseTask.Repository.get(task: $0, conn: conn) }
                     .flatten(on: conn)
         }.flatMap { multipleTasks in
             try NumberInputTask.query(on: conn)
@@ -154,7 +151,7 @@ extension Topic.Repository {
                 .filter(\Task.subtopicId == subtopic.requireID())
                 .all()
                 .flatMap { tasks in
-                    try tasks.map { try NumberInputTask.repository.get(task: $0, conn: conn) }
+                    try tasks.map { try NumberInputTask.Repository.get(task: $0, conn: conn) }
                         .flatten(on: conn)
             }.flatMap { numberTasks in
                 try FlashCardTask.query(on: conn)
@@ -162,7 +159,7 @@ extension Topic.Repository {
                     .filter(\Task.subtopicId == subtopic.requireID())
                     .all()
                     .flatMap { tasks in
-                        try tasks.map { try FlashCardTask.repository.get(task: $0, conn: conn) }
+                        try tasks.map { try FlashCardTask.Repository.get(task: $0, conn: conn) }
                             .flatten(on: conn)
                 }.map { flashCards in
                     SubtopicExportContent(
@@ -176,7 +173,7 @@ extension Topic.Repository {
         }
     }
 
-    public func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
 
         content.topic.id = nil
         content.topic.creatorId = 1
@@ -185,14 +182,14 @@ extension Topic.Repository {
             .create(on: conn)
             .flatMap { topic in
                 try content.subtopics.map {
-                    try Topic.repository.importContent(from: $0, in: topic, on: conn)
+                    try Topic.Repository.importContent(from: $0, in: topic, on: conn)
                 }
                 .flatten(on: conn)
         }.transform(to: ())
     }
 
 
-    public func importContent(from content: SubtopicExportContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func importContent(from content: SubtopicExportContent, in topic: Topic, on conn: DatabaseConnectable) throws -> Future<Void> {
 
         content.subtopic.id = nil
         content.subtopic.topicId = try topic.requireID()
@@ -202,22 +199,90 @@ extension Topic.Repository {
             .flatMap { subtopic in
                 try content.multipleChoiseTasks
                     .map { task in
-                        try MultipleChoiseTask.repository
+                        try MultipleChoiseTask.Repository
                             .importTask(from: task, in: subtopic, on: conn)
                 }.flatten(on: conn).flatMap { _ in
                     try content.inputTasks
                     .map { task in
-                        try NumberInputTask.repository
+                        try NumberInputTask.Repository
                             .importTask(from: task, in: subtopic, on: conn)
                     }.flatten(on: conn).flatMap { _ in
                         try content.flashCards
                         .map { task in
-                            try FlashCardTask.repository
+                            try FlashCardTask.Repository
                                 .importTask(from: task, in: subtopic, on: conn)
                         }.flatten(on: conn)
                     }
                 }
         }.transform(to: ())
+    }
+
+    public static func leveledTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[[Topic]]> {
+
+        return try getTopics(in: subject, conn: conn)
+            .flatMap { topics in
+
+                try topicPreknowleged(in: subject, on: conn)
+                    .map { preknowleged in
+
+                        structure(topics, with: preknowleged)
+                }
+        }
+    }
+
+    static func topicPreknowleged(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[Topic.Pivot.Preknowleged]> {
+        return try Topic.Pivot.Preknowleged.query(on: conn)
+            .join(\Topic.id, to: \Topic.Pivot.Preknowleged.topicID)
+            .filter(\Topic.subjectId == subject.requireID())
+            .all()
+    }
+
+    static func structure(_ topics: [Topic], with preknowleged: [Topic.Pivot.Preknowleged]) -> [[Topic]] {
+        var knowlegedGraph = [Topic.ID: [Topic.ID]]()
+        for knowleged in preknowleged {
+            if let value = knowlegedGraph[knowleged.topicID] {
+                knowlegedGraph[knowleged.topicID] = value + [knowleged.preknowlegedID]
+            } else {
+                knowlegedGraph[knowleged.topicID] = [knowleged.preknowlegedID]
+            }
+        }
+        var levels = [Topic.ID: Int]()
+        var unleveledTopics = topics
+        var topicIndex = unleveledTopics.count - 1
+        while topicIndex >= 0 {
+            let currentTopic = unleveledTopics[topicIndex]
+            guard let currentTopicID = try? currentTopic.requireID() else {
+                unleveledTopics.remove(at: topicIndex)
+                topicIndex -= 1
+                continue
+            }
+            if let node = knowlegedGraph[currentTopicID] {
+                let preLevels = node.compactMap { levels[$0] }
+                if preLevels.count == node.count {
+                    levels[currentTopicID] = preLevels.reduce(1) { max($0, $1) } + 1
+                    unleveledTopics.remove(at: topicIndex)
+                }
+            } else {
+                unleveledTopics.remove(at: topicIndex)
+                levels[currentTopicID] = 1
+            }
+
+            if topicIndex >= 1 {
+                topicIndex -= 1
+            } else {
+                topicIndex = unleveledTopics.count - 1
+            }
+        }
+        var leveledTopics = [[Topic]]()
+        for (topicID, level) in levels.sorted(by: { $0.1 < $1.1 }) {
+            if leveledTopics.count < level {
+                leveledTopics.append([])
+            }
+            if let topic = topics.first(where: { $0.id == topicID }) {
+                leveledTopics[level - 1] = leveledTopics[level - 1] + [topic]
+            }
+        }
+        return leveledTopics
     }
 }
 

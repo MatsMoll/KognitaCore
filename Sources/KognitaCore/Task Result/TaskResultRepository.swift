@@ -10,8 +10,6 @@ import FluentSQL
 
 public class TaskResultRepository {
 
-    public static let shared = TaskResultRepository()
-
     public struct FlowZoneTaskResult: Codable {
         public let taskID: Task.ID
     }
@@ -32,20 +30,20 @@ public class TaskResultRepository {
         let topicID: Int
     }
 
-    private let getSubtopicsQuery = "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($3)"
+    private static let getSubtopicsQuery = "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($3)"
 
-    private let getTaskResults = "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private static let getTaskResults = "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    lazy private var getFlowTasksQuery = "SELECT * FROM (\(self.getTaskResults)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($3) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($4) AND \"Task\".\"subtopicId\" = ANY (\(self.getSubtopicsQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
+    private static let getFlowTasksQuery = "SELECT * FROM (\(TaskResultRepository.getTaskResults)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($3) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($4) AND \"Task\".\"subtopicId\" = ANY (\(TaskResultRepository.getSubtopicsQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
 
-    private let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private static let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private static let getTasksQueryTopicFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private static let getTasksQuerySubjectFilter = "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
 
-    public func getAllResults(for userId: User.ID, with conn: PostgreSQLConnection) throws -> Future<[TaskResult]> {
+    public static func getAllResults(for userId: User.ID, with conn: PostgreSQLConnection) throws -> Future<[TaskResult]> {
 
         return conn.select()
             .all(table: TaskResult.self)
@@ -58,7 +56,7 @@ public class TaskResultRepository {
             .all(decoding: TaskResult.self)
     }
 
-    public func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
+    public static func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
 
         let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         let scoreThreshold: Double = 0.6
@@ -71,7 +69,7 @@ public class TaskResultRepository {
             .first(decoding: FlowZoneTaskResult.self)
     }
 
-    public func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> Future<[TaskResult]> {
+    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> Future<[TaskResult]> {
 
         let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         return conn.raw(getTasksQuery)
@@ -100,7 +98,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> Future<[TopicResultContent]> {
+    public static func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> Future<[TopicResultContent]> {
 
         return try conn.raw(getTasksQuery)
             .bind(user.requireID())
@@ -140,7 +138,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfDays: Int = 7) throws -> Future<[TaskResult.History]> {
+    public static func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfDays: Int = 7) throws -> Future<[TaskResult.History]> {
 
         let weekAgo = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60) // One week back
@@ -179,12 +177,12 @@ public class TaskResultRepository {
         }
     }
 
-    func createResult(from result: TaskSubmitResult, by user: User, on conn: DatabaseConnectable, in session: PracticeSession? = nil) throws -> Future<TaskResult> {
+    static func createResult(from result: TaskSubmitResult, by user: User, on conn: DatabaseConnectable, in session: PracticeSession? = nil) throws -> Future<TaskResult> {
         return try TaskResult(result: result, userID: user.requireID(), session: session)
             .save(on: conn)
     }
 
-    public func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: PostgreSQLConnection) throws -> Future<[User.TopicLevel]> {
+    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: PostgreSQLConnection) throws -> Future<[User.TopicLevel]> {
 
         return conn.raw(getTasksQueryTopicFilter)
             .bind(userId)
@@ -224,7 +222,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getUserLevel(in subject: Subject, userId: User.ID, on conn: PostgreSQLConnection) throws -> Future<User.SubjectLevel> {
+    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: PostgreSQLConnection) throws -> Future<User.SubjectLevel> {
 
         return try conn.raw(getTasksQuerySubjectFilter)
             .bind(userId)
@@ -262,7 +260,7 @@ public class TaskResultRepository {
         }
     }
 
-    public func getLastResult(for taskID: Task.ID, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult?> {
+    public static func getLastResult(for taskID: Task.ID, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult?> {
         return try TaskResult.query(on: conn)
             .filter(\TaskResult.taskID == taskID)
             .filter(\TaskResult.userID == user.requireID())
@@ -271,7 +269,7 @@ public class TaskResultRepository {
     }
 
 
-    public func getResults(on conn: PostgreSQLConnection) -> Future<[UserResultOverview]> {
+    public static func getResults(on conn: PostgreSQLConnection) -> Future<[UserResultOverview]> {
 
         return conn.select()
             .column(.count(.all, as: "resultCount"))

@@ -141,7 +141,7 @@ final class PracticeSessionTests: VaporTestCase {
             ]
         )
         
-        let session = try PracticeSession.repository
+        let session = try PracticeSession.Repository
             .create(from: create, by: user, on: conn).wait()
         
         let firstTask = try session.currentTask(on: conn).wait()
@@ -154,7 +154,7 @@ final class PracticeSessionTests: VaporTestCase {
             choises: [],
             taskIndex: 1
         )
-        _ = try PracticeSession.repository
+        _ = try PracticeSession.Repository
             .submitMultipleChoise(submit, in: session, by: user, on: conn).wait()
         
         let secondTask = try session.currentTask(on: conn).wait()
@@ -179,9 +179,9 @@ final class PracticeSessionTests: VaporTestCase {
             ]
         )
         
-        _ = try PracticeSession.repository
+        _ = try PracticeSession.Repository
             .create(from: create, by: user, on: conn).wait()
-        let session = try PracticeSession.repository
+        let session = try PracticeSession.Repository
             .create(from: create, by: user, on: conn).wait()
         
         let firstTask = try session.currentTask(on: conn).wait()
@@ -194,7 +194,7 @@ final class PracticeSessionTests: VaporTestCase {
             choises: [],
             taskIndex: 1
         )
-        _ = try PracticeSession.repository
+        _ = try PracticeSession.Repository
             .submitMultipleChoise(submit, in: session, by: user, on: conn).wait()
         
         let secondTask = try session.currentTask(on: conn).wait()
@@ -220,9 +220,9 @@ final class PracticeSessionTests: VaporTestCase {
             ]
         )
 
-        let firstSession = try PracticeSession.repository
+        let firstSession = try PracticeSession.Repository
             .create(from: create, by: user, on: conn).wait()
-        let secondSession = try PracticeSession.repository
+        let secondSession = try PracticeSession.Repository
             .create(from: create, by: user, on: conn).wait()
 
         var submit = MultipleChoiseTask.Submit(
@@ -230,25 +230,25 @@ final class PracticeSessionTests: VaporTestCase {
             choises: [],
             taskIndex: 1
         )
-        _ = try PracticeSession.repository
+        _ = try PracticeSession.Repository
             .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
         submit.taskIndex = 2
-        _ = try PracticeSession.repository
+        _ = try PracticeSession.Repository
             .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
 
         submit.taskIndex = 1
         XCTAssertNoThrow(
-            _ = try PracticeSession.repository
+            _ = try PracticeSession.Repository
                 .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
         )
         submit.taskIndex = 2
         XCTAssertNoThrow(
-            _ = try PracticeSession.repository
+            _ = try PracticeSession.Repository
                 .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
         )
         submit.taskIndex = 3
         XCTAssertThrowsError(
-            _ = try PracticeSession.repository
+            _ = try PracticeSession.Repository
                 .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
         )
     }

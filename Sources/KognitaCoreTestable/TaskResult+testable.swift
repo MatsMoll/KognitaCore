@@ -12,7 +12,7 @@ import Crypto
 
 
 extension TaskResult {
-    static func create(task: Task, session: PracticeSession, user: User, score: Double = 1, on conn: PostgreSQLConnection) throws -> TaskResult {
+    public static func create(task: Task, session: PracticeSession, user: User, score: Double = 1, on conn: PostgreSQLConnection) throws -> TaskResult {
         let practiceResult = PracticeSessionResult(
             result: "",
             score: score,

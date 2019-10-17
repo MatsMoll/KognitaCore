@@ -11,7 +11,7 @@ import FluentPostgreSQL
 
 extension Task {
     
-    static func create(creator:         User?           = nil,
+    public static func create(creator:         User?           = nil,
                        subtopic:        Subtopic?       = nil,
                        estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",
@@ -33,7 +33,7 @@ extension Task {
                           on: conn)
     }
     
-    static func create(creatorId:       User.ID,
+    public static func create(creatorId:       User.ID,
                        subtopicId:      Subtopic.ID,
                        estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",

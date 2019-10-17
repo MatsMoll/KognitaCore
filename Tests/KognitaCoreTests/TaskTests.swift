@@ -9,6 +9,7 @@ import Vapor
 import XCTest
 import FluentPostgreSQL
 import KognitaCore
+import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
@@ -23,7 +24,7 @@ class TaskTests: VaporTestCase {
         _ = try Task.create(subtopic: subtopic, on: conn)
         _ = try Task.create(on: conn)
 
-        let tasks = try Task.repository
+        let tasks = try Task.Repository
             .getTasks(in: subject, with: conn)
             .wait()
         XCTAssertEqual(tasks.count, 4)

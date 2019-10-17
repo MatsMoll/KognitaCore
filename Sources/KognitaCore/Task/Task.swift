@@ -165,7 +165,7 @@ extension Task {
     }
 
     func getTaskTypePath(_ conn: DatabaseConnectable) throws -> Future<String> {
-        return try Task.Repository.shared
+        return try Task.Repository
             .getTaskTypePath(for: requireID(), conn: conn)
     }
 

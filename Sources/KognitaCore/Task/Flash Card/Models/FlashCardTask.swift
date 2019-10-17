@@ -41,6 +41,6 @@ extension FlashCardTask {
     }
 
     func content(on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
-        return FlashCardTask.repository.content(for: self, on: conn)
+        return FlashCardTask.Repository.content(for: self, on: conn)
     }
 }

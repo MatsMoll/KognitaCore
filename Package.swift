@@ -10,6 +10,9 @@ let package = Package(
         .library(
             name: "KognitaCore",
             targets: ["KognitaCore"]),
+        .library(
+            name: "KognitaCoreTestable",
+            targets: ["KognitaCoreTestable"]),
     ],
     dependencies: [
         // 👤 Authentication and Authorization layer for Fluent.
@@ -32,8 +35,14 @@ let package = Package(
 //                "SwifQLVapor"
             ]
         ),
+        .target(
+            name: "KognitaCoreTestable",
+            dependencies: [
+                "KognitaCore"
+            ]
+        ),
         .testTarget(
             name: "KognitaCoreTests",
-            dependencies: ["KognitaCore"]),
+            dependencies: ["KognitaCoreTestable"]),
     ]
 )

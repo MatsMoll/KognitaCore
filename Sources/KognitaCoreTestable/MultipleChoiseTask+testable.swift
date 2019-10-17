@@ -12,7 +12,7 @@ import XCTest
 
 extension MultipleChoiseTask {
     
-    static func create(creator:             User?       = nil,
+    public static func create(creator:             User?       = nil,
                        subtopic:               Subtopic?      = nil,
                        task:                Task?       = nil,
                        isMultipleSelect:    Bool        = true,
@@ -26,7 +26,7 @@ extension MultipleChoiseTask {
                           on: conn)
     }
     
-    static func create(taskId:              Task.ID,
+    public static func create(taskId:              Task.ID,
                        isMultipleSelect:    Bool        = true,
                        choises:             [MultipleChoiseTaskChoise.Data] = MultipleChoiseTaskChoise.Data.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
@@ -46,7 +46,7 @@ extension MultipleChoiseTask {
 }
 
 extension MultipleChoiseTaskChoise.Data {
-    static let standard: [MultipleChoiseTaskChoise.Data] = [
+    public static let standard: [MultipleChoiseTaskChoise.Data] = [
         .init(choise: "not", isCorrect: false),
         .init(choise: "yes", isCorrect: true),
         .init(choise: "not again", isCorrect: false)

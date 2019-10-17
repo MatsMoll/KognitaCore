@@ -28,6 +28,7 @@ public class DatabaseMigrations {
         migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
         migrations.add(model: Subject.self,                         database: .psql)
         migrations.add(model: Topic.self,                           database: .psql)
+        migrations.add(model: Topic.Pivot.Preknowleged.self,        database: .psql)
         migrations.add(model: Subtopic.self,                        database: .psql)
         migrations.add(model: Task.self,                            database: .psql)
         migrations.add(model: MultipleChoiseTask.self,              database: .psql)
@@ -38,10 +39,11 @@ public class DatabaseMigrations {
         migrations.add(model: NumberInputTask.self,                 database: .psql)
         migrations.add(model: FlashCardTask.self,                   database: .psql)
         migrations.add(model: TaskResult.self,                      database: .psql)
+        migrations.add(model: WorkPoints.self,                      database: .psql)
     }
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
         guard enviroment != .testing else { return }
-        migrations.add(migration: TaskResultUniqueMigration.self,   database: .psql)
+        migrations.add(migration: TaskResultWorkPointsMigration.self, database: .psql)
     }
 }

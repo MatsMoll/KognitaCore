@@ -13,29 +13,27 @@ extension FlashCardTask {
     public final class Repository : KognitaCRUDRepository {
         
         public typealias Model = FlashCardTask
-        
-        public static var shared = Repository()
     }
 }
 
 
 extension FlashCardTask.Repository {
     
-    public func create(from content: FlashCardTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public static func create(from content: FlashCardTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
         
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
 
-        return Subtopic.repository
+        return Subtopic.Repository
             .find(content.subtopicId, on: conn)
             .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
                 
                 conn.transaction(on: .psql) { conn in
                     
-                    try Task.repository
+                    try Task.Repository
                         .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { task in
                             
@@ -47,7 +45,7 @@ extension FlashCardTask.Repository {
         }
     }
     
-    public func edit(_ flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public static func edit(_ flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -55,7 +53,7 @@ extension FlashCardTask.Repository {
             throw Abort(.internalServerError)
         }
         try content.validate()
-        return try FlashCardTask.repository
+        return try FlashCardTask.Repository
             .create(from: content, by: user, on: conn)
             .flatMap { newTask in
                 task.get(on: conn)
@@ -69,7 +67,7 @@ extension FlashCardTask.Repository {
         }
     }
     
-    public func delete(_ flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public static func delete(_ flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
@@ -83,7 +81,7 @@ extension FlashCardTask.Repository {
         }
     }
 
-    public func importTask(from task: Task, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func importTask(from task: Task, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         task.id = nil
         task.creatorId = 1
         try task.subtopicId = subtopic.requireID()
@@ -94,14 +92,14 @@ extension FlashCardTask.Repository {
         }
     }
 
-    public func get(task flashCard: FlashCardTask, conn: DatabaseConnectable) throws -> Future<Task> {
+    public static func get(task flashCard: FlashCardTask, conn: DatabaseConnectable) throws -> Future<Task> {
         guard let task = flashCard.task else {
             throw Abort(.internalServerError)
         }
         return task.get(on: conn)
     }
 
-    public func getCollection(conn: DatabaseConnectable) -> Future<[Task]> {
+    public static func getCollection(conn: DatabaseConnectable) -> Future<[Task]> {
         return FlashCardTask.query(on: conn)
             .join(\FlashCardTask.id, to: \Task.id)
             .decode(Task.self)
@@ -109,7 +107,7 @@ extension FlashCardTask.Repository {
     }
 
 
-    public func content(for flashCard: FlashCardTask, on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
+    public static func content(for flashCard: FlashCardTask, on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
 
         return Task.query(on: conn)
             .filter(\Task.id == flashCard.id)
