@@ -56,6 +56,11 @@ extension Topic.Repository {
             .getSubtopics(in: topic, with: conn)
     }
 
+    public static func subtopics(with topicID: Topic.ID, on conn: DatabaseConnectable) -> Future<[Subtopic]> {
+        return Subtopic.Repository
+            .subtopics(with: topicID, on: conn)
+    }
+
     public static func content(for topic: Topic, on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
         return try subtopics(in: topic, on: conn)
             .map { subtopics in

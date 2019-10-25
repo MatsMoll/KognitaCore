@@ -8,6 +8,8 @@
 import Vapor
 import FluentPostgreSQL
 
+/// Part of the scoring system. This model contains one record of achived points
+/// An example of this would be after completing one task. Therefore the total score will be a sum of `WorkPoints`
 public final class WorkPoints: KognitaPersistenceModel {
 
     public var id: Int?
@@ -18,6 +20,8 @@ public final class WorkPoints: KognitaPersistenceModel {
 
     public var points: Int
 
+    /// The amount of boost on the points.
+    /// 1 here = 1 x points and 1.5 = 1.5 x points
     public var boostAmount: Double
 
     public var updatedAt: Date?
@@ -41,6 +45,7 @@ public final class WorkPoints: KognitaPersistenceModel {
 
 extension WorkPoints : Content {}
 
+/// Creats `WorkPoints` for all `TaskResult`
 struct TaskResultWorkPointsMigration: PostgreSQLMigration {
 
     static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

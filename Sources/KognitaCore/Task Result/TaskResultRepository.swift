@@ -30,11 +30,11 @@ public class TaskResultRepository {
         let topicID: Int
     }
 
-    private static let getSubtopicsQuery = "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($3)"
+    private static let getSubtopicsQuery = "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($2)"
 
-    private static let getTaskResults = "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+    private static let getTaskResults = "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
-    private static let getFlowTasksQuery = "SELECT * FROM (\(TaskResultRepository.getTaskResults)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($3) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($4) AND \"Task\".\"subtopicId\" = ANY (\(TaskResultRepository.getSubtopicsQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
+    private static let getFlowTasksQuery = "SELECT * FROM (\(TaskResultRepository.getTaskResults)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicId\" = ANY (\(TaskResultRepository.getSubtopicsQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
 
     private static let getTasksQuery = "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
 
@@ -58,12 +58,12 @@ public class TaskResultRepository {
 
     public static func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
 
-        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
-        let scoreThreshold: Double = 0.6
+//        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
+        let scoreThreshold: Double = 0.8
 
         return try conn.raw(getFlowTasksQuery)
             .bind(session.userID)
-            .bind(oneDayAgo)
+//            .bind(oneDayAgo)
             .bind(session.requireID())
             .bind(scoreThreshold)
             .first(decoding: FlowZoneTaskResult.self)

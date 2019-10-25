@@ -38,7 +38,6 @@ extension Task.Repository : KognitaRepository {
         return try Task(content: content.content, subtopic: content.subtopic, creator: user)
             .save(on: conn)
     }
-    
 
     public static func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
@@ -49,7 +48,8 @@ extension Task.Repository : KognitaRepository {
             .join(\User.id, to: \Task.creatorId)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
-            .all().flatMap { tasks in
+            .all()
+            .flatMap { tasks in
                 try tasks.map { content in
                     try content.0.1.getTaskTypePath(conn).map { path in
                         TaskContent(

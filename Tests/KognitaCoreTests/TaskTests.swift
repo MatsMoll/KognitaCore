@@ -30,6 +30,29 @@ class TaskTests: VaporTestCase {
         XCTAssertEqual(tasks.count, 4)
     }
 
+    func testSolutions() throws {
+
+        let task = try Task.create(on: conn)
+        let user = try User.create(on: conn)
+        let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
+        let secondSolution = try TaskSolution.create(task: task, on: conn)
+        _ = try TaskSolution.create(on: conn)
+
+        secondSolution.isApproved = true
+        secondSolution.approvedBy = try user.requireID()
+        _ = try secondSolution.save(on: conn).wait()
+
+        let solutions = try TaskSolution.Repository.solutions(for: task, on: conn).wait()
+        
+        XCTAssertEqual(solutions.count, 2)
+        XCTAssertNotNil(solutions.first(where: { $0.solution == firstSolution.solution }))
+        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.creatorName)
+        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.approvedBy)
+        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution }))
+        XCTAssertEqual(solutions.first(where: { $0.solution == secondSolution.solution })?.approvedBy, user.name)
+        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorName)
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject)
     ]

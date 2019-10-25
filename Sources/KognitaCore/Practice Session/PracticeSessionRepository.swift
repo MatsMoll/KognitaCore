@@ -18,7 +18,9 @@ extension PracticeSession {
             public let numberOfTaskGoal: Int
 
             /// The topic id's for the tasks to map
-            public let subtopicsIDs: Set<Subtopic.ID>
+            public let subtopicsIDs: Set<Subtopic.ID>?
+
+            public let topicIDs: Set<Topic.ID>?
         }
         
         public typealias Response = PracticeSession
@@ -56,20 +58,45 @@ extension PracticeSession.Repository {
     }
 
     public static func create(from content: PracticeSession.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
-        
-        guard content.subtopicsIDs.count > 0 else {
-            throw Abort(.badRequest)
-        }
+
         guard let user = user else {
             throw Abort(.unauthorized)
         }
+
+        if let topicIDs = content.topicIDs {
+            return try create(topicIDs: topicIDs, numberOfTaskGoal: content.numberOfTaskGoal, user: user, on: conn)
+        } else if let subtopicIDs = content.subtopicsIDs {
+            return try create(subtopicIDs: subtopicIDs, numberOfTaskGoal: content.numberOfTaskGoal, user: user, on: conn)
+        } else {
+            throw Abort(.badRequest)
+        }
+    }
+
+    static func create(topicIDs: Set<Topic.ID>, numberOfTaskGoal: Int, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
+        guard topicIDs.count > 0 else {
+            throw Abort(.badRequest)
+        }
+        return topicIDs.map {
+            Subtopic.Repository.subtopics(with: $0, on: conn)
+        }
+        .flatten(on: conn)
+        .flatMap { subtopics in
+            let subtopicIDs = Set(subtopics.flatMap { $0 }.compactMap { $0.id })
+            return try create(subtopicIDs: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, user: user, on: conn)
+        }
+    }
+
+    static func create(subtopicIDs: Set<Subtopic.ID>, numberOfTaskGoal: Int, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSession.Create.Response> {
+        guard subtopicIDs.count > 0 else {
+            throw Abort(.badRequest)
+        }
         return conn.transaction(on: .psql) { conn in
 
-            try PracticeSession(user: user, numberOfTaskGoal: content.numberOfTaskGoal)
+            try PracticeSession(user: user, numberOfTaskGoal: numberOfTaskGoal)
                 .create(on: conn)
                 .flatMap { session in
 
-                    try content.subtopicsIDs.map {
+                    try subtopicIDs.map {
                         try PracticeSession.Pivot.Subtopic(subtopicID: $0, session: session)
                             .create(on: conn)
                         }
@@ -207,6 +234,18 @@ extension PracticeSession.Repository {
             .unwrap(or: Abort(.badRequest))
             .map { taskContent in
                 TaskType(content: taskContent)
+        }
+    }
+
+    public static func taskID(index: Int, in session: PracticeSession, on conn: DatabaseConnectable) throws -> Future<Task.ID> {
+        try PracticeSession.Pivot.Task
+            .query(on: conn)
+            .filter(\.index == index)
+            .filter(\.sessionID == session.requireID())
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .map {
+                $0.taskID
         }
     }
 }
@@ -427,9 +466,9 @@ extension PracticeSession.Repository {
             .createResult(from: submitResult, by: user, on: conn, in: session)
             .flatMap { result in
 
-                try WorkPoints.Repository
-                    .create(from: result, by: user, on: conn)
-                    .flatMap { points in
+//                try WorkPoints.Repository
+//                    .create(from: result, by: user, on: conn)
+//                    .flatMap { points in
 
                         try PracticeSession.Repository
                             .markAsComplete(taskID: submitResult.taskID, in: session, on: conn)
@@ -439,7 +478,7 @@ extension PracticeSession.Repository {
                                 default: return conn.future(error: error)
                                 }
                         }.transform(to: result)
-                }
+//                }
         }
         
 //        guard let taskID = session.currentTaskID else {

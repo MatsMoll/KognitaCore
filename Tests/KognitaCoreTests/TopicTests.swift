@@ -76,7 +76,7 @@ class TopicTests: VaporTestCase {
 
         XCTAssertEqual(levels.count, 3)
         XCTAssertEqual(levels.first?.count, 2)
-        try! XCTAssertEqual(levels.first?.map { try $0.requireID() }, [topicFive.requireID(), topicThree.requireID()])
+        try! XCTAssertEqual(Set(levels.first?.map { try $0.requireID() } ?? []), Set([topicFive.requireID(), topicThree.requireID()]))
         XCTAssertEqual(levels.last?.count, 2)
     }
 

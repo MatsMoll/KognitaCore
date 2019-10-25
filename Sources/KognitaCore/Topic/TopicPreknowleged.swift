@@ -13,6 +13,8 @@ extension Topic {
 }
 
 extension Topic.Pivot {
+    /// This modal contains the info of which topics that rely on other topics knowleged.
+    /// An example here could  be that Integrals rely on basic calculus
     final class Preknowleged: PostgreSQLPivot {
 
         public var id: Int?

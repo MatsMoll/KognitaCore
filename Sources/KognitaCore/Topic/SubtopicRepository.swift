@@ -26,9 +26,15 @@ extension Subtopic.Repository {
             .save(on: conn)
     }
     
-    public static func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+    public static func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> EventLoopFuture<[Subtopic]> {
         return try Subtopic.query(on: conn)
             .filter(\.topicId == topic.requireID())
+            .all()
+    }
+
+    public static func subtopics(with topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[Subtopic]> {
+        return Subtopic.query(on: conn)
+            .filter(\.topicId == topicID)
             .all()
     }
 }

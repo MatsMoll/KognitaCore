@@ -83,7 +83,8 @@ extension PracticeSession {
         return try Repository.create(
                 from: .init(
                     numberOfTaskGoal: numberOfTaskGoal,
-                    subtopicsIDs: subtopics
+                    subtopicsIDs: subtopics,
+                    topicIDs: nil
                 ),
                 by: user,
                 on: conn
