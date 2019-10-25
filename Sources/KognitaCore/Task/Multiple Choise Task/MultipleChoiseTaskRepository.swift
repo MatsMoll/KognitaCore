@@ -164,6 +164,7 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
+    /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
     static func evaluate(_ submit: MultipleChoiseTask.Submit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         return try task.choises
@@ -199,6 +200,15 @@ extension MultipleChoiseTask.Repository {
                     progress: 0
                 )
         }
+    }
+
+    public static func createAnswer(in sessionID: PracticeSession.ID, with submit: MultipleChoiseTask.Submit, on conn: DatabaseConnectable) -> EventLoopFuture<Void> {
+        submit.choises.map {
+            MultipleChoiseTaskAnswer(sessionID: sessionID, choiseID: $0)
+                .save(on: conn)
+        }
+        .flatten(on: conn)
+        .transform(to: ())
     }
 }
 

@@ -42,7 +42,7 @@ class TaskTests: VaporTestCase {
         secondSolution.approvedBy = try user.requireID()
         _ = try secondSolution.save(on: conn).wait()
 
-        let solutions = try TaskSolution.Repository.solutions(for: task, on: conn).wait()
+        let solutions = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
         
         XCTAssertEqual(solutions.count, 2)
         XCTAssertNotNil(solutions.first(where: { $0.solution == firstSolution.solution }))

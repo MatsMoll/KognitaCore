@@ -88,10 +88,7 @@ extension MultipleChoiseTask {
     ///   - conn: A connection to the database
     /// - Returns: The results
     /// - Throws: If there was an error with the database query
-    func evaluateAnswer(
-        _ submit: MultipleChoiseTask.Submit,
-        on conn: DatabaseConnectable
-    ) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    func evaluateAnswer(_ submit: MultipleChoiseTask.Submit, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
         
         return try Repository
             .evaluate(submit, for: self, on: conn)

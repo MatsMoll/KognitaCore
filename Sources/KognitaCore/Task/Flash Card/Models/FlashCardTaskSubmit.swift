@@ -12,5 +12,6 @@ extension FlashCardTask {
         public let timeUsed: TimeInterval
         public let knowledge: Double
         public internal(set) var taskIndex: Int
+        public let answer: String
     }
 }

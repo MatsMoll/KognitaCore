@@ -127,4 +127,10 @@ extension FlashCardTask.Repository {
                 )
         }
     }
+
+    public static func createAnswer(in session: PracticeSession, for task: FlashCardTask, with submit: FlashCardTask.Submit, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        try FlashCardAnswer(sessionID: session.requireID(), taskID: task.requireID(), answer: submit.answer)
+            .save(on: conn)
+            .transform(to: ())
+    }
 }

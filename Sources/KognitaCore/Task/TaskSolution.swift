@@ -111,7 +111,7 @@ extension TaskSolution {
 
         public static func solutions(for taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
             return conn.databaseConnection(to: .psql).flatMap { psqlConn in
-                try psqlConn
+                psqlConn
                     .raw(Query.content)
                     .bind(taskID)
                     .all(decoding: TaskSolution.Response.self)

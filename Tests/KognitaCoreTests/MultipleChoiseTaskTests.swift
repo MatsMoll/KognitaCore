@@ -125,10 +125,61 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
     }
 
+    func testAnswerIsSavedOnSubmit() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+
+        let create = try PracticeSession.Create.Data(
+            numberOfTaskGoal: 2,
+            subtopicsIDs: [
+                subtopic.requireID()
+            ],
+            topicIDs: nil
+        )
+
+        let session = try PracticeSession.Repository
+            .create(from: create, by: user, on: conn).wait()
+
+        let firstTask = try session.currentTask(on: conn).wait()
+        let firstChoises = try firstTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == true).all().wait()
+
+        let firstSubmit = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: firstChoises.compactMap { $0.id },
+            taskIndex: 1
+        )
+        _ = try PracticeSession.Repository
+            .submitMultipleChoise(firstSubmit, in: session, by: user, on: conn).wait()
+
+        let secondTask = try session.currentTask(on: conn).wait()
+        let secondChoises = try secondTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == false).all().wait()
+
+        let secondSubmit = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: secondChoises.compactMap { $0.id },
+            taskIndex: 2
+        )
+
+        _ = try PracticeSession.Repository
+            .submitMultipleChoise(secondSubmit, in: session, by: user, on: conn).wait()
+
+        let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
+        XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
+        XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+        XCTAssert(answers.contains { $0.choiseID == firstChoises.first?.id })
+        XCTAssert(answers.contains { answer in secondChoises.contains { answer.choiseID == $0.id }})
+    }
+
     static var allTests = [
         ("testCreate", testCreate),
         ("testCreateWithoutPrivilage", testCreateWithoutPrivilage),
         ("testEdit", testEdit),
         ("testEditEqualChoisesError", testEditEqualChoisesError),
+        ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit)
     ]
 }

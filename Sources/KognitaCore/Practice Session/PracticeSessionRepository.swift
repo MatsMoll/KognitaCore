@@ -143,7 +143,7 @@ extension PracticeSession.Repository {
                             .all()
                             .map { uncompletedTasks in
                                 
-                                return SessionTasks(
+                                SessionTasks(
                                     uncompletedTasks: uncompletedTasks,
                                     assignedTasks: assignedTasks
                                 )
@@ -303,23 +303,28 @@ extension PracticeSession.Repository {
         return try get(MultipleChoiseTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
             try MultipleChoiseTask.Repository
-                .evaluate(submit, for: task, on: conn)
-                .flatMap { result in
+                .createAnswer(in: session.requireID(), with: submit, on: conn)
+                .flatMap { _ in
 
-                    let submitResult = try TaskSubmitResult(
-                        submit: submit,
-                        result: result,
-                        taskID: task.requireID()
-                    )
+                    try MultipleChoiseTask.Repository
+                        .evaluate(submit, for: task, on: conn)
+                        .flatMap { result in
 
-                    return try PracticeSession.Repository
-                        .register(submitResult, result: result, in: session, by: user, on: conn)
-                        .flatMap { _ in
-                            
-                            try session.goalProgress(on: conn)
-                                .map { progress in
-                                    result.progress = Double(progress)
-                                    return result
+                            let submitResult = try TaskSubmitResult(
+                                submit: submit,
+                                result: result,
+                                taskID: task.requireID()
+                            )
+
+                            return try PracticeSession.Repository
+                                .register(submitResult, result: result, in: session, by: user, on: conn)
+                                .flatMap { _ in
+
+                                    try session.goalProgress(on: conn)
+                                        .map { progress in
+                                            result.progress = Double(progress)
+                                            return result
+                                    }
                             }
                     }
             }
@@ -339,29 +344,34 @@ extension PracticeSession.Repository {
         
         return try get(FlashCardTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
-            let score = ScoreEvaluater.shared
-                .compress(score: submit.knowledge, range: 0...4)
+            try FlashCardTask.Repository
+                .createAnswer(in: session, for: task, with: submit, on: conn)
+                .flatMap {
 
-            let result = PracticeSessionResult(
-                result:                 submit,
-                score:                  score,
-                progress:               0
-            )
+                    let score = ScoreEvaluater.shared
+                        .compress(score: submit.knowledge, range: 0...4)
 
-            let submitResult = try TaskSubmitResult(
-                submit: submit,
-                result: result,
-                taskID: task.requireID()
-            )
+                    let result = PracticeSessionResult(
+                        result:     submit,
+                        score:      score,
+                        progress:   0
+                    )
 
-            return try PracticeSession.Repository
-                .register(submitResult, result: result, in: session, by: user, on: conn)
-                .flatMap { _ in
+                    let submitResult = try TaskSubmitResult(
+                        submit: submit,
+                        result: result,
+                        taskID: task.requireID()
+                    )
 
-                    try session.goalProgress(on: conn)
-                        .map { progress in
-                            result.progress = Double(progress)
-                            return result
+                    return try PracticeSession.Repository
+                        .register(submitResult, result: result, in: session, by: user, on: conn)
+                        .flatMap { _ in
+
+                            try session.goalProgress(on: conn)
+                                .map { progress in
+                                    result.progress = Double(progress)
+                                    return result
+                            }
                     }
             }
         }

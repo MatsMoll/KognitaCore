@@ -27,7 +27,8 @@ final class PracticeSessionTests: VaporTestCase {
         var answer = FlashCardTask.Submit(
             timeUsed: 20,
             knowledge: 3,
-            taskIndex: 1
+            taskIndex: 1,
+            answer: ""
         )
         XCTAssertNoThrow(try session.submit(answer, by: user, with: conn).wait())
         answer.taskIndex = 2
@@ -52,7 +53,8 @@ final class PracticeSessionTests: VaporTestCase {
         var answer = FlashCardTask.Submit(
             timeUsed: 20,
             knowledge: 3,
-            taskIndex: 1
+            taskIndex: 1,
+            answer: ""
         )
         let firstResult     = try session.submit(answer, by: user, with: conn).wait()
         answer.taskIndex = 2
@@ -138,7 +140,8 @@ final class PracticeSessionTests: VaporTestCase {
             numberOfTaskGoal: 2,
             subtopicsIDs: [
                 subtopic.requireID()
-            ]
+            ],
+            topicIDs: nil
         )
         
         let session = try PracticeSession.Repository
@@ -176,7 +179,8 @@ final class PracticeSessionTests: VaporTestCase {
             numberOfTaskGoal: 2,
             subtopicsIDs: [
                 subtopic.requireID()
-            ]
+            ],
+            topicIDs: nil
         )
         
         _ = try PracticeSession.Repository
@@ -217,7 +221,8 @@ final class PracticeSessionTests: VaporTestCase {
             numberOfTaskGoal: 2,
             subtopicsIDs: [
                 subtopic.requireID()
-            ]
+            ],
+            topicIDs: nil
         )
 
         let firstSession = try PracticeSession.Repository

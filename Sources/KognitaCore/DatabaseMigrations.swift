@@ -28,10 +28,10 @@ public class DatabaseMigrations {
         migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
         migrations.add(model: Subject.self,                         database: .psql)
         migrations.add(model: Topic.self,                           database: .psql)
-//        migrations.add(model: Topic.Pivot.Preknowleged.self,        database: .psql)
+        migrations.add(model: Topic.Pivot.Preknowleged.self,        database: .psql)
         migrations.add(model: Subtopic.self,                        database: .psql)
         migrations.add(model: Task.self,                            database: .psql)
-        migrations.add(model: TaskSolution.self,                   database: .psql)
+        migrations.add(model: TaskSolution.self,                    database: .psql)
         migrations.add(model: MultipleChoiseTask.self,              database: .psql)
         migrations.add(model: MultipleChoiseTaskChoise.self,        database: .psql)
         migrations.add(model: PracticeSession.self,                 database: .psql)
@@ -40,6 +40,8 @@ public class DatabaseMigrations {
         migrations.add(model: NumberInputTask.self,                 database: .psql)
         migrations.add(model: FlashCardTask.self,                   database: .psql)
         migrations.add(model: TaskResult.self,                      database: .psql)
+        migrations.add(model: MultipleChoiseTaskAnswer.self,        database: .psql)
+        migrations.add(model: FlashCardAnswer.self,                 database: .psql)
 //        migrations.add(model: WorkPoints.self,                      database: .psql)
     }
 
