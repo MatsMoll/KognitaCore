@@ -10,6 +10,7 @@ jobs:
         DATABASE_USER: postgres
         DATABASE_PASSWORD: postgres
         DATABASE_DB: postgres
+        DATABASE_HOSTNAME: psql
     services:
       psql:
         image: postgres
