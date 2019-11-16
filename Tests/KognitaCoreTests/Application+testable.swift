@@ -120,10 +120,9 @@ private func setupDatabase(for enviroment: Environment, in services: inout Servi
         port: databasePort,
         username: username,
         database: databaseName,
-        password: password
+        password: password,
+        transport: .unverifiedTLS
     )
-
-    print(databaseConfig)
 
     let postgres = PostgreSQLDatabase(config: databaseConfig)
 
