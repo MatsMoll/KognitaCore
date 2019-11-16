@@ -3,25 +3,34 @@ name: Swift
 on: [push]
 
 jobs:
-  build:
+  container-job:
+    runs-on: ubuntu-latest
+    
+    # runs all of the steps inside the specified container rather than on the VM host.  
+    # Because of this the network configuration changes from host based network to a container network.
+    container:
+      image: swift:5.1.2-bionic
 
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
+    services:
+      postgres:
+        image: postgres:11.1
+        env:
+          POSTGRES_USER: matsmollestad
+          POSTGRES_DB: testing
+        ports:
+        - 5432:5432
 
     steps:
     - uses: actions/checkout@v1
-    - uses: harmon758/postgresql-action@v1
-      with:
-        postgresql version: '11'  # See https://hub.docker.com/_/postgres for available versions
-        postgresql db: 'testing'
-        postgresql user: 'matsmollestad'
     - name: Run unit tests
       run: |
-        docker build --tag unit-tests -f unitTests.dockerfile .
-        docker run unit-tests
+        apt-get -qq update && apt-get install -y \
+          libssl-dev zlib1g-dev \
+          && rm -r /var/lib/apt/lists/*
+        swift test -v
     - name: Build library in release mode
       run: |
-        docker build --tag release-library -f releaseLibrary.dockerfile .
-        docker run release-library
+        apt-get -qq update && apt-get install -y \
+          libssl-dev zlib1g-dev \
+          && rm -r /var/lib/apt/lists/*
+        swift build -c release
