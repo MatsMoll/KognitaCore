@@ -14,17 +14,9 @@ jobs:
     - uses: actions/checkout@v1
     - name: Run unit tests
       run: |
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            swift test
-        else
-          docker build --tag unit-tests -f unitTests.dockerfile .
-          docker run unit-tests
-        fi
+        docker build --tag unit-tests -f unitTests.dockerfile .
+        docker run unit-tests
     - name: Build library in release mode
       run: |
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            swift build -c release
-        else
-          docker build --tag release-library -f releaseLibrary.dockerfile .
-          docker run release-library
-        fi
+        docker build --tag release-library -f releaseLibrary.dockerfile .
+        docker run release-library
