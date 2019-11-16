@@ -16,15 +16,17 @@ jobs:
         DATABASE_DB: postgres
 
     services:
-      postgres:
-        image: postgres:11.1
+      psql:
+        image: postgres
+        ports:
+          - 5432:5432
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@master
     - name: Run unit tests
       run: |
         apt-get -qq update && apt-get install -y \
