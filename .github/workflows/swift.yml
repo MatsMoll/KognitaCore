@@ -10,13 +10,18 @@ jobs:
     # Because of this the network configuration changes from host based network to a container network.
     container:
       image: swift:5.1.2-bionic
+      env:
+        DATABASE_USER: postgres
+        DATABASE_PASSWORD: postgres
+        DATABASE_DB: postgres
 
     services:
       postgres:
         image: postgres:11.1
         env:
-          POSTGRES_USER: matsmollestad
-          POSTGRES_DB: testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
         ports:
         - 5432:5432
 
@@ -27,7 +32,7 @@ jobs:
         apt-get -qq update && apt-get install -y \
           libssl-dev zlib1g-dev \
           && rm -r /var/lib/apt/lists/*
-        swift test -v
+        swift test
     - name: Build library in release mode
       run: |
         apt-get -qq update && apt-get install -y \
