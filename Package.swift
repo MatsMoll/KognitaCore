@@ -12,6 +12,9 @@ let package = Package(
             targets: ["KognitaCore"]),
     ],
     dependencies: [
+        // 💧 A server-side Swift web framework.
+        .package(url: "https://github.com/vapor/vapor.git", from: "3.3.1"),
+
         // 👤 Authentication and Authorization layer for Fluent.
         .package(url: "https://github.com/vapor/auth.git", from: "2.0.0"),
 
