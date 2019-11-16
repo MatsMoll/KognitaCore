@@ -287,7 +287,7 @@ extension Topic.Repository {
                 leveledTopics[level - 1] = leveledTopics[level - 1] + [topic]
             }
         }
-        return leveledTopics
+        return leveledTopics.map { level in level.sorted(by: { $0.chapter < $1.chapter }) }
     }
 }
 
