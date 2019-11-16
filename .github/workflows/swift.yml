@@ -22,12 +22,11 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-        ports:
-        - 5432:5432
 
     steps:
     - uses: actions/checkout@v1
     - name: Run unit tests
+      working-directory: ./postgres
       run: |
         apt-get -qq update && apt-get install -y \
           libssl-dev zlib1g-dev \
