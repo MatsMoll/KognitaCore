@@ -28,7 +28,7 @@ public class DatabaseMigrations {
         migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
         migrations.add(model: Subject.self,                         database: .psql)
         migrations.add(model: Topic.self,                           database: .psql)
-        migrations.add(model: Topic.Pivot.Preknowleged.self,        database: .psql)
+//        migrations.add(model: Topic.Pivot.Preknowleged.self,        database: .psql)
         migrations.add(model: Subtopic.self,                        database: .psql)
         migrations.add(model: Task.self,                            database: .psql)
         migrations.add(model: TaskSolution.self,                    database: .psql)

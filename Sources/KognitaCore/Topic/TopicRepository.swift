@@ -236,6 +236,7 @@ extension Topic.Repository {
     }
 
     static func topicPreknowleged(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[Topic.Pivot.Preknowleged]> {
+        throw Abort(.internalServerError)
         return try Topic.Pivot.Preknowleged.query(on: conn)
             .join(\Topic.id, to: \Topic.Pivot.Preknowleged.topicID)
             .filter(\Topic.subjectId == subject.requireID())
