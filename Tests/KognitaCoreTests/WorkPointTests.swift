@@ -12,7 +12,6 @@ import FluentPostgreSQL
 import KognitaCoreTestable
 
 //class WorkPointTests: VaporTestCase {
-
 //    func testLeaderboard() throws {
 //
 //        let user = try User.create(on: conn)

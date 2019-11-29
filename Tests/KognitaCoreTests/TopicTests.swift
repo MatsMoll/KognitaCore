@@ -57,32 +57,32 @@ class TopicTests: VaporTestCase {
         XCTAssertEqual(allTasks.count, 4)
     }
 
-    func testLeveledTopics() throws {
-
-        let subject = try Subject.create(on: conn)
-
-        let topicOne = try Topic.create(chapter: 1, subject: subject, on: conn)
-        let topicTwo = try Topic.create(chapter: 2, subject: subject, on: conn)
-        let topicThree = try Topic.create(chapter: 3, subject: subject, on: conn)
-        let topicFour = try Topic.create(chapter: 4, subject: subject, on: conn)
-        let topicFive = try Topic.create(chapter: 6, subject: subject, on: conn)
-
-        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicTwo, on: conn).wait()
-        _ = try Topic.Pivot.Preknowleged.create(topic: topicTwo, requires: topicThree, on: conn).wait()
-        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicThree, on: conn).wait()
-        _ = try Topic.Pivot.Preknowleged.create(topic: topicFour, requires: topicTwo, on: conn).wait()
-
-        let levels = try Topic.Repository.leveledTopics(in: subject, on: conn).wait()
-
-        XCTAssertEqual(levels.count, 3)
-        XCTAssertEqual(levels.first?.count, 2)
-        try! XCTAssertEqual(Set(levels.first?.map { try $0.requireID() } ?? []), Set([topicFive.requireID(), topicThree.requireID()]))
-        XCTAssertEqual(levels.last?.count, 2)
-    }
+//    func testLeveledTopics() throws {
+//
+//        let subject = try Subject.create(on: conn)
+//
+//        let topicOne = try Topic.create(chapter: 1, subject: subject, on: conn)
+//        let topicTwo = try Topic.create(chapter: 2, subject: subject, on: conn)
+//        let topicThree = try Topic.create(chapter: 3, subject: subject, on: conn)
+//        let topicFour = try Topic.create(chapter: 4, subject: subject, on: conn)
+//        let topicFive = try Topic.create(chapter: 6, subject: subject, on: conn)
+//
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicTwo, on: conn).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicTwo, requires: topicThree, on: conn).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicThree, on: conn).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicFour, requires: topicTwo, on: conn).wait()
+//
+//        let levels = try Topic.Repository.leveledTopics(in: subject, on: conn).wait()
+//
+//        XCTAssertEqual(levels.count, 3)
+//        XCTAssertEqual(levels.first?.count, 2)
+//        try! XCTAssertEqual(Set(levels.first?.map { try $0.requireID() } ?? []), Set([topicFive.requireID(), topicThree.requireID()]))
+//        XCTAssertEqual(levels.last?.count, 2)
+//    }
 
     static let allTests = [
         ("testTimlyTopics", testTimlyTopics),
         ("testSoftDelete", testSoftDelete),
-        ("testLeveledTopics", testLeveledTopics)
+//        ("testLeveledTopics", testLeveledTopics)
     ]
 }
