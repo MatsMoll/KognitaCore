@@ -10,6 +10,9 @@ let package = Package(
         .library(
             name: "KognitaCore",
             targets: ["KognitaCore"]),
+        .library(
+            name: "KognitaCoreTestable",
+            targets: ["KognitaCoreTestable"]),
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
@@ -35,8 +38,14 @@ let package = Package(
 //                "SwifQLVapor"
             ]
         ),
+        .target(
+            name: "KognitaCoreTestable",
+            dependencies: [
+                "KognitaCore"
+            ]
+        ),
         .testTarget(
             name: "KognitaCoreTests",
-            dependencies: ["KognitaCore"]),
+            dependencies: ["KognitaCoreTestable"]),
     ]
 )

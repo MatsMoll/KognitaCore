@@ -10,7 +10,7 @@ import Vapor
 
 public final class FlashCardTask: KognitaCRUDModel {
 
-    static let actionDescriptor = "Svar på oppgaven og se om du har riktig"
+    static let actionDescriptor = "Les spørsmålet og skriv et passende svar"
 
     public var id: Int?
     
@@ -41,6 +41,6 @@ extension FlashCardTask {
     }
 
     func content(on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
-        return FlashCardTask.repository.content(for: self, on: conn)
+        return FlashCardTask.Repository.content(for: self, on: conn)
     }
 }

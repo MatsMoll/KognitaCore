@@ -17,7 +17,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
-        let content = try MultipleChoiseTask.Create.Data(
+        let taskData = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
@@ -31,14 +31,51 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTask.repository.create(from: content, by: user, on: conn).wait()
-        let task = try multiple.task?.get(on: conn).wait()
-        let choises = try multiple.choises.query(on: conn).all().wait()
+        let multiple = try MultipleChoiseTask.Repository
+            .create(from: taskData, by: user, on: conn)
+            .wait()
+
+        let content = try multiple
+            .content(on: conn)
+            .wait()
+
+        let solution = try TaskSolution.Repository
+            .solutions(for: multiple.requireID(), on: conn)
+            .wait()
 
         XCTAssertNotNil(multiple.createdAt)
         XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(task?.id, multiple.id)
-        XCTAssertEqual(choises.count, content.choises.count)
+        XCTAssertEqual(content.task.subtopicId, subtopic.id)
+        XCTAssertEqual(content.task.question, taskData.question)
+        XCTAssertEqual(content.task.solution, taskData.solution)
+        XCTAssertEqual(solution.first?.solution, taskData.solution)
+        XCTAssertEqual(content.choises.count, taskData.choises.count)
+    }
+
+
+    func testCreateWithoutSolution() throws {
+        let user = try User.create(on: conn)
+        let subtopic = try Subtopic.create(on: conn)
+
+        let taskData = try MultipleChoiseTask.Create.Data(
+            subtopicId: subtopic.requireID(),
+            description: nil,
+            question: "Test",
+            solution: nil,
+            isMultipleSelect: false,
+            examPaperSemester: nil,
+            examPaperYear: nil,
+            isExaminable: false,
+            choises: [
+                .init(choise: "Is Correct", isCorrect: true),
+                .init(choise: "Is Not Correct", isCorrect: false)
+            ]
+        )
+        XCTAssertThrowsError(
+            try MultipleChoiseTask.Repository
+                .create(from: taskData, by: user, on: conn)
+                .wait()
+        )
     }
 
     func testCreateWithoutPrivilage() throws {
@@ -59,7 +96,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        XCTAssertThrowsError(try MultipleChoiseTask.repository.create(from: content, by: user, on: conn).wait())
+        XCTAssertThrowsError(try MultipleChoiseTask.Repository.create(from: content, by: user, on: conn).wait())
     }
 
     func testEdit() throws {
@@ -82,7 +119,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTask.repository.edit(startingMultiple, to: content, by: user, on: conn).wait()
+        let editedMultiple = try MultipleChoiseTask.Repository.edit(startingMultiple, to: content, by: user, on: conn).wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)
@@ -113,7 +150,9 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
         )
 
-        let editedMultiple = try MultipleChoiseTask.repository.edit(startingMultiple, to: content, by: user, on: conn).wait()
+        let editedMultiple = try MultipleChoiseTask.Repository
+            .edit(startingMultiple, to: content, by: user, on: conn)
+            .wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)
@@ -125,10 +164,62 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
     }
 
+    func testAnswerIsSavedOnSubmit() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+
+        let create = try PracticeSession.Create.Data(
+            numberOfTaskGoal: 2,
+            subtopicsIDs: [
+                subtopic.requireID()
+            ],
+            topicIDs: nil
+        )
+
+        let session = try PracticeSession.Repository
+            .create(from: create, by: user, on: conn).wait()
+
+        let firstTask = try session.currentTask(on: conn).wait()
+        let firstChoises = try firstTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == true).all().wait()
+
+        let firstSubmit = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: firstChoises.compactMap { $0.id },
+            taskIndex: 1
+        )
+        _ = try PracticeSession.Repository
+            .submitMultipleChoise(firstSubmit, in: session, by: user, on: conn).wait()
+
+        let secondTask = try session.currentTask(on: conn).wait()
+        let secondChoises = try secondTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == false).all().wait()
+
+        let secondSubmit = MultipleChoiseTask.Submit(
+            timeUsed: 20,
+            choises: secondChoises.compactMap { $0.id },
+            taskIndex: 2
+        )
+
+        _ = try PracticeSession.Repository
+            .submitMultipleChoise(secondSubmit, in: session, by: user, on: conn).wait()
+
+        let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
+        XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
+        XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+        XCTAssert(answers.contains { $0.choiseID == firstChoises.first?.id })
+        XCTAssert(answers.contains { answer in secondChoises.contains { answer.choiseID == $0.id }})
+    }
+
     static var allTests = [
         ("testCreate", testCreate),
+        ("testCreateWithoutSolution", testCreateWithoutSolution),
         ("testCreateWithoutPrivilage", testCreateWithoutPrivilage),
         ("testEdit", testEdit),
         ("testEditEqualChoisesError", testEditEqualChoisesError),
+        ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit)
     ]
 }

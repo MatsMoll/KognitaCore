@@ -11,13 +11,13 @@ import FluentPostgreSQL
 
 extension Task {
     
-    static func create(creator:         User?           = nil,
+    public static func create(creator:         User?           = nil,
                        subtopic:        Subtopic?       = nil,
                        estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = nil,
+                       explenation:     String?         = "Some explenation",
                        on conn:         PostgreSQLConnection) throws -> Task {
 
         let usedCreator = try creator ?? User.create(on: conn)
@@ -33,13 +33,13 @@ extension Task {
                           on: conn)
     }
     
-    static func create(creatorId:       User.ID,
+    public static func create(creatorId:       User.ID,
                        subtopicId:      Subtopic.ID,
                        estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = nil,
+                       explenation:     String?         = "Some explenation",
                        on conn:         PostgreSQLConnection) throws -> Task {
         
         return try Task(subtopicId:     subtopicId,

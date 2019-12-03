@@ -46,5 +46,9 @@ public struct TaskResultContent: Content {
         default: return "badge-success"
         }
     }
+
+    public var sessionId: PracticeSession.ID? {
+        return result.sessionID
+    }
 }
 

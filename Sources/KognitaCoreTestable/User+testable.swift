@@ -12,7 +12,7 @@ import Crypto
 
 
 extension User {
-    static func create(name: String = "Mats", email: String? = nil, role: Role = .creator, on conn: PostgreSQLConnection) throws -> User {
+    public static func create(name: String = "Mats", email: String? = nil, role: Role = .creator, on conn: PostgreSQLConnection) throws -> User {
         
         let createEmail = email ?? UUID().uuidString + "@email.com"
         

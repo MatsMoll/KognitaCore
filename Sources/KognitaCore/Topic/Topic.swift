@@ -117,22 +117,22 @@ extension Topic {
     }
 
     func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
-        return try Repository.shared
+        return try Repository
             .numberOfTasks(in: self, on: conn)
     }
 
     func tasks(on conn: DatabaseConnectable) throws -> Future<[Task]> {
-        return try Repository.shared
+        return try Repository
             .tasks(in: self, on: conn)
     }
 
     func subtopics(on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
-        return try Repository.shared
+        return try Repository
             .subtopics(in: self, on: conn)
     }
 
     func content(on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
-        return try Repository.shared
+        return try Repository
             .content(for: self, on: conn)
     }
 }

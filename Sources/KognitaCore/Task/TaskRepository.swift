@@ -32,15 +32,28 @@ extension Task {
 
 extension Task.Repository : KognitaRepository {
     
-    public func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+
         guard let user = user else { throw Abort(.forbidden) }
+        guard let solution = content.content.solution else { throw Abort(.badRequest) }
         
         return try Task(content: content.content, subtopic: content.subtopic, creator: user)
             .save(on: conn)
+            .flatMap { task in
+                try TaskSolution(
+                    data: TaskSolution.Create.Data(
+                        solution: solution,
+                        presentUser: true,
+                        taskID: task.requireID()
+                    ),
+                    creatorID: user.requireID()
+                )
+                .save(on: conn)
+                .transform(to: task)
+        }
     }
-    
 
-    public func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public static func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
         return try subject.topics
             .query(on: conn)
@@ -49,7 +62,8 @@ extension Task.Repository : KognitaRepository {
             .join(\User.id, to: \Task.creatorId)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
-            .all().flatMap { tasks in
+            .all()
+            .flatMap { tasks in
                 try tasks.map { content in
                     try content.0.1.getTaskTypePath(conn).map { path in
                         TaskContent(
@@ -64,14 +78,14 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
-    public func getTasks(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Task]> {
+    public static func getTasks(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Task]> {
         return try Task.query(on: conn)
             .join(\Subtopic.id, to: \Task.subtopicId)
             .filter(\Subtopic.topicId == topic.requireID())
             .all()
     }
 
-    public func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public static func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
 
         return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
             .join(\Subtopic.id, to: \Task.subtopicId)
@@ -108,7 +122,7 @@ extension Task.Repository : KognitaRepository {
         let isMultipleSelect: Bool?  // MultipleChoiseTask
     }
     
-    public func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
+    public static func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
 
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == id)
@@ -131,13 +145,13 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
-    public func getNumberOfTasks(in subtopicIDs: Subtopic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
+    public static func getNumberOfTasks(in subtopicIDs: Subtopic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
         return Task.query(on: conn)
             .filter(\.subtopicId ~~ subtopicIDs)
             .count()
     }
 
-    public func getTaskCreators(on conn: PostgreSQLConnection) -> Future<[TaskCreators]> {
+    public static func getTaskCreators(on conn: PostgreSQLConnection) -> Future<[TaskCreators]> {
 
         return conn.select()
             .column(.count(.all, as: "taskCount"))
@@ -149,7 +163,7 @@ extension Task.Repository : KognitaRepository {
             .all(decoding: TaskCreators.self)
     }
     
-    public func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)?> {
+    public static func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)?> {
         
         return conn.select()
             .all(table: Task.self)

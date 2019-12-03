@@ -11,10 +11,7 @@ import Vapor
 
 extension User {
     public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
-        
         public typealias Model = User
-        
-        public static let shared = Repository()
     }
 }
 
@@ -38,7 +35,7 @@ extension User.Repository {
         }
     }
 
-    public func login(with user: User, conn: DatabaseConnectable) throws -> Future<UserToken> {
+    static public func login(with user: User, conn: DatabaseConnectable) throws -> Future<UserToken> {
         // create new token for this user
         let token = try UserToken.create(userID: user.requireID())
 
@@ -46,7 +43,7 @@ extension User.Repository {
         return token.save(on: conn)
     }
 
-    public func create(from content: User.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
+    static public func create(from content: User.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
         
         guard content.acceptedTerms else {
             throw Errors.missingInput
@@ -62,10 +59,10 @@ extension User.Repository {
         let hash = try BCrypt.hash(content.password)
         // save new user
         let newUser = User(
-            id: nil,
             name: content.name,
             email: content.email,
-            passwordHash: hash
+            passwordHash: hash,
+            role: .user
         )
 
         return User.query(on: conn)
@@ -81,7 +78,7 @@ extension User.Repository {
         }
     }
     
-    public func edit(_ model: User, to content: User.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
+    static public func edit(_ model: User, to content: User.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
         guard try model.requireID() == user.requireID() else {
             throw Abort(.forbidden)
         }
@@ -90,7 +87,7 @@ extension User.Repository {
             .map { try $0.content() }
     }
 
-    public func getAll(on conn: DatabaseConnectable) -> Future<[User.Response]> {
+    static public func getAll(on conn: DatabaseConnectable) -> Future<[User.Response]> {
 
         return User.query(on: conn)
             .all()

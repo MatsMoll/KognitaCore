@@ -11,7 +11,7 @@ import FluentPostgreSQL
 
 extension NumberInputTask {
     
-    static func create(creator:             User?       = nil,
+    public static func create(creator:             User?       = nil,
                        subtopic:            Subtopic?   = nil,
                        task:                Task?       = nil,
                        correctAnswer:       Double      = 0,
@@ -23,7 +23,7 @@ extension NumberInputTask {
         return try create(correctAnswer: correctAnswer, unit: unit, taskId: usedTask.requireID(), on: conn)
     }
     
-    static func create(correctAnswer:   Double,
+    public static func create(correctAnswer:   Double,
                        unit:            String?,
                        taskId:          Task.ID,
                        on conn:         PostgreSQLConnection) throws -> NumberInputTask {

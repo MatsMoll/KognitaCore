@@ -8,6 +8,7 @@
 import Vapor
 import FluentPostgreSQL
 
+/// The superclass of all task types
 public final class Task: KognitaPersistenceModel {
 
     /// The semester a exam was taken
@@ -155,7 +156,8 @@ extension Task {
             .join(\Subject.id, to: \Topic.subjectId)
             .alsoDecode(Topic.self)
             .alsoDecode(Subject.self)
-            .all().flatMap { tasks in
+            .all()
+            .flatMap { tasks in
                 return try tasks.map { (taskTopic, subject) in
                     try taskTopic.0.getTaskTypePath(conn).map { path in
                         TaskContent(task: taskTopic.0, topic: taskTopic.1, subject: subject, creator: nil, taskTypePath: path)
@@ -165,7 +167,7 @@ extension Task {
     }
 
     func getTaskTypePath(_ conn: DatabaseConnectable) throws -> Future<String> {
-        return try Task.Repository.shared
+        return try Task.Repository
             .getTaskTypePath(for: requireID(), conn: conn)
     }
 

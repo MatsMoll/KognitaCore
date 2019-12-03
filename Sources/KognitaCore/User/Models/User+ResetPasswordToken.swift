@@ -64,8 +64,6 @@ extension User.ResetPassword {
 extension User.ResetPassword.Token {
     public final class Repository : KognitaRepository, KognitaRepositoryDeletable {
         
-        public static let shared = Repository()
-        
         public typealias Model = User.ResetPassword.Token
     }
 }
@@ -76,7 +74,7 @@ extension User.ResetPassword.Token.Repository {
         case incorrectOrExpiredToken
     }
     
-    public func create(from content: User.ResetPassword.Token.Create.Data = .init(), by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
+    public static func create(from content: User.ResetPassword.Token.Create.Data = .init(), by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
         
         guard let user = user else { throw Abort(.unauthorized) }
         
@@ -88,7 +86,7 @@ extension User.ResetPassword.Token.Repository {
         }
     }
     
-    public func delete(_ model: User.ResetPassword.Token, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public static func delete(_ model: User.ResetPassword.Token, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         
         guard try user?.requireID() == model.userId else {
             throw Abort(.forbidden)
@@ -97,15 +95,15 @@ extension User.ResetPassword.Token.Repository {
             .transform(to: ())
     }
     
-    public func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> Future<Void> {
         
         guard content.password == content.verifyPassword else { throw User.Repository.Errors.passwordMismatch }
         
-        return User.ResetPassword.Token.repository
+        return User.ResetPassword.Token.Repository
             .first(where: \.string == token, or: Errors.incorrectOrExpiredToken, on: conn)
             .flatMap { tokenModel in
                 
-                User.repository
+                User.Repository
                     .find(tokenModel.userId, or: Abort(.internalServerError), on: conn)
                     .flatMap { user in
 

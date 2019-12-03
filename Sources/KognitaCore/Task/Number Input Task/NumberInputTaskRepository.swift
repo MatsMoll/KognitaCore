@@ -14,28 +14,26 @@ extension NumberInputTask {
     public final class Repository {
             
         public typealias Model = NumberInputTask
-        
-        public static let shared = Repository()
     }
 }
 
 extension NumberInputTask.Repository : KognitaCRUDRepository {
     
-    public func create(from content: NumberInputTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Create.Response> {
+    public static func create(from content: NumberInputTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Create.Response> {
         
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
         
-        return Subtopic.repository
+        return Subtopic.Repository
             .find(content.subtopicId, on: conn)
             .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
                 
                 conn.transaction(on: .psql) { conn in
                     
-                    try Task.repository
+                    try Task.Repository
                         .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
                         .flatMap { (task) in
                             try NumberInputTask(content: content, task: task)
@@ -45,7 +43,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
         }
     }
     
-    public func edit(_ number: NumberInputTask, to content: NumberInputTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Edit.Response> {
+    public static func edit(_ number: NumberInputTask, to content: NumberInputTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<NumberInputTask.Edit.Response> {
         guard user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -53,7 +51,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
             throw Abort(.internalServerError)
         }
         
-        return try NumberInputTask.repository
+        return try NumberInputTask.Repository
             .create(from: content, by: user, on: conn)
             .flatMap { newTask in
                 task.get(on: conn)
@@ -67,7 +65,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
         }
     }
     
-    public func delete(_ multiple: NumberInputTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public static func delete(_ multiple: NumberInputTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
@@ -83,7 +81,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
     }
     
 
-    public func importTask(from taskContent: NumberInputTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func importTask(from taskContent: NumberInputTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
         
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
@@ -99,7 +97,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
         }
     }
 
-    public func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTask.Data> {
+    public static func get(task number: NumberInputTask, conn: DatabaseConnectable) throws -> Future<NumberInputTask.Data> {
         guard let task = number.task else {
             throw Abort(.internalServerError)
         }
@@ -109,7 +107,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
         }
     }
 
-    public func content(for input: NumberInputTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, NumberInputTask)> {
+    public static func content(for input: NumberInputTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, NumberInputTask)> {
 
         return Task.query(on: conn)
             .filter(\Task.id == input.id)
@@ -134,7 +132,7 @@ extension NumberInputTask.Repository : KognitaCRUDRepository {
         }
     }
 
-    public func evaluate(_ answer: NumberInputTask.Submit.Data, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
+    public static func evaluate(_ answer: NumberInputTask.Submit.Data, for task: NumberInputTask) -> PracticeSessionResult<NumberInputTask.Submit.Response> {
         
         let wasCorrect = task.correctAnswer == answer.answer
         return PracticeSessionResult.init(
