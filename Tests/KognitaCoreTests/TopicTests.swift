@@ -109,6 +109,7 @@ class TopicTests: VaporTestCase {
 //    }
 
     static let allTests = [
+        ("testCreate", testCreate),
         ("testTimlyTopics", testTimlyTopics),
         ("testSoftDelete", testSoftDelete),
 //        ("testLeveledTopics", testLeveledTopics)

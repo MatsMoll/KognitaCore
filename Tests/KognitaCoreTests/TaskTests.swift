@@ -88,5 +88,6 @@ class TaskTests: VaporTestCase {
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
         ("testSolutions", testSolutions),
+        ("testSolutionBugFixMigration", testSolutions),
     ]
 }
