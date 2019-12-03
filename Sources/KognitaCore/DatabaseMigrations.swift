@@ -47,7 +47,8 @@ public class DatabaseMigrations {
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
         guard enviroment != .testing else { return }
-        migrations.add(migration: TaskSolution.ConvertMigration.self, database: .psql)
+        migrations.add(migration: TaskSolution.ConvertMigration.self,               database: .psql)
+        migrations.add(migration: TaskSolution.MissingSolutionBugMigration.self,    database: .psql)
 //        migrations.add(migration: TaskResultWorkPointsMigration.self, database: .psql)
     }
 }

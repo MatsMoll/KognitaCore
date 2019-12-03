@@ -125,6 +125,24 @@ extension TaskSolution {
                 }
             }
         }
+
+        static func createSolutionForOutOfSyncTasks(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            conn.raw(#"SELECT * FROM "Task" LEFT OUTER JOIN "TaskSolution" ON "Task"."id" = "TaskSolution"."taskID" WHERE "TaskSolution"."taskID" IS NULL;"#)
+                .all(decoding: Task.self)
+                .flatMap { tasks in
+
+                    return tasks.compactMap { (task: Task) -> Future<TaskSolution>? in
+                        if let solution = task.solution, let id = task.id {
+                            return TaskSolution(data: .init(solution: solution, presentUser: true, taskID: id), creatorID: task.creatorId)
+                                .save(on: conn)
+                        } else {
+                            return nil
+                        }
+                    }
+                    .flatten(on: conn)
+                    .transform(to: ())
+            }
+        }
     }
 }
 
@@ -144,6 +162,19 @@ extension TaskSolution {
                 .flatten(on: conn)
                 .transform(to: ())
             }
+        }
+
+        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            conn.future()
+        }
+    }
+}
+
+extension TaskSolution {
+    struct MissingSolutionBugMigration: PostgreSQLMigration {
+        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            TaskSolution.Repository
+                .createSolutionForOutOfSyncTasks(on: conn)
         }
 
         static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

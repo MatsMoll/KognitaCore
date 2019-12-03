@@ -8,7 +8,7 @@
 import Vapor
 import XCTest
 import FluentPostgreSQL
-import KognitaCore
+@testable import KognitaCore
 import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
@@ -53,7 +53,40 @@ class TaskTests: VaporTestCase {
         XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorName)
     }
 
+    func testSolutionBugFixMigration() throws {
+        _ = try Task.create(on: conn)
+        _ = try Task.create(on: conn)
+        _ = try Task.create(on: conn)
+        let okTask = try Task.create(on: conn)
+        _ = try TaskSolution(
+            data: .init(
+                solution: okTask.solution!,
+                presentUser: true,
+                taskID: okTask.requireID()
+            ),
+            creatorID: okTask.creatorId
+        )
+        .save(on: conn)
+
+        let solutionsCount = try TaskSolution.query(on: conn)
+            .count()
+            .wait()
+
+        XCTAssertEqual(solutionsCount, 1)
+
+        _ = try TaskSolution.Repository
+            .createSolutionForOutOfSyncTasks(on: conn)
+            .wait()
+
+        let newSolutionsCount = try TaskSolution.query(on: conn)
+            .count()
+            .wait()
+
+        XCTAssertEqual(newSolutionsCount, 4)
+    }
+
     static var allTests = [
-        ("testTasksInSubject", testTasksInSubject)
+        ("testTasksInSubject", testTasksInSubject),
+        ("testSolutions", testSolutions),
     ]
 }
