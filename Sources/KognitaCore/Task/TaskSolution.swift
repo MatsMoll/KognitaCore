@@ -95,7 +95,7 @@ extension TaskSolution {
     public final class Repository: KognitaRepository {
 
         struct Query {
-            static let content = #"SELECT "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."name" AS "creatorName", "approved"."name" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1) "#
+            static let taskSolutionForTaskID = #"SELECT "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."name" AS "creatorName", "approved"."name" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
         }
 
         public typealias Model = TaskSolution
@@ -112,7 +112,7 @@ extension TaskSolution {
         public static func solutions(for taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
             return conn.databaseConnection(to: .psql).flatMap { psqlConn in
                 psqlConn
-                    .raw(Query.content)
+                    .raw(Query.taskSolutionForTaskID)
                     .bind(taskID)
                     .all(decoding: TaskSolution.Response.self)
                     .map { solutions in

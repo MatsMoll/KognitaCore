@@ -13,6 +13,34 @@ import FluentPostgreSQL
 
 class TopicTests: VaporTestCase {
 
+    func testCreate() throws {
+
+        let user = try User.create(on: conn)
+        let subject = try Subject.create(on: conn)
+
+        let topicData = try Topic.Create.Data(
+            subjectId: subject.requireID(),
+            name: "Test",
+            description: "Some description",
+            chapter: 1
+        )
+
+        let topic = try Topic.Repository
+            .create(from: topicData, by: user, on: conn)
+            .wait()
+        let subtopics = try Subtopic.Repository
+            .getSubtopics(in: topic, with: conn)
+            .wait()
+
+        XCTAssertEqual(topic.name, topicData.name)
+        XCTAssertEqual(topic.subjectId, topicData.subjectId)
+        XCTAssertEqual(topic.description, topicData.description)
+        XCTAssertEqual(topic.chapter, topicData.chapter)
+        XCTAssertEqual(topic.name, topicData.name)
+        XCTAssertEqual(subtopics.count, 1)
+        XCTAssertEqual(subtopics.first?.name, "Generelt")
+    }
+
     func testTimlyTopics() throws {
 
         let subtopic = try Subtopic.create(on: conn)

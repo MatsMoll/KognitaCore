@@ -17,7 +17,7 @@ extension Task {
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = nil,
+                       explenation:     String?         = "Some explenation",
                        on conn:         PostgreSQLConnection) throws -> Task {
 
         let usedCreator = try creator ?? User.create(on: conn)
@@ -39,7 +39,7 @@ extension Task {
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = nil,
+                       explenation:     String?         = "Some explenation",
                        on conn:         PostgreSQLConnection) throws -> Task {
         
         return try Task(subtopicId:     subtopicId,

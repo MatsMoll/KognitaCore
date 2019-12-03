@@ -33,10 +33,24 @@ extension Task {
 extension Task.Repository : KognitaRepository {
     
     public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+
         guard let user = user else { throw Abort(.forbidden) }
+        guard let solution = content.content.solution else { throw Abort(.badRequest) }
         
         return try Task(content: content.content, subtopic: content.subtopic, creator: user)
             .save(on: conn)
+            .flatMap { task in
+                try TaskSolution(
+                    data: TaskSolution.Create.Data(
+                        solution: solution,
+                        presentUser: true,
+                        taskID: task.requireID()
+                    ),
+                    creatorID: user.requireID()
+                )
+                .save(on: conn)
+                .transform(to: task)
+        }
     }
 
     public static func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {

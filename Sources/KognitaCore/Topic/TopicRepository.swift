@@ -34,6 +34,17 @@ extension Topic.Repository {
             .flatMap { subject in
                 try Topic(content: content, subject: subject, creator: user)
                     .create(on: conn)
+                    .flatMap { topic in
+                        try Subtopic(
+                            content: Subtopic.Create.Data(
+                                name: "Generelt",
+                                topicId: topic.requireID(),
+                                chapter: 1
+                            )
+                        )
+                        .save(on: conn)
+                        .transform(to: topic)
+                }
         }
     }
 
@@ -222,26 +233,26 @@ extension Topic.Repository {
         }.transform(to: ())
     }
 
-    public static func leveledTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[[Topic]]> {
+//    public static func leveledTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[[Topic]]> {
+//
+//        return try getTopics(in: subject, conn: conn)
+//            .flatMap { topics in
+//
+//                try topicPreknowleged(in: subject, on: conn)
+//                    .map { preknowleged in
+//
+//                        structure(topics, with: preknowleged)
+//                }
+//        }
+//    }
 
-        return try getTopics(in: subject, conn: conn)
-            .flatMap { topics in
-
-                try topicPreknowleged(in: subject, on: conn)
-                    .map { preknowleged in
-
-                        structure(topics, with: preknowleged)
-                }
-        }
-    }
-
-    static func topicPreknowleged(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[Topic.Pivot.Preknowleged]> {
-        throw Abort(.internalServerError)
-        return try Topic.Pivot.Preknowleged.query(on: conn)
-            .join(\Topic.id, to: \Topic.Pivot.Preknowleged.topicID)
-            .filter(\Topic.subjectId == subject.requireID())
-            .all()
-    }
+//    static func topicPreknowleged(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<[Topic.Pivot.Preknowleged]> {
+//        throw Abort(.internalServerError)
+//        return try Topic.Pivot.Preknowleged.query(on: conn)
+//            .join(\Topic.id, to: \Topic.Pivot.Preknowleged.topicID)
+//            .filter(\Topic.subjectId == subject.requireID())
+//            .all()
+//    }
 
     static func structure(_ topics: [Topic], with preknowleged: [Topic.Pivot.Preknowleged]) -> [[Topic]] {
         var knowlegedGraph = [Topic.ID: [Topic.ID]]()
