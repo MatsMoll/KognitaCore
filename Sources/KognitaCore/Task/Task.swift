@@ -29,8 +29,6 @@ public final class Task: KognitaPersistenceModel {
 
     public var id: Int?
 
-    var topicId: Topic.ID?
-
     /// The topic.id for the topic this task relates to
     public var subtopicId: Subtopic.ID
 

@@ -15,6 +15,10 @@ public struct TimelyTopic: Codable {
     public let numberOfTasks: Int
 }
 
+public struct TopicTaskCount: Codable {
+    public let taskCount: Int
+}
+
 extension Topic {
     public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
         
@@ -92,6 +96,21 @@ extension Topic.Repository {
             .sort(\.chapter, .ascending)
             .all()
     }
+
+    public static func getTopicsWithTaskCount(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[(Topic, TopicTaskCount)]> {
+       conn.databaseConnection(to: .psql)
+        .flatMap { psqlConn in
+            try psqlConn.select()
+                .all(table: Topic.self)
+                .from(Topic.self)
+                .column(.count(\Task.id), as: "taskCount")
+                .join(\Topic.id , to: \Subtopic.topicId)
+                .join(\Subtopic.id, to: \Task.subtopicId)
+                .groupBy(\Topic.id)
+                .where(\Topic.subjectId == subject.requireID())
+                .all(decoding: Topic.self, TopicTaskCount.self)
+       }
+   }
 
     public static func getTopicResponses(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic.Response]> {
         return try getTopics(in: subject, conn: conn)
