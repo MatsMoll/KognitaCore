@@ -12,7 +12,9 @@ extension TaskResult {
 
         public let numberOfTasksCompleted: Int
 
-        public let date: Date
+        public let year: Double
+
+        public let week: Double
     }
 }
 
