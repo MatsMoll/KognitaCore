@@ -74,8 +74,8 @@ public class TaskResultRepository {
                     .bind(topicIds)
             case .resultsInSubject(let subjectId, for: let userId):
                 return conn.raw(self.rawQuery)
-                    .bind(subjectId)
                     .bind(userId)
+                    .bind(subjectId)
             case .subtopics, .taskResults:
                 throw Errors.incompleateSqlStatment
             }
