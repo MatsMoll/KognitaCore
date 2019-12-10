@@ -30,12 +30,20 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskOne, session: sessionTwo, user: user, on: conn)
         _ = try TaskResult.create(task: taskTwo, session: sessionTwo, user: user, on: conn)
 
-        let histogram = try TaskResultRepository
+        let firstHistogram = try TaskResultRepository
             .getAmountHistory(for: user, on: conn)
             .wait()
-        XCTAssertEqual(histogram.count, 7)
+        let secondHistogram = try TaskResultRepository
+            .getAmountHistory(for: user, on: conn, numberOfWeeks: 7)
+            .wait()
+
+        XCTAssertEqual(firstHistogram.count, 4)
         // A local bug groupes it in the second day sometimes
-        XCTAssertTrue(histogram.last?.numberOfTasksCompleted == 4 || histogram[5].numberOfTasksCompleted == 4)
+        XCTAssertTrue(firstHistogram.last?.numberOfTasksCompleted == 4)
+
+        XCTAssertEqual(secondHistogram.count, 7)
+        // A local bug groupes it in the second day sometimes
+        XCTAssertTrue(secondHistogram.last?.numberOfTasksCompleted == 4)
     }
 
     func testFlowZoneTasks() throws {
