@@ -25,8 +25,8 @@ public struct PSTaskResult {
         }
     }
 
-    public var resultScore: Double? {
-        return result.resultScore
+    public var resultScore: Double {
+        return result.resultScore * 100
     }
 
     public var timeUsed: String { return "Ukjent" }

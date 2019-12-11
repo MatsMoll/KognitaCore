@@ -74,8 +74,8 @@ public class TaskResultRepository {
                     .bind(topicIds)
             case .resultsInSubject(let subjectId, for: let userId):
                 return conn.raw(self.rawQuery)
-                    .bind(subjectId)
                     .bind(userId)
+                    .bind(subjectId)
             case .subtopics, .taskResults:
                 throw Errors.incompleateSqlStatment
             }
@@ -196,6 +196,66 @@ public class TaskResultRepository {
             .from(TaskResult.self)
             .where(\TaskResult.userID == user.requireID())
             .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
+            .groupBy(.column(.column(nil, "year")))
+            .groupBy(.column(.column(nil, "week")))
+            .all(decoding: TaskResult.History.self)
+            .map { days in
+                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
+                let now = Date()
+
+                var data = [String : TaskResult.History]()
+
+                try (0...(numberOfWeeks - 1)).forEach {
+                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
+                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
+
+                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
+
+                    guard
+                        let year = dateData.year,
+                        let week = dateData.weekOfYear
+                    else {
+                        throw Errors.incompleateSqlStatment
+                    }
+
+                    data["\(year)-\(week)"] = TaskResult.History(
+                        numberOfTasksCompleted: 0,
+                        year: Double(year),
+                        week: Double(week)
+                    )
+                }
+
+                for day in days {
+                    data["\(Int(day.year))-\(Int(day.week))"] = day
+                }
+
+                return data.map { $1 }
+                    .sorted(by: { first, second in
+                        if first.year == second.year {
+                            return first.week < second.week
+                        } else {
+                            return first.year < second.year
+                        }
+                })
+        }
+    }
+
+    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> Future<[TaskResult.History]> {
+
+        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
+            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+
+        return try conn.select()
+            .column(.count(\TaskResult.id), as: "numberOfTasksCompleted")
+            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "year")
+            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
+            .from(TaskResult.self)
+            .join(\TaskResult.taskID, to: \Task.id)
+            .join(\Task.subtopicId, to: \Subtopic.id)
+            .join(\Subtopic.topicId, to: \Topic.id)
+            .where(\TaskResult.userID == user.requireID())
+            .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
+            .where(\Topic.subjectId == subjectId)
             .groupBy(.column(.column(nil, "year")))
             .groupBy(.column(.column(nil, "week")))
             .all(decoding: TaskResult.History.self)
