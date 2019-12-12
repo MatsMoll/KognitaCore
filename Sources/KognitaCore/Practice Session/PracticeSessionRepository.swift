@@ -471,7 +471,7 @@ extension PracticeSession.Repository {
     }
 
     public static func getAllSessionsWithSubject(by user: User, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[(PracticeSession, Subject)]> {
-        return conn.select()
+        return try conn.select()
             .all(table: PracticeSession.self)
             .all(table: Subject.self)
             .from(PracticeSession.self)
@@ -480,6 +480,7 @@ extension PracticeSession.Repository {
             .join(\Subtopic.topicId, to: \Topic.id)
             .join(\Topic.subjectId, to: \Subject.id)
             .where(\PracticeSession.endedAt != nil)
+            .where(\PracticeSession.userID == user.requireID())
             .orderBy(\PracticeSession.createdAt, .descending)
             .groupBy(\PracticeSession.id)
             .groupBy(\Subject.id)
