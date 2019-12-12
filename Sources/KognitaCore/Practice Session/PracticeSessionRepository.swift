@@ -470,6 +470,34 @@ extension PracticeSession.Repository {
             .all()
     }
 
+    public static func getAllSessionsWithSubject(by user: User, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[(PracticeSession, Subject)]> {
+        return conn.select()
+            .all(table: PracticeSession.self)
+            .all(table: Subject.self)
+            .from(PracticeSession.self)
+            .join(\PracticeSession.id, to: \PracticeSession.Pivot.Subtopic.sessionID)
+            .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.id)
+            .join(\Subtopic.topicId, to: \Topic.id)
+            .join(\Topic.subjectId, to: \Subject.id)
+            .where(\PracticeSession.endedAt != nil)
+            .orderBy(\PracticeSession.createdAt, .descending)
+            .groupBy(\PracticeSession.id)
+            .groupBy(\Subject.id)
+            .all(decoding: PracticeSession.self, Subject.self)
+//        return try PracticeSession
+//            .query(on: conn)
+//            .filter(\.userID == user.requireID())
+//            .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.id)
+//            .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
+//            .join(\Topic.id, to: \Subtopic.topicId)
+//            .join(\Subject.id, to: \Topic.subjectId)
+//            .filter(\.endedAt != nil)
+//            .sort(\.createdAt, .descending)
+//            .groupBy(\PracticeSession.id)
+//            .alsoDecode(Subject.self)
+//            .all()
+    }
+
     static func register<T: Content>(_ submitResult: TaskSubmitResult, result: PracticeSessionResult<T>, in session: PracticeSession, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult> {
 
         return try TaskResultRepository

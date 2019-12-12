@@ -41,7 +41,7 @@ jobs:
         swift test
     - name: Build library in release mode
       run: swift build -c release
-      if: github.ref == 'master'
+      if: github.ref == 'refs/heads/master'
     - name: Release new version
       run: bash ./CI/release-version.sh
-      if: github.ref == 'master'
+      if: github.ref == 'refs/heads/master'
