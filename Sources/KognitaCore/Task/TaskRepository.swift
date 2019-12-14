@@ -113,13 +113,14 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
-    public static func getTasks(in subject: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
+    public static func getTasks(in subjectId: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
 
         Task.query(on: conn, withSoftDeleted: true)
             .join(\User.id, to: \Task.creatorId)
             .join(\Subtopic.id, to: \Task.subtopicId)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
+            .filter(\Topic.subjectId == subjectId)
             .alsoDecode(User.self)
             .alsoDecode(Topic.self)
             .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
