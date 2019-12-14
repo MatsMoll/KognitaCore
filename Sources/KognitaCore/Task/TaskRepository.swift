@@ -113,6 +113,29 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
+    public static func getTasks(in subject: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
+
+        Task.query(on: conn, withSoftDeleted: true)
+            .join(\User.id, to: \Task.creatorId)
+            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Topic.id, to: \Subtopic.topicId)
+            .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
+            .alsoDecode(User.self)
+            .alsoDecode(Topic.self)
+            .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
+            .all()
+            .map { content in
+                content.map { taskContent in
+                    CreatorTaskContent(
+                        task: taskContent.0.0.0,
+                        topic: taskContent.0.1,
+                        creator: taskContent.0.0.1,
+                        IsMultipleChoise: taskContent.1.isMultipleSelect != nil
+                    )
+                }
+        }
+    }
+
     
     struct NumberInputTaskKey: Content {
         let correctAnswer: Double?  // NumberInputTask

@@ -139,7 +139,7 @@ extension MultipleChoiseTask.Repository {
             .content(on: conn)
             .flatMap { content in
 
-                Task.query(on: conn)
+                Task.query(on: conn, withSoftDeleted: true)
                     .filter(\Task.id == multiple.id)
                     .join(\Subtopic.id, to: \Task.subtopicId)
                     .join(\Topic.id, to: \Subtopic.topicId)

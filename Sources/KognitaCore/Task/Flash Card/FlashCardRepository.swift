@@ -109,7 +109,7 @@ extension FlashCardTask.Repository {
 
     public static func content(for flashCard: FlashCardTask, on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
 
-        return Task.query(on: conn)
+        return Task.query(on: conn, withSoftDeleted: true)
             .filter(\Task.id == flashCard.id)
             .join(\Subtopic.id, to: \Task.subtopicId)
             .join(\Topic.id, to: \Subtopic.topicId)
