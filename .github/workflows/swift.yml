@@ -39,9 +39,6 @@ jobs:
           libssl-dev zlib1g-dev \
           && rm -r /var/lib/apt/lists/*
         swift test
-    - name: Build library in release mode
-      run: swift build -c release
-      if: github.ref == 'refs/heads/master'
     - name: Release new version
       run: bash ./CI/release-version.sh
       if: github.ref == 'refs/heads/master'
