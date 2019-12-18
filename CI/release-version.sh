@@ -42,8 +42,8 @@ function pr_has_label {
 
 function generate_new_release_data {
 
-    LAST_TAG_NAME=$(jq ".tag_name" last_release -r || echo "0.0.0")
-    LAST_VERSION=${LAST_TAG_NAME#v}
+    LAST_VERSION=`git tag -l --sort -version:refname | head -n 1` # newest version
+    LAST_VERSION=${LAST_VERSION%%"-"*}
 
     #replace . with space so can split into an array
     VERSION_BITS=(${LAST_VERSION//./ })
