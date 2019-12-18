@@ -33,8 +33,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1.2.0
+#    - name: Run unit tests
+#      run: |
+#        apt-get -qq update && apt-get install -y \
+#          libssl-dev zlib1g-dev \
+#          && rm -r /var/lib/apt/lists/*
+#        swift test
     - name: Release new version
-      run: bash ./CI/release-version.sh
+      run: |
+        apt-get -qq update && apt-get install -y jq curl
+        bash ./CI/release-version.sh
       if: github.ref == 'refs/heads/master'
       env: 
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

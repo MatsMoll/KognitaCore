@@ -41,18 +41,34 @@ function pr_has_label {
 }
 
 function generate_new_release_data {
-    BUMP_VERSION_SCHEME="$INPUT_BUMP_VERSION_SCHEME"
-    if [[ "true" == $(pr_has_label "release:patch") ]]; then
-        BUMP_VERSION_SCHEME="patch"
-    elif [[ "true" == $(pr_has_label "release:minor") ]]; then
-        BUMP_VERSION_SCHEME="minor"
-    elif [[ "true" == $(pr_has_label "release:major") ]]; then
-        BUMP_VERSION_SCHEME="major"
-    fi
 
     LAST_TAG_NAME=$(jq ".tag_name" last_release -r || echo "0.0.0")
     LAST_VERSION=${LAST_TAG_NAME#v}
-    NEXT_VERSION=$("${CURRENT_DIR}/lib/semver" "$BUMP_VERSION_SCHEME" "$LAST_VERSION")
+
+    #replace . with space so can split into an array
+    VERSION_BITS=(${LAST_VERSION//./ })
+
+    #get number parts and increase last one by 1
+    MAJOR_VERSION=${VERSION_BITS[0]:-1}
+    MINOR_VERSION=${VERSION_BITS[1]:-0}
+    BUILD_VERSION=${VERSION_BITS[2]:-(-1)}
+
+    #get current hash and see if it already has a tag
+    GIT_MESSAGE="$(git log --format=%B -n 1 $GIT_COMMIT)"
+
+    if [[ "true" == $(pr_has_label "release:patch") ]]; then
+        BUILD_VERSION=$((BUILD_VERSION+1))
+    elif [[ "true" == $(pr_has_label "release:minor") ]]; then
+        MINOR_VERSION=$((MINOR_VERSION+1))
+        BUILD_VERSION=0
+    elif [[ "true" == $(pr_has_label "release:major") ]]; then
+        MAJOR_VERSION=$((MAJOR_VERSION+1))
+        MINOR_VERSION=0
+        BUILD_VERSION=0
+    fi
+
+    #create new tag
+    NEXT_VERSION="$MAJOR_VERSION.$MINOR_VERSION.$BUILD_VERSION"
 
     cat << EOF > new_release_data
 {
