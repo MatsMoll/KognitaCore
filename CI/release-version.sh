@@ -58,7 +58,7 @@ function generate_new_release_data {
     elif [[ "true" == $(pr_has_label "release:minor") ]]; then
         MINOR_VERSION=$((MINOR_VERSION+1))
         BUILD_VERSION=0
-    elif [[ "true" == $(pr_has_label "release:major") ]]; then
+    else
         MAJOR_VERSION=$((MAJOR_VERSION+1))
         MINOR_VERSION=0
         BUILD_VERSION=0
