@@ -42,8 +42,8 @@ function pr_has_label {
 
 function generate_new_release_data {
 
-    LAST_VERSION=`git tag -l --sort -version:refname | head -n 1` # newest version
-    LAST_VERSION=${LAST_VERSION%%"-"*}
+    LAST_TAG_NAME=$(jq ".tag_name" last_release -r || echo "0.0.0")
+    LAST_VERSION=${LAST_TAG_NAME%%"-"*}
 
     #replace . with space so can split into an array
     VERSION_BITS=(${LAST_VERSION//./ })
@@ -52,9 +52,6 @@ function generate_new_release_data {
     MAJOR_VERSION=${VERSION_BITS[0]:-1}
     MINOR_VERSION=${VERSION_BITS[1]:-0}
     BUILD_VERSION=${VERSION_BITS[2]:-(-1)}
-
-    #get current hash and see if it already has a tag
-    GIT_MESSAGE="$(git log --format=%B -n 1 $GIT_COMMIT)"
 
     if [[ "true" == $(pr_has_label "release:patch") ]]; then
         BUILD_VERSION=$((BUILD_VERSION+1))
