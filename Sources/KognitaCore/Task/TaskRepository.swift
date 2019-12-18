@@ -115,7 +115,7 @@ extension Task.Repository : KognitaRepository {
 
     public static func getTasks(in subjectId: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
 
-        Task.query(on: conn, withSoftDeleted: true)
+        Task.query(on: conn, withSoftDeleted: withSoftDeleted)
             .join(\User.id, to: \Task.creatorId)
             .join(\Subtopic.id, to: \Task.subtopicId)
             .join(\Topic.id, to: \Subtopic.topicId)
@@ -124,6 +124,7 @@ extension Task.Repository : KognitaRepository {
             .alsoDecode(User.self)
             .alsoDecode(Topic.self)
             .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
+            .range(lower: 0, upper: maxAmount)
             .all()
             .map { content in
                 content.map { taskContent in

@@ -305,86 +305,94 @@ public class TaskResultRepository {
             .save(on: conn)
     }
 
-    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: PostgreSQLConnection) throws -> Future<[User.TopicLevel]> {
+    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: DatabaseConnectable) throws -> Future<[User.TopicLevel]> {
 
-        return try Query.resultsInTopics(topics, for: userId)
-            .query(for: conn)
-            .all(decoding: SubqueryTopicResult.self)
-            .flatMap { result in
+        return conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
 
-                let ids = result.map { $0.id }
+                try Query.resultsInTopics(topics, for: userId)
+                    .query(for: psqlConn)
+                    .all(decoding: SubqueryTopicResult.self)
+                    .flatMap { result in
 
-                return conn.select()
-                    .column(.column(\TaskResult.resultScore), as: "resultScore")
-                    .column(.column(\Topic.id), as: "topicID")
-                    .from(TaskResult.self)
-                    .where(\TaskResult.id, .in, ids)
-                    .join(\TaskResult.taskID, to: \Task.id)
-                    .join(\Task.subtopicId, to: \Subtopic.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .all(decoding: UserLevelScore.self)
-                    .flatMap { scores in
+                        let ids = result.map { $0.id }
 
-                        return scores.group(by: \UserLevelScore.topicID)
-                            .map { topicID, grouped in
+                        return psqlConn.select()
+                            .column(.column(\TaskResult.resultScore), as: "resultScore")
+                            .column(.column(\Topic.id), as: "topicID")
+                            .from(TaskResult.self)
+                            .where(\TaskResult.id, .in, ids)
+                            .join(\TaskResult.taskID, to: \Task.id)
+                            .join(\Task.subtopicId, to: \Subtopic.id)
+                            .join(\Subtopic.topicId, to: \Topic.id)
+                            .all(decoding: UserLevelScore.self)
+                            .flatMap { scores in
 
-                            Task.query(on: conn)
-                                .join(\Subtopic.id, to: \Task.subtopicId)
-                                .filter(\Subtopic.topicId == topicID)
-                                .count()
-                                .map { maxScore in
-                                    User.TopicLevel(
-                                        topicID: topicID,
-                                        correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
-                                        maxScore: Double(maxScore)
-                                    )
-                            }
-                        }.flatten(on: conn)
-                }
-        }
-    }
+                                return scores.group(by: \UserLevelScore.topicID)
+                                    .map { topicID, grouped in
 
-    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: PostgreSQLConnection) throws -> Future<User.SubjectLevel> {
-
-        return try Query.resultsInSubject(subject.requireID(), for: userId)
-            .query(for: conn)
-            .all(decoding: SubqueryResult.self)
-            .flatMap { result in
-
-                let ids = result.map { $0.id }
-
-                guard ids.isEmpty == false else {
-                    return conn.future(
-                        try User.SubjectLevel(subjectID: subject.requireID(), correctScore: 0, maxScore: 1)
-                    )
-                }
-
-                return TaskResult.query(on: conn)
-                    .filter(\.id ~~ ids)
-                    .sum(\.resultScore)
-                    .flatMap { score in
-
-                        try Task.query(on: conn)
-                            .join(\Subtopic.id, to: \Task.subtopicId)
-                            .join(\Topic.id, to: \Subtopic.topicId)
-                            .filter(\Topic.subjectId == subject.requireID())
-                            .count()
-                            .map { maxScore in
-                                
-                                try User.SubjectLevel(
-                                    subjectID: subject.requireID(),
-                                    correctScore: score,
-                                    maxScore: Double(maxScore)
-                                )
+                                    Task.query(on: psqlConn)
+                                        .join(\Subtopic.id, to: \Task.subtopicId)
+                                        .filter(\Subtopic.topicId == topicID)
+                                        .count()
+                                        .map { maxScore in
+                                            User.TopicLevel(
+                                                topicID: topicID,
+                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
+                                                maxScore: Double(maxScore)
+                                            )
+                                    }
+                                }.flatten(on: conn)
                         }
                 }
         }
     }
 
-    public static func getLastResult(for taskID: Task.ID, by user: User, on conn: DatabaseConnectable) throws -> Future<TaskResult?> {
-        return try TaskResult.query(on: conn)
+    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: DatabaseConnectable) throws -> Future<User.SubjectLevel> {
+
+        conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                try Query.resultsInSubject(subject.requireID(), for: userId)
+                    .query(for: psqlConn)
+                    .all(decoding: SubqueryResult.self)
+                    .flatMap { result in
+
+                        let ids = result.map { $0.id }
+
+                        guard ids.isEmpty == false else {
+                            return psqlConn.future(
+                                try User.SubjectLevel(subjectID: subject.requireID(), correctScore: 0, maxScore: 1)
+                            )
+                        }
+
+                        return TaskResult.query(on: psqlConn)
+                            .filter(\.id ~~ ids)
+                            .sum(\.resultScore)
+                            .flatMap { score in
+
+                                try Task.query(on: psqlConn)
+                                    .join(\Subtopic.id, to: \Task.subtopicId)
+                                    .join(\Topic.id, to: \Subtopic.topicId)
+                                    .filter(\Topic.subjectId == subject.requireID())
+                                    .count()
+                                    .map { maxScore in
+
+                                        try User.SubjectLevel(
+                                            subjectID: subject.requireID(),
+                                            correctScore: score,
+                                            maxScore: Double(maxScore)
+                                        )
+                                }
+                        }
+                }
+        }
+    }
+
+    public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult?> {
+        return TaskResult.query(on: conn)
             .filter(\TaskResult.taskID == taskID)
-            .filter(\TaskResult.userID == user.requireID())
+            .filter(\TaskResult.userID == userId)
             .sort(\.createdAt, .descending)
             .first()
     }
@@ -411,7 +419,7 @@ struct TaskSubmitResult {
 }
 
 extension User {
-    public struct TopicLevel {
+    public struct TopicLevel: Codable {
         public let topicID: Topic.ID
         public let correctScore: Double
         public let maxScore: Double
@@ -422,7 +430,7 @@ extension User {
         }
     }
 
-    public struct SubjectLevel {
+    public struct SubjectLevel: Codable {
         public let subjectID: Subject.ID
         public let correctScore: Double
         public let maxScore: Double
@@ -430,6 +438,35 @@ extension User {
         public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
         public var correctProsentage: Double {
             return (correctScore * 1000 / maxScore).rounded() / 10
+        }
+    }
+}
+
+extension Subject {
+    public struct Details: Codable {
+        public let subject: Subject
+        public let topics: [Topic.WithTaskCount]
+        public let levels: [User.TopicLevel]
+        public let subjectLevel: User.SubjectLevel
+
+        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel]) {
+            self.subject = subject
+            self.topics = topics
+            self.levels = levels
+
+            var correctScore: Double = 0
+            var maxScore: Double = 0
+
+            for level in levels {
+                correctScore += level.correctScore
+                maxScore += level.maxScore
+            }
+
+            self.subjectLevel = User.SubjectLevel(
+                subjectID: subject.id ?? 0,
+                correctScore: correctScore,
+                maxScore: maxScore
+            )
         }
     }
 }

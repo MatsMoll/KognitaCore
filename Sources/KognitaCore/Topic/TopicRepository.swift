@@ -15,8 +15,15 @@ public struct TimelyTopic: Codable {
     public let numberOfTasks: Int
 }
 
-public struct TopicTaskCount: Codable {
-    public let taskCount: Int
+struct TopicTaskCount: Codable {
+    let taskCount: Int
+}
+
+extension Topic {
+    public struct WithTaskCount: Content {
+        public let topic: Topic
+        public let taskCount: Int
+    }
 }
 
 extension Topic {
@@ -97,7 +104,7 @@ extension Topic.Repository {
             .all()
     }
 
-    public static func getTopicsWithTaskCount(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[(Topic, TopicTaskCount)]> {
+    public static func getTopicsWithTaskCount(in subject: Subject, conn: DatabaseConnectable) throws -> Future<[Topic.WithTaskCount]> {
        conn.databaseConnection(to: .psql)
         .flatMap { psqlConn in
             try psqlConn.select()
@@ -109,6 +116,14 @@ extension Topic.Repository {
                 .groupBy(\Topic.id)
                 .where(\Topic.subjectId == subject.requireID())
                 .all(decoding: Topic.self, TopicTaskCount.self)
+                .map { topics in
+                    topics.map { data in
+                        Topic.WithTaskCount(
+                            topic: data.0,
+                            taskCount: data.1.taskCount
+                        )
+                    }
+            }
        }
    }
 
