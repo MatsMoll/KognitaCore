@@ -47,6 +47,17 @@ extension PracticeSession {
     }
 }
 
+extension PracticeSession {
+    public struct HistoryList: Content {
+        public struct Session: Content {
+            public let session: PracticeSession
+            public let subject: Subject
+        }
+
+        public let sessions: [Session]
+    }
+}
+
 
 extension PracticeSession.Repository {
 
@@ -470,7 +481,7 @@ extension PracticeSession.Repository {
             .all()
     }
 
-    public static func getAllSessionsWithSubject(by user: User, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[(PracticeSession, Subject)]> {
+    public static func getAllSessionsWithSubject(by user: User, on conn: PostgreSQLConnection) throws -> EventLoopFuture<PracticeSession.HistoryList> {
         return try conn.select()
             .all(table: PracticeSession.self)
             .all(table: Subject.self)
@@ -485,6 +496,16 @@ extension PracticeSession.Repository {
             .groupBy(\PracticeSession.id)
             .groupBy(\Subject.id)
             .all(decoding: PracticeSession.self, Subject.self)
+            .map { sessions in
+                PracticeSession.HistoryList(
+                    sessions: sessions.map { item in
+                        PracticeSession.HistoryList.Session(
+                            session: item.0,
+                            subject: item.1
+                        )
+                    }
+                )
+        }
 //        return try PracticeSession
 //            .query(on: conn)
 //            .filter(\.userID == user.requireID())

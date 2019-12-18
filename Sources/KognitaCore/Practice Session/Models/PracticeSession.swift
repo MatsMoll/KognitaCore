@@ -161,7 +161,7 @@ extension PracticeSession: Parameter {}
 extension PracticeSession: Content {}
 
 
-public struct TaskType {
+public struct TaskType: Content {
 
     public let task: Task
     public let multipleChoise: MultipleChoiseTask?
@@ -171,5 +171,22 @@ public struct TaskType {
         self.task = content.task
         self.multipleChoise = content.chosie
         self.numberInputTask = content.input
+    }
+}
+
+extension PracticeSession {
+    public struct CurrentTask: Content {
+
+        public let session: PracticeSession
+        public let task: TaskType
+        public let index: Int
+        public let user: User.Response
+
+        public init(session: PracticeSession, task: TaskType, index: Int, user: User.Response) {
+            self.session = session
+            self.task = task
+            self.index = index
+            self.user = user
+        }
     }
 }

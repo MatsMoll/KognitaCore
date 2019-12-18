@@ -95,7 +95,7 @@ extension User.ResetPassword.Token.Repository {
             .transform(to: ())
     }
     
-    public static func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> Future<Void> {
+    public static func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         
         guard content.password == content.verifyPassword else { throw User.Repository.Errors.passwordMismatch }
         

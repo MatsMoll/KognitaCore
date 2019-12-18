@@ -10,11 +10,11 @@ import Vapor
 /// Public representation of user data.
 extension User {
     
-    public struct Response : Content {
+    public struct Response : Content, UserContent {
 
         /// User's unique identifier.
         /// Not optional since we only return users that exist in the DB.
-        public let id: Int
+        public var userId: Int
 
         /// User's full name.
         public let name: String
@@ -24,5 +24,8 @@ extension User {
 
         /// The User's registration date
         public let registrationDate: Date
+
+        /// If the user is a creator
+        public let isCreator: Bool
     }
 }

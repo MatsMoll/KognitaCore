@@ -2,8 +2,16 @@ import Authentication
 import FluentPostgreSQL
 import Vapor
 
+
+public protocol UserContent {
+    var userId: Int { get }
+    var name: String { get }
+    var email: String { get }
+    var isCreator: Bool { get }
+}
+
 /// A registered user, capable of owning todo items.
-public final class User: KognitaCRUDModel {
+public final class User: KognitaCRUDModel, UserContent {
 
     public enum Role: String, PostgreSQLEnum, PostgreSQLMigration {
         case none
@@ -15,6 +23,8 @@ public final class User: KognitaCRUDModel {
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
     public var id: Int?
+
+    public var userId: Int { id ?? 0 }
 
     /// User's full name.
     public private(set) var name: String
@@ -83,12 +93,13 @@ extension User {
     /// A bool indicating if the user is a creator
     public var isCreator: Bool { return role == .creator || role == .admin }
     
-    func content() throws -> User.Response {
+    public func content() throws -> User.Response {
         return try User.Response(
-            id:                 requireID(),
+            userId:             requireID(),
             name:               name,
             email:              email,
-            registrationDate:   createdAt ?? Date()
+            registrationDate:   createdAt ?? Date(),
+            isCreator:          isCreator
         )
     }
 }
