@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 /// A submitted answer form a `FlashCardTask`
-public final class FlashCardAnswer: PostgreSQLModel {
+public final class FlashCardAnswer: PostgreSQLModel, Codable {
     
     public var id: Int?
 

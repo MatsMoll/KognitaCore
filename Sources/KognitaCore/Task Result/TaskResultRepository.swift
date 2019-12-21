@@ -410,6 +410,30 @@ public class TaskResultRepository {
             .groupBy(\User.id)
             .all(decoding: UserResultOverview.self)
     }
+
+    public static func exportResults(on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult.Answer]> {
+
+        let query = #"SELECT "TaskResult".*, "FlashCardAnswer".*, "MultipleChoiseTaskAnswer".* FROM "TaskResult" FULL OUTER JOIN "FlashCardAnswer" ON "FlashCardAnswer"."taskID" = "TaskResult"."taskID" AND "FlashCardAnswer"."sessionID" = "TaskResult"."sessionID" LEFT JOIN "MultipleChoiseTaskChoise" ON "TaskResult"."taskID" = "MultipleChoiseTaskChoise"."taskId" FULL OUTER JOIN "MultipleChoiseTaskAnswer" ON "MultipleChoiseTaskAnswer"."choiseID" = "MultipleChoiseTaskChoise"."id" AND "MultipleChoiseTaskChoise"."taskId" = "TaskResult"."taskID" AND "MultipleChoiseTaskAnswer"."sessionID" = "TaskResult"."sessionID" ORDER BY "createdAt" DESC;"#
+
+        return conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                psqlConn.raw(query)
+                    .all(decoding: TaskResult.self, MultipleChoiseTaskAnswer?.self, FlashCardAnswer?.self)
+                    .map { results in
+                        results
+                            .map { (result, multiple, flash) in
+                                TaskResult.Answer(
+                                    result: result,
+                                    multiple: multiple,
+                                    flash: flash
+                                )
+                        }
+                }
+                .map(Set.init)
+                .map(Array.init)
+        }
+    }
 }
 
 struct TaskSubmitResult {
@@ -468,5 +492,23 @@ extension Subject {
                 maxScore: maxScore
             )
         }
+    }
+}
+
+extension TaskResult {
+    public struct Answer: Codable, Hashable {
+
+        public static func == (lhs: Answer, rhs: Answer) -> Bool {
+            lhs.result.id == rhs.result.id && lhs.multiple?.choiseID == rhs.multiple?.choiseID
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(result.id)
+            hasher.combine(multiple?.choiseID)
+        }
+
+        let result: TaskResult
+        let multiple: MultipleChoiseTaskAnswer?
+        let flash: FlashCardAnswer?
     }
 }

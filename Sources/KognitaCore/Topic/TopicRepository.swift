@@ -188,39 +188,87 @@ extension Topic.Repository {
     }
 
     public static func exportTasks(in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<SubtopicExportContent> {
-        return try MultipleChoiseTask.query(on: conn)
-            .join(\Task.id, to: \MultipleChoiseTask.id)
-            .filter(\Task.subtopicId == subtopic.requireID())
-            .all()
-            .flatMap { tasks in
-                try tasks.map { try MultipleChoiseTask.Repository.get(task: $0, conn: conn) }
-                    .flatten(on: conn)
-        }.flatMap { multipleTasks in
-            try NumberInputTask.query(on: conn)
-                .join(\Task.id, to: \NumberInputTask.id)
-                .filter(\Task.subtopicId == subtopic.requireID())
-                .all()
-                .flatMap { tasks in
-                    try tasks.map { try NumberInputTask.Repository.get(task: $0, conn: conn) }
-                        .flatten(on: conn)
-            }.flatMap { numberTasks in
-                try FlashCardTask.query(on: conn)
-                    .join(\Task.id, to: \FlashCardTask.id)
-                    .filter(\Task.subtopicId == subtopic.requireID())
-                    .all()
-                    .flatMap { tasks in
-                        try tasks.map { try FlashCardTask.Repository.get(task: $0, conn: conn) }
-                            .flatten(on: conn)
-                }.map { flashCards in
-                    SubtopicExportContent(
-                        subtopic: subtopic,
-                        multipleChoiseTasks: multipleTasks,
-                        inputTasks: numberTasks,
-                        flashCards: flashCards
-                    )
+        return conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                try psqlConn.select()
+                    .all(table: Task.self)
+                    .all(table: MultipleChoiseTask.self)
+                    .all(table: MultipleChoiseTaskChoise.self)
+                    .from(Task.self)
+                    .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+                    .join(\Task.id, to: \FlashCardTask.id, method: .left)
+                    .join(\MultipleChoiseTask.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
+                    .where(\Task.subtopicId == subtopic.requireID())
+                    .all(decoding: Task.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
+                    .map { tasks in
+
+                        var multipleTasks = [Int : MultipleChoiseTask.Data]()
+                        var flashTasks = [Task]()
+
+                        for task in tasks {
+                            if
+                                let multiple = task.1,
+                                let choise = task.2
+                            {
+                                if let earlierTask = multipleTasks[multiple.id ?? 0] {
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.Data(
+                                        task: earlierTask.task,
+                                        multipleTask: multiple,
+                                        choises: earlierTask.choises + [choise]
+                                    )
+                                } else {
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.Data(
+                                        task: task.0,
+                                        multipleTask: multiple,
+                                        choises: [choise]
+                                    )
+                                }
+                            } else {
+                                flashTasks.append(task.0)
+                            }
+                        }
+
+                        return SubtopicExportContent(
+                            subtopic: subtopic,
+                            multipleChoiseTasks: multipleTasks.map { $0.value },
+                            flashCards: flashTasks
+                        )
                 }
-            }
         }
+//        return try MultipleChoiseTask.query(on: conn)
+//            .join(\Task.id, to: \MultipleChoiseTask.id)
+//            .filter(\Task.subtopicId == subtopic.requireID())
+//            .all()
+//            .flatMap { tasks in
+//                try tasks.map { try MultipleChoiseTask.Repository.get(task: $0, conn: conn) }
+//                    .flatten(on: conn)
+//        }.flatMap { multipleTasks in
+//            try NumberInputTask.query(on: conn)
+//                .join(\Task.id, to: \NumberInputTask.id)
+//                .filter(\Task.subtopicId == subtopic.requireID())
+//                .all()
+//                .flatMap { tasks in
+//                    try tasks.map { try NumberInputTask.Repository.get(task: $0, conn: conn) }
+//                        .flatten(on: conn)
+//            }.flatMap { numberTasks in
+//                try FlashCardTask.query(on: conn)
+//                    .join(\Task.id, to: \FlashCardTask.id)
+//                    .filter(\Task.subtopicId == subtopic.requireID())
+//                    .all()
+//                    .flatMap { tasks in
+//                        try tasks.map { try FlashCardTask.Repository.get(task: $0, conn: conn) }
+//                            .flatten(on: conn)
+//                }.map { flashCards in
+//                    SubtopicExportContent(
+//                        subtopic: subtopic,
+//                        multipleChoiseTasks: multipleTasks,
+//                        inputTasks: numberTasks,
+//                        flashCards: flashCards
+//                    )
+//                }
+//            }
+//        }
     }
 
     public static func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
@@ -252,17 +300,11 @@ extension Topic.Repository {
                         try MultipleChoiseTask.Repository
                             .importTask(from: task, in: subtopic, on: conn)
                 }.flatten(on: conn).flatMap { _ in
-                    try content.inputTasks
+                    try content.flashCards
                     .map { task in
-                        try NumberInputTask.Repository
+                        try FlashCardTask.Repository
                             .importTask(from: task, in: subtopic, on: conn)
-                    }.flatten(on: conn).flatMap { _ in
-                        try content.flashCards
-                        .map { task in
-                            try FlashCardTask.Repository
-                                .importTask(from: task, in: subtopic, on: conn)
-                        }.flatten(on: conn)
-                    }
+                    }.flatten(on: conn)
                 }
         }.transform(to: ())
     }
@@ -340,7 +382,6 @@ extension Topic.Repository {
 public struct SubtopicExportContent : Content {
     let subtopic: Subtopic
     let multipleChoiseTasks: [MultipleChoiseTask.Data]
-    let inputTasks: [NumberInputTask.Data]
     let flashCards: [Task]
 }
 
