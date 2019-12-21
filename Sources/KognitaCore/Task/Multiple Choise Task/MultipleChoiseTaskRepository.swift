@@ -103,7 +103,6 @@ extension MultipleChoiseTask.Repository {
         return taskContent.task
             .create(on: conn)
             .flatMap { task in
-                TaskSolution
                 try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
                     .create(on: conn)
         }.flatMap { task in
