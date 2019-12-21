@@ -100,9 +100,12 @@ extension MultipleChoiseTask.Repository {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
-        return taskContent.task.create(on: conn).flatMap { task in
-            try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
-                .create(on: conn)
+        return taskContent.task
+            .create(on: conn)
+            .flatMap { task in
+                TaskSolution
+                try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                    .create(on: conn)
         }.flatMap { task in
             try taskContent.choises
                 .map { choise in
