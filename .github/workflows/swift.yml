@@ -36,7 +36,7 @@ jobs:
     - name: Test Finch
       run: |
         bash ./CI/install-finch.sh
-        finch compare
+        finch compare --release-manager=mem@mollestad.no
 #    - name: Run unit tests
 #      run: |
 #        apt-get -qq update && apt-get install -y \
