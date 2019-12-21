@@ -27,7 +27,7 @@ public final class User: KognitaCRUDModel, UserContent {
     public var userId: Int { id ?? 0 }
 
     /// User's full name.
-    public private(set) var name: String
+    public var name: String
 
     /// User's email address.
     public private(set) var email: String
@@ -45,9 +45,9 @@ public final class User: KognitaCRUDModel, UserContent {
     public var updatedAt: Date?
 
     /// A token used to activate other users
-    public var loseAccessDate: Date?
-    
-    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
+//    public var loseAccessDate: Date?
+
+//    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
     init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role) {
@@ -107,6 +107,6 @@ extension User {
 extension User : KognitaModelUpdatable {
     
     public func updateValues(with content: User.Edit.Data) throws {
-        self.name = content.name
+//        self.name = content.name
     }
 }

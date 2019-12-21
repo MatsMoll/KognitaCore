@@ -19,7 +19,7 @@ public protocol TaskSubmitResultable {
 
 
 /// A Result from a executed task
-public final class TaskResult: PostgreSQLModel {
+public final class TaskResult: PostgreSQLModel, Codable {
 
     public static var createdAtKey: TimestampKey? = \.createdAt
 
