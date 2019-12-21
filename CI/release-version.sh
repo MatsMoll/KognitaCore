@@ -65,10 +65,10 @@ function generate_new_release_data {
     fi
 
     #create new tag
-    NEXT_VERSION="$MAJOR_VERSION.$MINOR_VERSION.$BUILD_VERSION-beta"
+    NEXT_VERSION="$MAJOR_VERSION.$MINOR_VERSION.$BUILD_VERSION"
 
     git tag $NEXT_VERSION
-    CHANGE_LOG="$(finch compare --release-manager="mem@mollestad.no" --project-dir="." --config="./CI/finch-config.yml")"
+    CHANGE_LOG="$(finch compare --release-manager="mem@mollestad.no" --project-dir="." --config="./CI/finch-config.yml" --no-fetch)"
 
     cat << EOF > new_release_data
 {

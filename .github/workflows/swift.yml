@@ -38,6 +38,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DRYRUN: true
       run: |
+        apt-get -qq update && apt-get install -y jq curl
         bash ./CI/install-finch.sh
         bash ./CI/release-version.sh
 #    - name: Run unit tests
