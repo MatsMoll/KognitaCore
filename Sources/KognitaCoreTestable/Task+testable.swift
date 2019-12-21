@@ -17,7 +17,8 @@ extension Task {
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = "Some explenation",
+                       explenation:     String          = "Some explenation",
+                       createSolution:  Bool            = true,
                        on conn:         PostgreSQLConnection) throws -> Task {
 
         let usedCreator = try creator ?? User.create(on: conn)
@@ -30,6 +31,7 @@ extension Task {
                           imageURL: imageURL,
                           question: question,
                           explenation: explenation,
+                          createSolution: createSolution,
                           on: conn)
     }
     
@@ -39,7 +41,8 @@ extension Task {
                        description:     String          = "Some description",
                        imageURL:        String?         = nil,
                        question:        String          = "Some question",
-                       explenation:     String?         = "Some explenation",
+                       explenation:     String          = "Some explenation",
+                       createSolution:  Bool            = true,
                        on conn:         PostgreSQLConnection) throws -> Task {
         
         return try Task(subtopicId:     subtopicId,
@@ -49,6 +52,21 @@ extension Task {
                         explenation:    explenation,
                         question:       question,
                         creatorId:      creatorId)
-            .save(on: conn).wait()
+            
+            .save(on: conn)
+            .flatMap { task in
+                if createSolution {
+                    return try TaskSolution(
+                        data: TaskSolution.Create.Data(
+                            solution: explenation,
+                            presentUser: true,
+                            taskID: task.requireID()),
+                        creatorID: creatorId)
+                        .save(on: conn)
+                        .transform(to: task)
+                } else {
+                    return conn.future(task)
+                }
+        }.wait()
     }
 }

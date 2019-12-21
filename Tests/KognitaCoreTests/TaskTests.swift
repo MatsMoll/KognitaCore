@@ -32,7 +32,7 @@ class TaskTests: VaporTestCase {
 
     func testSolutions() throws {
 
-        let task = try Task.create(on: conn)
+        let task = try Task.create(createSolution: false, on: conn)
         let user = try User.create(on: conn)
         let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
         let secondSolution = try TaskSolution.create(task: task, on: conn)
@@ -54,19 +54,10 @@ class TaskTests: VaporTestCase {
     }
 
     func testSolutionBugFixMigration() throws {
+        _ = try Task.create(createSolution: false, on: conn)
+        _ = try Task.create(createSolution: false, on: conn)
+        _ = try Task.create(createSolution: false, on: conn)
         _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        let okTask = try Task.create(on: conn)
-        _ = try TaskSolution(
-            data: .init(
-                solution: okTask.solution!,
-                presentUser: true,
-                taskID: okTask.requireID()
-            ),
-            creatorID: okTask.creatorId
-        )
-        .save(on: conn)
 
         let solutionsCount = try TaskSolution.query(on: conn)
             .count()
