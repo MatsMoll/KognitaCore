@@ -46,6 +46,7 @@ class SubjectTests: VaporTestCase {
         _ = try Subject.Repository.importContent(subjectExport, on: conn).wait()
         
         XCTAssertEqual(try Task.Repository.all(on: conn).wait().count, 10)
+        XCTAssertEqual(try TaskSolution.Repository.all(on: conn).wait().count, 10)
     }
 
     static let allTests = [

@@ -88,7 +88,21 @@ extension FlashCardTask.Repository {
         return task.create(on: conn).flatMap { task in
             try FlashCardTask(task: task)
                 .create(on: conn)
-                .transform(to: ())
+                .flatMap { _ in
+                    if let solution = task.solution {
+                        return TaskSolution(
+                            data: TaskSolution.Create.Data(
+                                solution: solution,
+                                presentUser: true,
+                                taskID: 1),
+                            creatorID: 1
+                        )
+                            .create(on: conn)
+                            .transform(to: ())
+                    } else {
+                        return conn.future()
+                    }
+            }
         }
     }
 

@@ -100,9 +100,26 @@ extension MultipleChoiseTask.Repository {
         taskContent.task.id = nil
         taskContent.task.creatorId = 1
         try taskContent.task.subtopicId = subtopic.requireID()
-        return taskContent.task.create(on: conn).flatMap { task in
-            try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
-                .create(on: conn)
+        return taskContent.task
+            .create(on: conn)
+            .flatMap { task -> EventLoopFuture<MultipleChoiseTask> in
+                if let solution = taskContent.task.solution {
+                    return TaskSolution(
+                        data: TaskSolution.Create.Data(
+                            solution: solution,
+                            presentUser: true,
+                            taskID: 1),
+                        creatorID: 1
+                    )
+                        .create(on: conn)
+                        .flatMap { _ in
+                            try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                                .create(on: conn)
+                    }
+                } else {
+                    return try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                        .create(on: conn)
+                }
         }.flatMap { task in
             try taskContent.choises
                 .map { choise in
