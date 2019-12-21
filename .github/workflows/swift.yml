@@ -36,6 +36,7 @@ jobs:
     - name: Test Finch
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DRYRUN: true
       run: |
         bash ./CI/install-finch.sh
         bash ./CI/release-version.sh
