@@ -8,42 +8,58 @@
 import FluentPostgreSQL
 import Vapor
 
+public protocol MultipleChoiseTaskRepository:
+    CreateModelRepository,
+    UpdateModelRepository,
+    DeleteModelRepository
+    where
+    Model           == MultipleChoiseTask,
+    CreateData      == MultipleChoiseTask.Create.Data,
+    CreateResponse  == MultipleChoiseTask.Create.Response,
+    UpdateData      == MultipleChoiseTask.Edit.Data,
+    UpdateResponse  == MultipleChoiseTask.Edit.Response
+{}
+
 extension MultipleChoiseTask {
-    
-    public final class Repository : KognitaCRUDRepository {
-        
-        public typealias Model = MultipleChoiseTask
-        
-        public static var shared = Repository()
-    }
+    public final class DatabaseRepository: MultipleChoiseTaskRepository {}
 }
 
 
-extension MultipleChoiseTask.Repository {
+extension MultipleChoiseTask.DatabaseRepository {
     
-    public static func create(from content: MultipleChoiseTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
+    public static func create(
+        from content: MultipleChoiseTask.Create.Data,
+        by user: User?,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<MultipleChoiseTask> {
+
         guard let user = user, user.isCreator else {
             throw Abort(.forbidden)
         }
         try content.validate()
-        
-        return Subtopic.Repository
+        return Subtopic.DatabaseRepository
             .find(content.subtopicId, on: conn)
             .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
-                
+
                 conn.transaction(on: .psql) { conn in
-                    
+
                     try Task.Repository
-                        .create(from: .init(content: content, subtopic: subtopic), by: user, on: conn)
-                        .flatMap { (task) in
-                            
+                        .create(
+                            from: .init(
+                                content: content,
+                                subtopicID: subtopic.requireID(),
+                                solution: content.solution
+                            ),
+                            by: user,
+                            on: conn)
+                        .flatMap { task in
+
                             try MultipleChoiseTask(
                                 isMultipleSelect: content.isMultipleSelect,
-                                task: task
-                            )
+                                task: task)
                                 .create(on: conn)
-                            
+
                         } .flatMap { (task) in
                             try content.choises.map { choise in
                                 try MultipleChoiseTaskChoise(content: choise, task: task)
@@ -55,54 +71,71 @@ extension MultipleChoiseTask.Repository {
                 }
         }
     }
-    
-    public static func edit(_ multiple: MultipleChoiseTask, to content: MultipleChoiseTask.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask> {
-        
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        guard let task = multiple.task else {
-            throw Abort(.internalServerError)
-        }
 
-        return try MultipleChoiseTask.Repository
-            .create(from: content, by: user, on: conn)
-            .flatMap { newTask in
+    public static func update(
+        model: MultipleChoiseTask,
+        to data: MultipleChoiseTask.Edit.Data,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<MultipleChoiseTask> {
 
-                task.get(on: conn)
-                    .flatMap { task in
+           guard user.isCreator else {
+               throw Abort(.forbidden)
+           }
+           guard let task = model.task else {
+               throw Abort(.internalServerError)
+           }
 
-                        task.deletedAt = Date() // Equilent to .delete(on: conn)
-                        task.editedTaskID = newTask.id
-                        return task
-                            .save(on: conn)
-                            .transform(to: newTask)
-                }
-            }
+           return try MultipleChoiseTask.DatabaseRepository
+               .create(from: data, by: user, on: conn)
+               .flatMap { newTask in
+
+                   task.get(on: conn)
+                       .flatMap { task in
+
+                           task.deletedAt = Date() // Equilent to .delete(on: conn)
+                           task.editedTaskID = newTask.id
+                           return task
+                               .save(on: conn)
+                               .transform(to: newTask)
+                   }
+               }
     }
-    
-    public static func delete(_ multiple: MultipleChoiseTask.Repository.Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+    public static func delete(
+        model: MultipleChoiseTask,
+        by user: User?,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<Void> {
         guard let user = user, user.isCreator else {
-            throw Abort(.forbidden)
-        }
-        guard let task = multiple.task else {
-            throw Abort(.internalServerError)
-        }
-        return task.get(on: conn)
-            .flatMap { task in
-                return task
-                    .delete(on: conn)
-                    .transform(to: ())
-        }
+           throw Abort(.forbidden)
+       }
+       guard let task = model.task else {
+           throw Abort(.internalServerError)
+       }
+       return task.get(on: conn)
+           .flatMap { task in
+               return task
+                   .delete(on: conn)
+                   .transform(to: ())
+       }
     }
 
-    public static func importTask(from taskContent: MultipleChoiseTask.Data, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> Future<Void> {
-        taskContent.task.id = nil
-        taskContent.task.creatorId = 1
-        try taskContent.task.subtopicId = subtopic.requireID()
-        return taskContent.task
+    public static func importTask(
+        from taskContent: MultipleChoiseTask.BetaFormat,
+        in subtopic: Subtopic,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<Void> {
+
+        return try Task(
+            subtopicID: subtopic.requireID(),
+            description: taskContent.task.description,
+            question: taskContent.task.question,
+            creatorID: 1
+        )
             .create(on: conn)
-            .flatMap { task -> EventLoopFuture<MultipleChoiseTask> in
+            .flatMap { savedTask -> EventLoopFuture<MultipleChoiseTask> in
+
                 if let solution = taskContent.task.solution {
                     return TaskSolution(
                         data: TaskSolution.Create.Data(
@@ -113,11 +146,17 @@ extension MultipleChoiseTask.Repository {
                     )
                         .create(on: conn)
                         .flatMap { _ in
-                            try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                            try MultipleChoiseTask(
+                                isMultipleSelect: taskContent.isMultipleSelect,
+                                taskID: savedTask.requireID()
+                            )
                                 .create(on: conn)
                     }
                 } else {
-                    return try MultipleChoiseTask(isMultipleSelect: taskContent.isMultipleSelect, taskID: task.requireID())
+                    return try MultipleChoiseTask(
+                        isMultipleSelect: taskContent.isMultipleSelect,
+                        taskID: savedTask.requireID()
+                    )
                         .create(on: conn)
                 }
         }.flatMap { task in
@@ -132,7 +171,10 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public static func get(task: MultipleChoiseTask, conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
+    public static func get(
+        task: MultipleChoiseTask,
+        conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<MultipleChoiseTask.Data> {
 
         return try task.choises
             .query(on: conn)
@@ -150,7 +192,10 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public static func content(for multiple: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<(TaskPreviewContent, MultipleChoiseTask.Data)> {
+    public static func content(
+        for multiple: MultipleChoiseTask,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<(TaskPreviewContent, MultipleChoiseTask.Data)> {
 
         return try multiple
             .content(on: conn)
@@ -158,7 +203,7 @@ extension MultipleChoiseTask.Repository {
 
                 Task.query(on: conn, withSoftDeleted: true)
                     .filter(\Task.id == multiple.id)
-                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
                     .join(\Topic.id, to: \Subtopic.topicId)
                     .join(\Subject.id, to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
@@ -182,7 +227,11 @@ extension MultipleChoiseTask.Repository {
     }
 
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
-    static func evaluate(_ submit: MultipleChoiseTask.Submit, for task: MultipleChoiseTask, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    static func evaluate(
+        _ submit: MultipleChoiseTask.Submit,
+        for task: MultipleChoiseTask,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         return try task.choises
             .query(on: conn)
@@ -219,7 +268,11 @@ extension MultipleChoiseTask.Repository {
         }
     }
 
-    public static func createAnswer(in sessionID: PracticeSession.ID, with submit: MultipleChoiseTask.Submit, on conn: DatabaseConnectable) -> EventLoopFuture<Void> {
+    public static func createAnswer(
+        in sessionID: PracticeSession.ID,
+        with submit: MultipleChoiseTask.Submit,
+        on conn: DatabaseConnectable
+    ) -> EventLoopFuture<Void> {
         submit.choises.map {
             MultipleChoiseTaskAnswer(sessionID: sessionID, choiseID: $0)
                 .save(on: conn)

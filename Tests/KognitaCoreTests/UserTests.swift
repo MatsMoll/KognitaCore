@@ -25,7 +25,7 @@ class UserTests: VaporTestCase {
         try User.ResetPassword.Token.Repository
             .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         
-        let savedUser = try User.Repository
+        let savedUser = try User.DatabaseRepository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         
         XCTAssert(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
@@ -48,7 +48,7 @@ class UserTests: VaporTestCase {
             try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
-        let savedUser = try User.Repository
+        let savedUser = try User.DatabaseRepository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }
@@ -74,7 +74,7 @@ class UserTests: VaporTestCase {
             try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
         )
-        let savedUser = try User.Repository
+        let savedUser = try User.DatabaseRepository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }

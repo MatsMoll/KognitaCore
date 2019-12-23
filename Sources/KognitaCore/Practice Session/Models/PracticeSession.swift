@@ -59,7 +59,7 @@ extension PracticeSession {
     /// - Returns: The progress in prosentage able to go above 100% ([0, ∞>)
     /// - Throws: Database error
     func goalProgress(on conn: DatabaseConnectable) throws -> Future<Int> {
-        return try Repository.goalProgress(for: self, on: conn)
+        return try DatabaseRepository.goalProgress(for: self, on: conn)
     }
     
     func numberOfCompletedTasks(with conn: DatabaseConnectable) throws -> Future<Int> {
@@ -80,7 +80,7 @@ extension PracticeSession {
     static func create(_ user: User, subtopics: Set<Subtopic.ID>, numberOfTaskGoal: Int, on conn: DatabaseConnectable)
         throws -> Future<PracticeSession> {
 
-        return try Repository.create(
+        return try DatabaseRepository.create(
                 from: .init(
                     numberOfTaskGoal: numberOfTaskGoal,
                     subtopicsIDs: subtopics,
@@ -97,22 +97,22 @@ extension PracticeSession {
     /// - Returns: An `Int` with the assigned `Task.ID`
     /// - Throws: If there was an error with the database queries
     func assignNextTask(on conn: DatabaseConnectable) throws -> Future<Void> {
-        return try Repository
+        return try DatabaseRepository
             .assignTask(to: self, on: conn)
     }
 
     public func getCurrentTaskIndex(_ conn: DatabaseConnectable) throws -> Future<Int> {
-        return try Repository
+        return try DatabaseRepository
             .getCurrentTaskIndex(for: self.requireID(), on: conn)
     }
     
     public func currentTask(on conn: PostgreSQLConnection) throws -> Future<TaskType> {
-        return try Repository
+        return try DatabaseRepository
             .currentActiveTask(in: self, on: conn)
     }
 
     public func taskAt(index: Int, on conn: PostgreSQLConnection) throws -> Future<TaskType> {
-        return try Repository
+        return try DatabaseRepository
             .taskAt(index: index, in: self, on: conn)
     }
     
@@ -120,18 +120,13 @@ extension PracticeSession {
         return try "/practice-sessions/\(requireID())/tasks/\(index)"
     }
     
-    public func submit(_ content: NumberInputTask.Submit.Data, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<NumberInputTask.Submit.Response>> {
-        return try PracticeSession.Repository
-            .submitInputTask(content, in: self, by: user, on: conn)
-    }
-    
     public func submit(_ content: MultipleChoiseTask.Submit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
-        return try PracticeSession.Repository
+        return try PracticeSession.DatabaseRepository
             .submitMultipleChoise(content, in: self, by: user, on: conn)
     }
     
     public func submit(_ content: FlashCardTask.Submit, by user: User, with conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<FlashCardTask.Submit>> {
-        return try PracticeSession.Repository
+        return try PracticeSession.DatabaseRepository
             .submitFlashCard(content, in: self, by: user, on: conn)
     }
 }
@@ -165,12 +160,10 @@ public struct TaskType: Content {
 
     public let task: Task
     public let multipleChoise: MultipleChoiseTask?
-    public let numberInputTask: NumberInputTask?
 
-    init(content: (task: Task, chosie: MultipleChoiseTask?, input: NumberInputTask?)) {
+    init(content: (task: Task, chosie: MultipleChoiseTask?)) {
         self.task = content.task
         self.multipleChoise = content.chosie
-        self.numberInputTask = content.input
     }
 }
 

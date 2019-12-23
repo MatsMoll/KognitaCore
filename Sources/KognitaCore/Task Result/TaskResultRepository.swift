@@ -8,7 +8,11 @@
 import FluentPostgreSQL
 import FluentSQL
 
-public class TaskResultRepository {
+extension TaskResult {
+    public class DatabaseRepository: TaskResultRepositoring {}
+}
+
+extension TaskResult.DatabaseRepository {
 
     enum Errors: Error {
         case incompleateSqlStatment
@@ -45,15 +49,15 @@ public class TaskResultRepository {
 
         var rawQuery: String {
             switch self {
-            case .subtopics: return "SELECT \"PracticeSession_Subtopic\".\"subtopicID\" FROM \"PracticeSession_Subtopic\" WHERE \"PracticeSession_Subtopic\".\"sessionID\" = ($2)"
-            case .taskResults: return "SELECT DISTINCT ON (\"taskID\") * FROM \"TaskResult\" WHERE \"TaskResult\".\"userID\" = ($1) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
-            case .flowTasks: return "SELECT * FROM (\(Query.taskResults.rawQuery)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicId\" = ANY (\(Query.subtopics.rawQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
+            case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
+            case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
+            case .flowTasks: return "SELECT * FROM (\(Query.taskResults.rawQuery)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicID\" = ANY (\(Query.subtopics.rawQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
             case .results:
-                return "SELECT DISTINCT ON (\"taskID\") \"TaskResult\".\"id\", \"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" WHERE \"TaskResult\".\"userID\" = ($1) AND \"Task\".\"deletedAt\" IS NULL AND \"TaskResult\".\"revisitDate\" > ($2) ORDER BY \"taskID\", \"TaskResult\".\"createdAt\" DESC"
+                return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
-                return "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\", \"Topic\".\"id\" AS \"topicID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Topic\".\"id\" = ANY($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicId" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Topic"."id" = ANY($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInSubject:
-                return "SELECT DISTINCT ON (\"TaskResult\".\"taskID\") \"TaskResult\".\"id\", \"TaskResult\".\"taskID\" FROM \"TaskResult\" INNER JOIN \"Task\" ON \"TaskResult\".\"taskID\" = \"Task\".\"id\" INNER JOIN \"Subtopic\" ON \"Task\".\"subtopicId\" = \"Subtopic\".\"id\" INNER JOIN \"Topic\" ON \"Subtopic\".\"topicId\" = \"Topic\".\"id\" INNER JOIN \"Subject\" ON \"Subject\".\"id\" = \"Topic\".\"subjectId\" WHERE \"Task\".\"deletedAt\" IS NULL AND \"userID\" = ($1) AND \"Subject\".\"id\" = ($2) ORDER BY \"TaskResult\".\"taskID\", \"TaskResult\".\"createdAt\" DESC"
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicId" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectId" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Subject"."id" = ($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
         }
 
@@ -82,18 +86,38 @@ public class TaskResultRepository {
         }
     }
 
+    public static func getResults(on conn: DatabaseConnectable) -> EventLoopFuture<[UserResultOverview]> {
 
-    public static func getAllResults(for userId: User.ID, with conn: PostgreSQLConnection) throws -> Future<[TaskResult]> {
+        conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
 
-        return conn.select()
-            .all(table: TaskResult.self)
-            .where(
-                .column(.keyPath(\TaskResult.id)),
-                .in,
-                .subquery(.raw(Query.taskResults.rawQuery, binds: [userId]))
-            )
-            .orderBy(\TaskResult.revisitDate)
-            .all(decoding: TaskResult.self)
+                psqlConn.select()
+                    .column(.count(.all, as: "resultCount"))
+                    .column(.keyPath(\User.id, as: "userID"))
+                    .column(.keyPath(\User.username, as: "username"))
+                    .column(.function("sum", [.expression(.column(\TaskResult.resultScore))]), as: "totalScore")
+                    .from(User.self)
+                    .join(\User.id, to: \TaskResult.userID)
+                    .groupBy(\User.id)
+                    .all(decoding: UserResultOverview.self)
+        }
+    }
+
+    public static func getAllResults(for userId: User.ID, with conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult]> {
+
+        conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                psqlConn.select()
+                    .all(table: TaskResult.self)
+                    .where(
+                        .column(.keyPath(\TaskResult.id)),
+                        .in,
+                        .subquery(.raw(Query.taskResults.rawQuery, binds: [userId]))
+                    )
+                    .orderBy(\TaskResult.revisitDate)
+                    .all(decoding: TaskResult.self)
+        }
     }
 
     public static func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
@@ -129,7 +153,7 @@ public class TaskResultRepository {
                     .filter(filter)
                     .sort(\.revisitDate)
                     .join(\Task.id, to: \TaskResult.taskID)
-                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
                     .join(\Topic.id, to: \Subtopic.topicId)
 
                 if let maxRevisitDays = maxRevisitDays,
@@ -157,7 +181,7 @@ public class TaskResultRepository {
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
                     .join(\Task.id,     to: \TaskResult.taskID)
-                    .join(\Subtopic.id, to: \Task.subtopicId)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
                     .join(\Topic.id,    to: \Subtopic.topicId)
                     .join(\Subject.id,  to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
@@ -251,7 +275,7 @@ public class TaskResultRepository {
             .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
             .from(TaskResult.self)
             .join(\TaskResult.taskID, to: \Task.id)
-            .join(\Task.subtopicId, to: \Subtopic.id)
+            .join(\Task.subtopicID, to: \Subtopic.id)
             .join(\Subtopic.topicId, to: \Topic.id)
             .where(\TaskResult.userID == user.requireID())
             .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
@@ -323,7 +347,7 @@ public class TaskResultRepository {
                             .from(TaskResult.self)
                             .where(\TaskResult.id, .in, ids)
                             .join(\TaskResult.taskID, to: \Task.id)
-                            .join(\Task.subtopicId, to: \Subtopic.id)
+                            .join(\Task.subtopicID, to: \Subtopic.id)
                             .join(\Subtopic.topicId, to: \Topic.id)
                             .all(decoding: UserLevelScore.self)
                             .flatMap { scores in
@@ -332,7 +356,7 @@ public class TaskResultRepository {
                                     .map { topicID, grouped in
 
                                     Task.query(on: psqlConn)
-                                        .join(\Subtopic.id, to: \Task.subtopicId)
+                                        .join(\Subtopic.id, to: \Task.subtopicID)
                                         .filter(\Subtopic.topicId == topicID)
                                         .count()
                                         .map { maxScore in
@@ -372,7 +396,7 @@ public class TaskResultRepository {
                             .flatMap { score in
 
                                 try Task.query(on: psqlConn)
-                                    .join(\Subtopic.id, to: \Task.subtopicId)
+                                    .join(\Subtopic.id, to: \Task.subtopicID)
                                     .join(\Topic.id, to: \Subtopic.topicId)
                                     .filter(\Topic.subjectId == subject.requireID())
                                     .count()
@@ -395,20 +419,6 @@ public class TaskResultRepository {
             .filter(\TaskResult.userID == userId)
             .sort(\.createdAt, .descending)
             .first()
-    }
-
-
-    public static func getResults(on conn: PostgreSQLConnection) -> Future<[UserResultOverview]> {
-
-        return conn.select()
-            .column(.count(.all, as: "resultCount"))
-            .column(.keyPath(\User.id, as: "userID"))
-            .column(.keyPath(\User.name, as: "userName"))
-            .column(.function("sum", [.expression(.column(\TaskResult.resultScore))]), as: "totalScore")
-            .from(User.self)
-            .join(\User.id, to: \TaskResult.userID)
-            .groupBy(\User.id)
-            .all(decoding: UserResultOverview.self)
     }
 
     public static func exportResults(on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult.Answer]> {

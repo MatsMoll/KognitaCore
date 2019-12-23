@@ -90,7 +90,7 @@ extension MultipleChoiseTask {
     /// - Throws: If there was an error with the database query
     func evaluateAnswer(_ submit: MultipleChoiseTask.Submit, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
         
-        return try Repository
+        return try DatabaseRepository
             .evaluate(submit, for: self, on: conn)
     }
 }
@@ -114,7 +114,7 @@ extension MultipleChoiseTask {
 
     static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
         return try Task.query(on: conn)
-            .filter(\.subtopicId == subtopic.requireID())
+            .filter(\.subtopicID == subtopic.requireID())
             .join(\MultipleChoiseTask.id, to: \Task.id)
             .decode(MultipleChoiseTask.self)
             .all()
@@ -122,7 +122,7 @@ extension MultipleChoiseTask {
 
     static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
         return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Subtopic.id, to: \Task.subtopicID)
             .filter(\Subtopic.topicId == topic.requireID())
             .join(\MultipleChoiseTask.id, to: \Task.id)
             .decode(MultipleChoiseTask.self)

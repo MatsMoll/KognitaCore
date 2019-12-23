@@ -83,7 +83,7 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
 
 extension Topic {
     
-    public struct Create : KognitaRequestData {
+    public enum Create {
         
         public struct Data : Content {
             
@@ -117,22 +117,22 @@ extension Topic {
     }
 
     func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
-        return try Repository
+        return try DatabaseRepository
             .numberOfTasks(in: self, on: conn)
     }
 
     func tasks(on conn: DatabaseConnectable) throws -> Future<[Task]> {
-        return try Repository
+        return try DatabaseRepository
             .tasks(in: self, on: conn)
     }
 
     func subtopics(on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
-        return try Repository
+        return try DatabaseRepository
             .subtopics(in: self, on: conn)
     }
 
     func content(on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
-        return try Repository
+        return try DatabaseRepository
             .content(for: self, on: conn)
     }
 }

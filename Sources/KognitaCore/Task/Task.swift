@@ -30,7 +30,7 @@ public final class Task: KognitaPersistenceModel {
     public var id: Int?
 
     /// The topic.id for the topic this task relates to
-    public var subtopicId: Subtopic.ID
+    public var subtopicID: Subtopic.ID
 
     /// Some html that contains extra information about the task if needed
     public var description: String?
@@ -38,11 +38,8 @@ public final class Task: KognitaPersistenceModel {
     /// The question needed to answer the task
     public var question: String
 
-    /// A soulution to the task (May be changed to support multiple solutions)
-    public var solution: String?
-
     /// The id of the user who created the task
-    public var creatorId: User.ID
+    public var creatorID: User.ID?
 
     /// The semester of the exam
     public var examPaperSemester: ExamSemester?
@@ -70,22 +67,18 @@ public final class Task: KognitaPersistenceModel {
 
 
     init(
-        subtopicId: Subtopic.ID,
-        estimatedTime: TimeInterval,
-        description: String,
-        imageURL: String?,
-        explenation: String?,
+        subtopicID: Subtopic.ID,
+        description: String?,
         question: String,
-        creatorId: User.ID,
+        creatorID: User.ID,
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
         isExaminable: Bool = true
     ) {
-        self.subtopicId     = subtopicId
-        self.solution       = explenation
+        self.subtopicID     = subtopicID
         self.description    = description
         self.question       = question
-        self.creatorId      = creatorId
+        self.creatorID      = creatorID
         self.isExaminable   = isExaminable
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
@@ -95,16 +88,15 @@ public final class Task: KognitaPersistenceModel {
 
     init(
         content: TaskCreationContentable,
-        subtopic: Subtopic,
+        subtopicID: Subtopic.ID,
         creator: User,
         canAnswer: Bool = true
     ) throws {
-        self.subtopicId     = try subtopic.requireID()
+        self.subtopicID     = subtopicID
         self.description    = content.description
         self.question       = content.question
-        self.solution       = content.solution
         self.isExaminable   = content.isExaminable
-        self.creatorId      = try creator.requireID()
+        self.creatorID      = try creator.requireID()
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
 
@@ -112,28 +104,39 @@ public final class Task: KognitaPersistenceModel {
     }
 
     public static func addTableConstraints(to builder: SchemaCreator<Task>) {
-        builder.reference(from: \.subtopicId, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
-        builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+        builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
+        builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
     }
 }
 
 extension Task {
 
     var subtopic: Parent<Task, Subtopic> {
-        return parent(\.subtopicId)
+        return parent(\.subtopicID)
     }
 
-    var creator: Parent<Task, User> {
-        return parent(\.creatorId)
+    var creator: Parent<Task, User>? {
+        return parent(\.creatorID)
     }
     
     func validate() {
         description?.makeHTMLSafe()
         question.makeHTMLSafe()
-        solution?.makeHTMLSafe()
     }
 
-    func taskContent(_ req: Request) -> Future<TaskContent> {
+    var betaFormatted: BetaFormat {
+        BetaFormat(
+            description: description,
+            question: question,
+            solution: nil,
+            examPaperSemester: examPaperSemester,
+            examPaperYear: examPaperYear,
+            isExaminable: isExaminable,
+            editedTaskID: editedTaskID
+        )
+    }
+
+    func taskContent(_ req: Request) -> EventLoopFuture<TaskContent> {
         return topic(on: req)
             .flatMap { topic in
                 topic.subject
@@ -146,10 +149,10 @@ extension Task {
         }
     }
 
-    static func taskContent(where filter: FilterOperator<PostgreSQLDatabase, Task>, on conn: DatabaseConnectable) -> Future<[TaskContent]> {
+    static func taskContent(where filter: FilterOperator<PostgreSQLDatabase, Task>, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskContent]> {
         return Task.query(on: conn)
             .filter(filter)
-            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Subtopic.id, to: \Task.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
             .alsoDecode(Topic.self)
@@ -164,7 +167,7 @@ extension Task {
         }
     }
 
-    func getTaskTypePath(_ conn: DatabaseConnectable) throws -> Future<String> {
+    func getTaskTypePath(_ conn: DatabaseConnectable) throws -> EventLoopFuture<String> {
         return try Task.Repository
             .getTaskTypePath(for: requireID(), conn: conn)
     }
@@ -172,7 +175,7 @@ extension Task {
     func topic(on conn: DatabaseConnectable) -> Future<Topic> {
         return Topic.query(on: conn)
             .join(\Subtopic.topicId, to: \Topic.id)
-            .filter(\Subtopic.id == subtopicId)
+            .filter(\Subtopic.id == subtopicID)
             .first()
             .unwrap(or: Abort(.internalServerError))
     }
@@ -180,3 +183,30 @@ extension Task {
 
 extension Task: Content { }
 extension Task: Parameter { }
+
+
+extension Task {
+    public struct BetaFormat: Content {
+
+        /// Some html that contains extra information about the task if needed
+        public var description: String?
+
+        /// The question needed to answer the task
+        public var question: String
+
+        /// A soulution to the task (May be changed to support multiple solutions)
+        public var solution: String?
+
+        /// The semester of the exam
+        public var examPaperSemester: ExamSemester?
+
+        /// The year of the exam
+        public var examPaperYear: Int?
+
+        /// A bool containing the info if the task may be used in a exam / test
+        public var isExaminable: Bool
+
+        /// The id of the new edited task if there exists one
+        public var editedTaskID: Task.ID?
+    }
+}

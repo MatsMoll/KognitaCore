@@ -46,39 +46,15 @@ class TaskTests: VaporTestCase {
         
         XCTAssertEqual(solutions.count, 2)
         XCTAssertNotNil(solutions.first(where: { $0.solution == firstSolution.solution }))
-        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.creatorName)
+        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.creatorUsername)
         XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.approvedBy)
         XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution }))
-        XCTAssertEqual(solutions.first(where: { $0.solution == secondSolution.solution })?.approvedBy, user.name)
-        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorName)
-    }
-
-    func testSolutionBugFixMigration() throws {
-        _ = try Task.create(createSolution: false, on: conn)
-        _ = try Task.create(createSolution: false, on: conn)
-        _ = try Task.create(createSolution: false, on: conn)
-        _ = try Task.create(on: conn)
-
-        let solutionsCount = try TaskSolution.query(on: conn)
-            .count()
-            .wait()
-
-        XCTAssertEqual(solutionsCount, 1)
-
-        _ = try TaskSolution.Repository
-            .createSolutionForOutOfSyncTasks(on: conn)
-            .wait()
-
-        let newSolutionsCount = try TaskSolution.query(on: conn)
-            .count()
-            .wait()
-
-        XCTAssertEqual(newSolutionsCount, 4)
+        XCTAssertEqual(solutions.first(where: { $0.solution == secondSolution.solution })?.approvedBy, user.username)
+        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorUsername)
     }
 
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
-        ("testSolutions", testSolutions),
-        ("testSolutionBugFixMigration", testSolutions),
+        ("testSolutions", testSolutions)
     ]
 }

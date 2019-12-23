@@ -25,10 +25,10 @@ class TopicTests: VaporTestCase {
             chapter: 1
         )
 
-        let topic = try Topic.Repository
+        let topic = try Topic.DatabaseRepository
             .create(from: topicData, by: user, on: conn)
             .wait()
-        let subtopics = try Subtopic.Repository
+        let subtopics = try Subtopic.DatabaseRepository
             .getSubtopics(in: topic, with: conn)
             .wait()
 
@@ -56,7 +56,7 @@ class TopicTests: VaporTestCase {
         let outdated = try Task.create(subtopic: subtopic, on: conn)
         _ = try outdated.delete(on: conn).wait()
 
-        let timely = try Topic.Repository
+        let timely = try Topic.DatabaseRepository
             .timelyTopics(on: conn)
             .wait()
 

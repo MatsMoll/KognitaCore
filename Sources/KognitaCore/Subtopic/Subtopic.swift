@@ -53,7 +53,7 @@ extension Subtopic: Parameter { }
 
 extension Subtopic {
 
-    public struct Create : KognitaRequestData {
+    public enum Create {
         
         public struct Data : Content {
 

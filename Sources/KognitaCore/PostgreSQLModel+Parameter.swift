@@ -10,7 +10,7 @@ import Vapor
 import FluentPostgreSQL
 
 extension PostgreSQLModel where Self: Parameter {
-    public static func resolveParameter(_ parameter: String, on container: Container) throws -> Future<Self> {
+    public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<Self> {
         guard let id = Int(parameter) else {
             throw Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`.")
         }

@@ -22,9 +22,17 @@ extension MultipleChoiseTask {
             self.isMultipleSelect   = multipleTask.isMultipleSelect
             self.choises            = choises
         }
+
+        var betaFormatted: BetaFormat {
+            BetaFormat(
+                task: task.betaFormatted,
+                choises: choises,
+                isMultipleSelect: isMultipleSelect
+            )
+        }
     }
     
-    public struct Create : KognitaRequestData {
+    public struct Create {
         
         public struct Data: Content, TaskCreationContentable {
 
@@ -34,7 +42,7 @@ extension MultipleChoiseTask {
 
             public let question: String
 
-            public let solution: String?
+            public let solution: String
 
             public let isMultipleSelect: Bool
 

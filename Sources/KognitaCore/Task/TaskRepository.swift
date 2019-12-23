@@ -11,10 +11,11 @@ import Vapor
 
 extension Task {
     
-    public struct Create: KognitaRequestData {
+    public enum Create {
         public struct Data {
             let content: TaskCreationContentable
-            let subtopic: Subtopic
+            let subtopicID: Subtopic.ID
+            let solution: String
         }
         public typealias Response = Task
 
@@ -23,26 +24,30 @@ extension Task {
         }
     }
     
-    public final class Repository {
+    public final class Repository: RetriveAllModelsRepository {
         public typealias Model = Task
+        public typealias ResponseModel = Task
         
         public static let shared = Repository()
     }
 }
 
-extension Task.Repository : KognitaRepository {
+extension Task.Repository {
     
     public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
         guard let user = user else { throw Abort(.forbidden) }
-        guard let solution = content.content.solution else { throw Abort(.badRequest) }
         
-        return try Task(content: content.content, subtopic: content.subtopic, creator: user)
+        return try Task(
+            content: content.content,
+            subtopicID: content.subtopicID,
+            creator: user
+        )
             .save(on: conn)
             .flatMap { task in
                 try TaskSolution(
                     data: TaskSolution.Create.Data(
-                        solution: solution,
+                        solution: content.solution,
                         presentUser: true,
                         taskID: task.requireID()
                     ),
@@ -53,13 +58,13 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
-    public static func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public static func getTasks(in subject: Subject, with conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskContent]> {
 
         return try subject.topics
             .query(on: conn)
             .join(\Subtopic.topicId, to: \Topic.id)
-            .join(\Task.subtopicId, to: \Subtopic.id)
-            .join(\User.id, to: \Task.creatorId)
+            .join(\Task.subtopicID, to: \Subtopic.id)
+            .join(\User.id, to: \Task.creatorID)
             .alsoDecode(Task.self)
             .alsoDecode(User.self)
             .all()
@@ -78,20 +83,20 @@ extension Task.Repository : KognitaRepository {
         }
     }
 
-    public static func getTasks(in topic: Topic, with conn: DatabaseConnectable) throws -> Future<[Task]> {
+    public static func getTasks(in topic: Topic, with conn: DatabaseConnectable) throws -> EventLoopFuture<[Task]> {
         return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Subtopic.id, to: \Task.subtopicID)
             .filter(\Subtopic.topicId == topic.requireID())
             .all()
     }
 
-    public static func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> Future<[TaskContent]> {
+    public static func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskContent]> {
 
         return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
-            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\Subtopic.id, to: \Task.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
-            .join(\User.id, to: \Task.creatorId)
+            .join(\User.id, to: \Task.creatorID)
             .filter(filter)
             .alsoDecode(Topic.self)
             .alsoDecode(Subject.self)
@@ -116,8 +121,8 @@ extension Task.Repository : KognitaRepository {
     public static func getTasks(in subjectId: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
 
         Task.query(on: conn, withSoftDeleted: withSoftDeleted)
-            .join(\User.id, to: \Task.creatorId)
-            .join(\Subtopic.id, to: \Task.subtopicId)
+            .join(\User.id, to: \Task.creatorID)
+            .join(\Subtopic.id, to: \Task.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
             .filter(\Topic.subjectId == subjectId)
@@ -147,58 +152,51 @@ extension Task.Repository : KognitaRepository {
         let isMultipleSelect: Bool?  // MultipleChoiseTask
     }
     
-    public static func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> Future<String> {
+    public static func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> EventLoopFuture<String> {
 
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == id)
             .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
-            .join(\NumberInputTask.id, to: \Task.id, method: .left)
-            .join(\FlashCardTask.id, to: \Task.id, method: .left)
             .decode(data: MultipleChoiseTaskKey.self, "MultipleChoiseTask")
-            .alsoDecode(NumberInputTaskKey.self, "NumberInputTask")
             .first()
             .unwrap(or: Abort(.internalServerError))
-            .map { (multiple, number) in
+            .map { multiple in
 
                 if multiple.isMultipleSelect != nil {
                     return "tasks/multiple-choise"
-                } else if number.correctAnswer != nil {
-                    return "tasks/input"
                 } else {
                     return "tasks/flash-card"
                 }
         }
     }
 
-    public static func getNumberOfTasks(in subtopicIDs: Subtopic.ID..., on conn: DatabaseConnectable) -> Future<Int> {
+    public static func getNumberOfTasks(in subtopicIDs: Subtopic.ID..., on conn: DatabaseConnectable) -> EventLoopFuture<Int> {
         return Task.query(on: conn)
-            .filter(\.subtopicId ~~ subtopicIDs)
+            .filter(\.subtopicID ~~ subtopicIDs)
             .count()
     }
 
-    public static func getTaskCreators(on conn: PostgreSQLConnection) -> Future<[TaskCreators]> {
+    public static func getTaskCreators(on conn: PostgreSQLConnection) -> EventLoopFuture<[TaskCreators]> {
 
         return conn.select()
             .column(.count(.all, as: "taskCount"))
             .column(.keyPath(\User.id, as: "userID"))
-            .column(.keyPath(\User.name, as: "userName"))
+            .column(.keyPath(\User.username, as: "username"))
             .from(Task.self)
-            .join(\Task.creatorId, to: \User.id)
+            .join(\Task.creatorID, to: \User.id)
             .groupBy(\User.id)
             .all(decoding: TaskCreators.self)
     }
     
-    public static func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> Future<(Task, MultipleChoiseTask?, NumberInputTask?)?> {
+    public static func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> EventLoopFuture<(Task, MultipleChoiseTask?)?> {
         
         return conn.select()
             .all(table: Task.self)
             .all(table: MultipleChoiseTask.self)
-            .all(table: NumberInputTask.self)
             .from(Task.self)
             .where(\Task.id == id)
             .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
-            .join(\Task.id, to: \NumberInputTask.id, method: .left)
-            .first(decoding: Task.self, MultipleChoiseTask?.self, NumberInputTask?.self)
+            .first(decoding: Task.self, MultipleChoiseTask?.self)
     }
 }
 
@@ -207,7 +205,7 @@ public struct TaskCreators: Content {
 
     public let userID: User.ID
 
-    public let userName: String
+    public let username: String
 
     public let taskCount: Int
 }

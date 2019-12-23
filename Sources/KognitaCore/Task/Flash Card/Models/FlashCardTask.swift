@@ -19,7 +19,7 @@ public final class FlashCardTask: KognitaCRUDModel {
     public var updatedAt: Date?
     
 
-    public init(taskId: Task.ID? = nil) {
+    public init(taskId: Task.ID) {
         self.id = taskId
     }
     
@@ -41,6 +41,6 @@ extension FlashCardTask {
     }
 
     func content(on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
-        return FlashCardTask.Repository.content(for: self, on: conn)
+        return FlashCardTask.DatabaseRepository.content(for: self, on: conn)
     }
 }

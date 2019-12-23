@@ -30,10 +30,10 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskOne, session: sessionTwo, user: user, on: conn)
         _ = try TaskResult.create(task: taskTwo, session: sessionTwo, user: user, on: conn)
 
-        let firstHistogram = try TaskResultRepository
+        let firstHistogram = try TaskResult.DatabaseRepository
             .getAmountHistory(for: user, on: conn)
             .wait()
-        let secondHistogram = try TaskResultRepository
+        let secondHistogram = try TaskResult.DatabaseRepository
             .getAmountHistory(for: user, on: conn, numberOfWeeks: 7)
             .wait()
 
@@ -57,18 +57,18 @@ class TaskResultRepoTests: VaporTestCase {
         let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
         let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-        let taskType = try TaskResultRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskType = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, session: lastSession, user: user, score: 0.4,  on: conn)
         _ = try TaskResult.create(task: taskTwo, session: lastSession, user: user, score: 0.6,  on: conn)
 
-        let taskTypeOne = try TaskResultRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskTypeOne = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskTwo.id)
 
         _ = try TaskResult.create(task: taskTwo, session: newSession, user: user, score: 0.5,    on: conn)
-        let taskTypeTwo = try TaskResultRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
 
         XCTAssertNotNil(taskTypeTwo)
         XCTAssertEqual(taskTypeTwo?.taskID, taskOne.id)

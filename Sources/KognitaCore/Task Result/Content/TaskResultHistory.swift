@@ -20,7 +20,7 @@ extension TaskResult {
 
 public struct UserResultOverview: Content {
 
-    let userName: String
+    let username: String
 
     let userID: User.ID
 
