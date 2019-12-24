@@ -256,7 +256,6 @@ extension Topic.DatabaseRepository: TopicRepository {
     public static func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
 
         content.topic.id = nil
-        content.topic.creatorId = 1
         try content.topic.subjectId = subject.requireID()
         return content.topic
             .create(on: conn)

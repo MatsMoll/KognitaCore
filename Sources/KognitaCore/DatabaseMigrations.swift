@@ -12,6 +12,7 @@ public class DatabaseMigrations {
     public static func migrationConfig(enviroment: Environment) -> MigrationConfig {
         var migrations = MigrationConfig()
         setupTables(&migrations)
+        extraDatabase(migrations: &migrations)
         versionBump(&migrations, enviroment: enviroment)
         return migrations
     }
@@ -40,6 +41,10 @@ public class DatabaseMigrations {
         migrations.add(model: TaskResult.self,                      database: .psql)
         migrations.add(model: MultipleChoiseTaskAnswer.self,        database: .psql)
         migrations.add(model: FlashCardAnswer.self,                 database: .psql)
+    }
+
+    static func extraDatabase(migrations: inout MigrationConfig) {
+        migrations.add(migration: User.UnknownUserMigration.self, database: .psql)
     }
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {

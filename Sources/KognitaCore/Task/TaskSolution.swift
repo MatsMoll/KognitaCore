@@ -37,11 +37,23 @@ public final class TaskSolution: KognitaPersistenceModel {
         self.isApproved = false
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<TaskSolution>) {
-        builder.reference(from: \.creatorID, to: \User.id)
-        builder.reference(from: \.taskID, to: \Task.id)
-        builder.reference(from: \.approvedBy, to: \User.id)
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(TaskSolution.self, on: conn) { builder in
+            try addProperties(to: builder)
+
+            builder.reference(from: \.taskID, to: \Task.id)
+            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
+                builder.deleteField(for: \.creatorID)
+                builder.deleteField(for: \.approvedBy)
+                builder.field(for: \.creatorID, type: .int, .default(1))
+                builder.field(for: \.approvedBy, type: .int, .default(1))
+            }
+        }
     }
+    
 
     func response(on conn: DatabaseConnectable) -> EventLoopFuture<Response> {
         fatalError()

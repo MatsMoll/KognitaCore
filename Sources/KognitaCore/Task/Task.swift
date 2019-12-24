@@ -103,9 +103,18 @@ public final class Task: KognitaPersistenceModel {
         validate()
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<Task>) {
-        builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
-        builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(Task.self, on: conn) { builder in
+            try addProperties(to: builder)
+
+            builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(Task.self, on: conn) { builder in
+                builder.deleteField(for: \.creatorID)
+                builder.field(for: \.creatorID, type: .int, .default(1))
+            }
+        }
     }
 }
 

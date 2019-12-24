@@ -137,11 +137,11 @@ extension MultipleChoiseTask.DatabaseRepository {
             .flatMap { savedTask -> EventLoopFuture<MultipleChoiseTask> in
 
                 if let solution = taskContent.task.solution {
-                    return TaskSolution(
+                    return try TaskSolution(
                         data: TaskSolution.Create.Data(
                             solution: solution,
                             presentUser: true,
-                            taskID: 1),
+                            taskID: savedTask.requireID()),
                         creatorID: 1
                     )
                         .create(on: conn)

@@ -46,8 +46,16 @@ public final class PracticeSession : KognitaCRUDModel, SoftDeleatableModel {
         self.numberOfTaskGoal = numberOfTaskGoal
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<PracticeSession>) {
-        builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(PracticeSession.self, on: conn) { builder in
+            try addProperties(to: builder)
+            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(PracticeSession.self, on: conn) { builder in
+                builder.deleteField(for: \.userID)
+                builder.field(for: \.userID, type: .int, .default(1))
+            }
+        }
     }
 }
 

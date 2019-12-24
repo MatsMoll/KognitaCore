@@ -42,9 +42,17 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         }
 
         if let topicIDs = content.topicIDs {
-            return try create(topicIDs: topicIDs, numberOfTaskGoal: content.numberOfTaskGoal, user: user, on: conn)
+            return try create(
+                topicIDs: topicIDs,
+                numberOfTaskGoal: content.numberOfTaskGoal,
+                user: user,
+                on: conn)
         } else if let subtopicIDs = content.subtopicsIDs {
-            return try create(subtopicIDs: subtopicIDs, numberOfTaskGoal: content.numberOfTaskGoal, user: user, on: conn)
+            return try create(
+                subtopicIDs: subtopicIDs,
+                numberOfTaskGoal: content.numberOfTaskGoal,
+                user: user,
+                on: conn)
         } else {
             throw Abort(.badRequest)
         }

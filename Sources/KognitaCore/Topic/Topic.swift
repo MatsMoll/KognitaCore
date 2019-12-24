@@ -28,9 +28,6 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
 
     /// The chapther number in a subject
     public private(set) var chapter: Int
-
-    /// The id of the creator
-    public internal(set) var creatorId: User.ID
     
     public var createdAt: Date?
     public var updatedAt: Date?
@@ -41,13 +38,11 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
         self.description    = description
         self.chapter        = chapter
         self.subjectId      = subjectId
-        self.creatorId      = creatorId
 
         try validateTopic()
     }
 
     init(content: Create.Data, subject: Subject, creator: User) throws {
-        creatorId   = try creator.requireID()
         subjectId   = try subject.requireID()
         name        = content.name
         description = content.description
@@ -77,7 +72,6 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
         builder.unique(on: \.chapter, \.subjectId)
 
         builder.reference(from: \.subjectId, to: \Subject.id, onUpdate: .cascade, onDelete: .cascade)
-        builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
     }
 }
 
@@ -110,10 +104,6 @@ extension Topic {
 
     var subject: Parent<Topic, Subject> {
         return parent(\.subjectId)
-    }
-
-    var creator: Parent<Topic, User> {
-        return parent(\.creatorId)
     }
 
     func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {

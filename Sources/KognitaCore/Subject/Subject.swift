@@ -65,8 +65,16 @@ public final class Subject : KognitaCRUDModel, KognitaModelUpdatable {
         try self.validateSubject()
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<Subject>) {
-        builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(Subject.self, on: conn) { builder in
+            try addProperties(to: builder)
+            builder.reference(from: \.creatorId, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(Subject.self, on: conn) { builder in
+                builder.deleteField(for: \.creatorId)
+                builder.field(for: \.creatorId, type: .int, .default(1))
+            }
+        }
     }
     
     /// Validates the subjects information

@@ -122,11 +122,11 @@ extension FlashCardTask.DatabaseRepository {
                     .create(on: conn)
                     .flatMap { _ in
                         if let solution = task.solution {
-                            return TaskSolution(
+                            return try TaskSolution(
                                 data: TaskSolution.Create.Data(
                                     solution: solution,
                                     presentUser: true,
-                                    taskID: 1
+                                    taskID: savedTask.requireID()
                                 ),
                                 creatorID: 1
                             )

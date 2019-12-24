@@ -36,8 +36,17 @@ extension User {
 }
 
 extension User.ResetPassword.Token {
-    public static func addTableConstraints(to builder: SchemaCreator<User.ResetPassword.Token>) {
-        builder.reference(from: \.userId, to: \User.id)
+
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
+            try addProperties(to: builder)
+            builder.reference(from: \.userId, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
+                builder.deleteField(for: \.userId)
+                builder.field(for: \.userId, type: .int, .default(1))
+            }
+        }
     }
     
     public enum Create {

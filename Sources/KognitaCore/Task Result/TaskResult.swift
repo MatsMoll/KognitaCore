@@ -62,15 +62,20 @@ extension TaskResult: Content { }
 
 extension TaskResult: Migration {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.create(TaskResult.self, on: conn) { builder in
             try addProperties(to: builder)
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setNull)
+            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
             builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .setNull)
 
             builder.unique(on: \.sessionID, \.taskID)
+        }.flatMap {
+            PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
+                builder.deleteField(for: \.userID)
+                builder.field(for: \.userID, type: .int, .default(1))
+            }
         }
     }
 

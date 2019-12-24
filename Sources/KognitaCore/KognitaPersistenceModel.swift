@@ -74,6 +74,8 @@ extension KognitaPersistenceModel {
     public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
         return PostgreSQLDatabase.delete(Self.self, on: connection)
     }
+
+    public static func addTableConstraints(to builder: SchemaCreator<Self>) {}
 }
 //
 //public typealias KognitaCRUDRepository = KognitaRepositoryDeletable & KognitaRepositoryEditable

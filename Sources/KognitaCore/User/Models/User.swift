@@ -110,3 +110,28 @@ extension User : KognitaModelUpdatable {
 //        self.name = content.name
     }
 }
+
+extension User {
+    struct UnknownUserMigration: PostgreSQLMigration {
+        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            do {
+                let hash = try BCrypt.hash("soMe-unKnown-paSswOrd-@934")
+                return User(
+                    id: nil,
+                    username: "Unknown",
+                    email: "unknown@kognita.no",
+                    passwordHash: hash,
+                    role: .user
+                )
+                    .create(on: conn)
+                    .transform(to: ())
+            } catch {
+                return conn.future()
+            }
+        }
+
+        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            conn.future()
+        }
+    }
+}
