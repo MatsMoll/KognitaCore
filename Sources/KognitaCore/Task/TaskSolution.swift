@@ -35,6 +35,7 @@ public final class TaskSolution: KognitaPersistenceModel {
         self.taskID = data.taskID
         self.creatorID = creatorID
         self.isApproved = false
+        self.approvedBy = nil
     }
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
@@ -47,9 +48,7 @@ public final class TaskSolution: KognitaPersistenceModel {
         }.flatMap {
             PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
                 builder.deleteField(for: \.creatorID)
-                builder.deleteField(for: \.approvedBy)
                 builder.field(for: \.creatorID, type: .int, .default(1))
-                builder.field(for: \.approvedBy, type: .int, .default(1))
             }
         }
     }
