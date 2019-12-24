@@ -7,10 +7,9 @@
 
 import Vapor
 
-
 extension FlashCardTask {
     
-    public struct Create : KognitaRequestData {
+    public struct Create: Content {
         
         public struct Data: Content, TaskCreationContentable {
 
@@ -20,7 +19,7 @@ extension FlashCardTask {
 
             public let question: String
 
-            public let solution: String?
+            public let solution: String
 
             public var isExaminable: Bool
 
@@ -32,7 +31,7 @@ extension FlashCardTask {
                 guard !question.isEmpty else {
                     throw Abort(.badRequest)
                 }
-                guard let solution = solution, !solution.isEmpty else {
+                guard !solution.isEmpty else {
                     throw Abort(.badRequest)
                 }
                 examPaperYear = nil

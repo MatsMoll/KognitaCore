@@ -11,7 +11,7 @@ import Crypto
 
 extension User {
     
-    public struct ResetPassword {
+    public enum ResetPassword {
             
         public struct Token : KognitaPersistenceModel, SoftDeleatableModel {
             
@@ -23,7 +23,6 @@ extension User {
             
             /// The date the token expires
             public var deletedAt: Date?
-            
             public var createdAt: Date?
             public var updatedAt: Date?
             
@@ -37,11 +36,20 @@ extension User {
 }
 
 extension User.ResetPassword.Token {
-    public static func addTableConstraints(to builder: SchemaCreator<User.ResetPassword.Token>) {
-        builder.reference(from: \.userId, to: \User.id)
+
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
+            try addProperties(to: builder)
+            builder.reference(from: \.userId, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
+                builder.deleteField(for: \.userId)
+                builder.field(for: \.userId, type: .int, .default(1))
+            }
+        }
     }
     
-    public struct Create : KognitaRequestData {
+    public enum Create {
         public struct Data {
             public init() {}
         }
@@ -61,14 +69,24 @@ extension User.ResetPassword {
     }
 }
 
-extension User.ResetPassword.Token {
-    public final class Repository : KognitaRepository, KognitaRepositoryDeletable {
-        
-        public typealias Model = User.ResetPassword.Token
-    }
+
+protocol ResetPasswordRepositoring:
+    CreateModelRepository,
+    DeleteModelRepository,
+    RetriveModelRepository
+    where
+    CreateData      == User.ResetPassword.Token.Create.Data,
+    CreateResponse  == User.ResetPassword.Token.Create.Response,
+    Model           == User.ResetPassword.Token
+{
+    static func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
 
-extension User.ResetPassword.Token.Repository {
+extension User.ResetPassword.Token {
+    public final class Repository {}
+}
+
+extension User.ResetPassword.Token.Repository: ResetPasswordRepositoring {
     
     enum Errors : Error {
         case incorrectOrExpiredToken
@@ -86,7 +104,7 @@ extension User.ResetPassword.Token.Repository {
         }
     }
     
-    public static func delete(_ model: User.ResetPassword.Token, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public static func delete(model: User.ResetPassword.Token, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         
         guard try user?.requireID() == model.userId else {
             throw Abort(.forbidden)
@@ -97,13 +115,13 @@ extension User.ResetPassword.Token.Repository {
     
     public static func reset(to content: User.ResetPassword.Data, with token: String, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         
-        guard content.password == content.verifyPassword else { throw User.Repository.Errors.passwordMismatch }
-        
+        guard content.password == content.verifyPassword else { throw User.DatabaseRepository.Errors.passwordMismatch }
+
         return User.ResetPassword.Token.Repository
             .first(where: \.string == token, or: Errors.incorrectOrExpiredToken, on: conn)
             .flatMap { tokenModel in
-                
-                User.Repository
+
+                User.DatabaseRepository
                     .find(tokenModel.userId, or: Abort(.internalServerError), on: conn)
                     .flatMap { user in
 

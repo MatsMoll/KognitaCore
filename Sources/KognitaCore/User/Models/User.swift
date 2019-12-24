@@ -5,7 +5,7 @@ import Vapor
 
 public protocol UserContent {
     var userId: Int { get }
-    var name: String { get }
+    var username: String { get }
     var email: String { get }
     var isCreator: Bool { get }
 }
@@ -26,8 +26,8 @@ public final class User: KognitaCRUDModel, UserContent {
 
     public var userId: Int { id ?? 0 }
 
-    /// User's full name.
-    public var name: String
+    /// The name the user want to go by
+    public var username: String
 
     /// User's email address.
     public private(set) var email: String
@@ -50,9 +50,9 @@ public final class User: KognitaCRUDModel, UserContent {
 //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, name: String, email: String, passwordHash: String, role: Role) {
+    init(id: Int? = nil, username: String, email: String, passwordHash: String, role: Role) {
         self.id = id
-        self.name = name
+        self.username = username
         self.email = email.lowercased()
         self.passwordHash = passwordHash
         self.role = role
@@ -96,7 +96,7 @@ extension User {
     public func content() throws -> User.Response {
         return try User.Response(
             userId:             requireID(),
-            name:               name,
+            username:           username,
             email:              email,
             registrationDate:   createdAt ?? Date(),
             isCreator:          isCreator
@@ -108,5 +108,30 @@ extension User : KognitaModelUpdatable {
     
     public func updateValues(with content: User.Edit.Data) throws {
 //        self.name = content.name
+    }
+}
+
+extension User {
+    struct UnknownUserMigration: PostgreSQLMigration {
+        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            do {
+                let hash = try BCrypt.hash("soMe-unKnown-paSswOrd-@934")
+                return User(
+                    id: nil,
+                    username: "Unknown",
+                    email: "unknown@kognita.no",
+                    passwordHash: hash,
+                    role: .user
+                )
+                    .create(on: conn)
+                    .transform(to: ())
+            } catch {
+                return conn.future()
+            }
+        }
+
+        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            conn.future()
+        }
     }
 }

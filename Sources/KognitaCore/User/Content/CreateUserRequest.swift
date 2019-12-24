@@ -9,12 +9,12 @@ import Vapor
 
 extension User {
     
-    public struct Create : KognitaRequestData {
+    public enum Create  {
         /// Data required to create a user.
         public struct Data : Content {
             
             /// User's full name.
-            public let name: String
+            public let username: String
 
             /// User's email address.
             public let email: String
@@ -35,12 +35,12 @@ extension User {
         public typealias Response = User.Response
     }
     
-    public struct Edit : KognitaRequestData {
+    public enum Edit {
         
         public struct Data : Content {
             
             /// User's full name.
-            public let name: String
+            public let username: String
             
             /// User's desired password.
             public let password: String

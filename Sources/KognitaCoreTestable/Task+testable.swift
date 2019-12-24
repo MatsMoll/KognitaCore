@@ -13,9 +13,7 @@ extension Task {
     
     public static func create(creator:         User?           = nil,
                        subtopic:        Subtopic?       = nil,
-                       estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",
-                       imageURL:        String?         = nil,
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,
@@ -26,9 +24,7 @@ extension Task {
         
         return try create(creatorId: usedCreator.requireID(),
                           subtopicId: usedSubtopic.requireID(),
-                          estimateTime: estimateTime,
                           description: description,
-                          imageURL: imageURL,
                           question: question,
                           explenation: explenation,
                           createSolution: createSolution,
@@ -37,21 +33,16 @@ extension Task {
     
     public static func create(creatorId:       User.ID,
                        subtopicId:      Subtopic.ID,
-                       estimateTime:    TimeInterval    = 60,
                        description:     String          = "Some description",
-                       imageURL:        String?         = nil,
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,
                        on conn:         PostgreSQLConnection) throws -> Task {
         
-        return try Task(subtopicId:     subtopicId,
-                        estimatedTime:  estimateTime,
+        return try Task(subtopicID:     subtopicId,
                         description:    description,
-                        imageURL:       imageURL,
-                        explenation:    explenation,
                         question:       question,
-                        creatorId:      creatorId)
+                        creatorID:      creatorId)
             
             .save(on: conn)
             .flatMap { task in

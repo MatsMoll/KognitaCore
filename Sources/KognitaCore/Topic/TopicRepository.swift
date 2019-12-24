@@ -8,6 +8,22 @@
 import FluentPostgreSQL
 import Vapor
 
+public protocol TopicRepository:
+    CreateModelRepository,
+    UpdateModelRepository,
+    DeleteModelRepository,
+    RetriveAllModelsRepository
+    where
+    Model           == Topic,
+    ResponseModel   == Topic,
+    CreateData      == Topic.Create.Data,
+    CreateResponse  == Topic.Create.Response,
+    UpdateData      == Topic.Edit.Data,
+    UpdateResponse  == Topic.Edit.Response
+{
+    static func getTopics(in subject: Subject, conn: DatabaseConnectable) throws -> EventLoopFuture<[Topic]>
+}
+
 public struct TimelyTopic: Codable {
     public let subjectName: String
     public let topicName: String
@@ -27,20 +43,17 @@ extension Topic {
 }
 
 extension Topic {
-    public final class Repository : KognitaRepository, KognitaRepositoryEditable, KognitaRepositoryDeletable {
-        
-        public typealias Model = Topic
-    }
+    public final class DatabaseRepository {}
 }
 
-extension Topic.Repository {
+extension Topic.DatabaseRepository: TopicRepository {
     
     public static func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
         
         guard let user = user,
             user.isCreator else { throw Abort(.forbidden) }
 
-        return Subject.Repository
+        return Subject.DatabaseRepository
             .getSubjectWith(id: content.subjectId, on: conn)
             .flatMap { subject in
                 try Topic(content: content, subject: subject, creator: user)
@@ -74,12 +87,12 @@ extension Topic.Repository {
     }
     
     public static func subtopics(in topic: Topic, on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
-        return try Subtopic.Repository
+        return try Subtopic.DatabaseRepository
             .getSubtopics(in: topic, with: conn)
     }
 
     public static func subtopics(with topicID: Topic.ID, on conn: DatabaseConnectable) -> Future<[Subtopic]> {
-        return Subtopic.Repository
+        return Subtopic.DatabaseRepository
             .subtopics(with: topicID, on: conn)
     }
 
@@ -112,7 +125,7 @@ extension Topic.Repository {
                 .from(Topic.self)
                 .column(.count(\Task.id), as: "taskCount")
                 .join(\Topic.id , to: \Subtopic.topicId)
-                .join(\Subtopic.id, to: \Task.subtopicId)
+                .join(\Subtopic.id, to: \Task.subtopicID)
                 .groupBy(\Topic.id)
                 .where(\Topic.subjectId == subject.requireID())
                 .all(decoding: Topic.self, TopicTaskCount.self)
@@ -151,7 +164,7 @@ extension Topic.Repository {
             .from(Subject.self)
             .join(\Subject.id,          to: \Topic.subjectId)
             .join(\Topic.id,            to: \Subtopic.topicId, method: .left)
-            .join(\Subtopic.id,         to: \Task.subtopicId,  method: .left)
+            .join(\Subtopic.id,         to: \Task.subtopicID,  method: .left)
             .where(\Task.deletedAt == nil)
             .groupBy(\Topic.id)
             .groupBy(\Subject.id)
@@ -162,7 +175,7 @@ extension Topic.Repository {
     public static func exportTopics(in subject: Subject, on conn: DatabaseConnectable) throws -> Future<SubjectExportContent> {
         return try getTopics(in: subject, conn: conn)
             .flatMap { topics in
-                try topics.map { try Topic.Repository.exportTasks(in: $0, on: conn) }
+                try topics.map { try Topic.DatabaseRepository.exportTasks(in: $0, on: conn) }
                     .flatten(on: conn)
         }.map { topicContent in
             SubjectExportContent(subject: subject, topics: topicContent)
@@ -175,7 +188,7 @@ extension Topic.Repository {
             .all()
             .flatMap { subtopics in
                 try subtopics.map {
-                    try Topic.Repository.exportTasks(in: $0, on: conn)
+                    try Topic.DatabaseRepository.exportTasks(in: $0, on: conn)
                 }
                 .flatten(on: conn)
                 .map { subtopicContent in
@@ -195,16 +208,18 @@ extension Topic.Repository {
                     .all(table: Task.self)
                     .all(table: MultipleChoiseTask.self)
                     .all(table: MultipleChoiseTaskChoise.self)
+                    .column(\TaskSolution.solution, as: "solution")
                     .from(Task.self)
                     .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
                     .join(\Task.id, to: \FlashCardTask.id, method: .left)
                     .join(\MultipleChoiseTask.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
-                    .where(\Task.subtopicId == subtopic.requireID())
-                    .all(decoding: Task.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
+                    .join(\Task.id, to: \TaskSolution.taskID, method: .left)
+                    .where(\Task.subtopicID == subtopic.requireID())
+                    .all(decoding: Task.BetaFormat.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
                     .map { tasks in
 
-                        var multipleTasks = [Int : MultipleChoiseTask.Data]()
-                        var flashTasks = [Task]()
+                        var multipleTasks = [Int : MultipleChoiseTask.BetaFormat]()
+                        var flashTasks = [Task.BetaFormat]()
 
                         for task in tasks {
                             if
@@ -212,16 +227,16 @@ extension Topic.Repository {
                                 let choise = task.2
                             {
                                 if let earlierTask = multipleTasks[multiple.id ?? 0] {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.Data(
-                                        task: earlierTask.task,
-                                        multipleTask: multiple,
-                                        choises: earlierTask.choises + [choise]
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.BetaFormat(
+                                        task: task.0,
+                                        choises: earlierTask.choises + [choise],
+                                        isMultipleSelect: multiple.isMultipleSelect
                                     )
                                 } else {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.Data(
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.BetaFormat(
                                         task: task.0,
-                                        multipleTask: multiple,
-                                        choises: [choise]
+                                        choises: [choise],
+                                        isMultipleSelect: multiple.isMultipleSelect
                                     )
                                 }
                             } else {
@@ -236,51 +251,17 @@ extension Topic.Repository {
                         )
                 }
         }
-//        return try MultipleChoiseTask.query(on: conn)
-//            .join(\Task.id, to: \MultipleChoiseTask.id)
-//            .filter(\Task.subtopicId == subtopic.requireID())
-//            .all()
-//            .flatMap { tasks in
-//                try tasks.map { try MultipleChoiseTask.Repository.get(task: $0, conn: conn) }
-//                    .flatten(on: conn)
-//        }.flatMap { multipleTasks in
-//            try NumberInputTask.query(on: conn)
-//                .join(\Task.id, to: \NumberInputTask.id)
-//                .filter(\Task.subtopicId == subtopic.requireID())
-//                .all()
-//                .flatMap { tasks in
-//                    try tasks.map { try NumberInputTask.Repository.get(task: $0, conn: conn) }
-//                        .flatten(on: conn)
-//            }.flatMap { numberTasks in
-//                try FlashCardTask.query(on: conn)
-//                    .join(\Task.id, to: \FlashCardTask.id)
-//                    .filter(\Task.subtopicId == subtopic.requireID())
-//                    .all()
-//                    .flatMap { tasks in
-//                        try tasks.map { try FlashCardTask.Repository.get(task: $0, conn: conn) }
-//                            .flatten(on: conn)
-//                }.map { flashCards in
-//                    SubtopicExportContent(
-//                        subtopic: subtopic,
-//                        multipleChoiseTasks: multipleTasks,
-//                        inputTasks: numberTasks,
-//                        flashCards: flashCards
-//                    )
-//                }
-//            }
-//        }
     }
 
     public static func importContent(from content: TopicExportContent, in subject: Subject, on conn: DatabaseConnectable) throws -> Future<Void> {
 
         content.topic.id = nil
-        content.topic.creatorId = 1
         try content.topic.subjectId = subject.requireID()
         return content.topic
             .create(on: conn)
             .flatMap { topic in
                 try content.subtopics.map {
-                    try Topic.Repository.importContent(from: $0, in: topic, on: conn)
+                    try Topic.DatabaseRepository.importContent(from: $0, in: topic, on: conn)
                 }
                 .flatten(on: conn)
         }.transform(to: ())
@@ -297,12 +278,12 @@ extension Topic.Repository {
             .flatMap { subtopic in
                 try content.multipleChoiseTasks
                     .map { task in
-                        try MultipleChoiseTask.Repository
+                        try MultipleChoiseTask.DatabaseRepository
                             .importTask(from: task, in: subtopic, on: conn)
                 }.flatten(on: conn).flatMap { _ in
                     try content.flashCards
                     .map { task in
-                        try FlashCardTask.Repository
+                        try FlashCardTask.DatabaseRepository
                             .importTask(from: task, in: subtopic, on: conn)
                     }.flatten(on: conn)
                 }
@@ -381,8 +362,8 @@ extension Topic.Repository {
 
 public struct SubtopicExportContent : Content {
     let subtopic: Subtopic
-    let multipleChoiseTasks: [MultipleChoiseTask.Data]
-    let flashCards: [Task]
+    let multipleChoiseTasks: [MultipleChoiseTask.BetaFormat]
+    let flashCards: [Task.BetaFormat]
 }
 
 public struct TopicExportContent: Content {
@@ -393,4 +374,15 @@ public struct TopicExportContent: Content {
 public struct SubjectExportContent: Content {
     let subject: Subject
     let topics: [TopicExportContent]
+}
+
+extension MultipleChoiseTask {
+    public struct BetaFormat: Content {
+
+        let task: Task.BetaFormat
+
+        let choises: [MultipleChoiseTaskChoise]
+
+        let isMultipleSelect: Bool
+    }
 }

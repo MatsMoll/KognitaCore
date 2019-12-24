@@ -17,7 +17,7 @@ extension User {
         public var userId: Int
 
         /// User's full name.
-        public let name: String
+        public let username: String
 
         /// User's email address.
         public let email: String

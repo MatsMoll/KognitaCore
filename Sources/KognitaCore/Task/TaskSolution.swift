@@ -25,8 +25,6 @@ public final class TaskSolution: KognitaPersistenceModel {
 
     public var approvedBy: User.ID?
 
-//    public var helpAmount: Double // Should maybe be another table so it can not be voted by the same person twise
-
     public var taskID: Task.ID
 
     public var presentUser: Bool
@@ -37,13 +35,24 @@ public final class TaskSolution: KognitaPersistenceModel {
         self.taskID = data.taskID
         self.creatorID = creatorID
         self.isApproved = false
+        self.approvedBy = nil
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<TaskSolution>) {
-        builder.reference(from: \.creatorID, to: \User.id)
-        builder.reference(from: \.taskID, to: \Task.id)
-        builder.reference(from: \.approvedBy, to: \User.id)
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        PostgreSQLDatabase.create(TaskSolution.self, on: conn) { builder in
+            try addProperties(to: builder)
+
+            builder.reference(from: \.taskID, to: \Task.id)
+            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+        }.flatMap {
+            PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
+                builder.deleteField(for: \.creatorID)
+                builder.field(for: \.creatorID, type: .int, .default(1))
+            }
+        }
     }
+    
 
     func response(on conn: DatabaseConnectable) -> EventLoopFuture<Response> {
         fatalError()
@@ -78,12 +87,12 @@ extension TaskSolution {
     public final class Response: Content {
         public let createdAt: Date?
         public let solution: String
-        public var creatorName: String?
+        public var creatorUsername: String?
         public let presentUser: Bool
         public let approvedBy: String?
     }
 
-    public struct Create: KognitaRequestData {
+    public enum Create {
         public struct Data {
             let solution: String
             let presentUser: Bool
@@ -92,13 +101,14 @@ extension TaskSolution {
         public struct Response: Content {}
     }
 
-    public final class Repository: KognitaRepository {
+    public final class Repository: RetriveAllModelsRepository {
 
         struct Query {
-            static let taskSolutionForTaskID = #"SELECT "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."name" AS "creatorName", "approved"."name" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
+            static let taskSolutionForTaskID = #"SELECT "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."username" AS "creatorUsername", "approved"."username" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
         }
 
         public typealias Model = TaskSolution
+        public typealias ResponseModel = TaskSolution
 
         public static func create(from content: TaskSolution.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Create.Response> {
 
@@ -118,67 +128,12 @@ extension TaskSolution {
                     .map { solutions in
                         solutions.map { solution in
                             if solution.presentUser == false {
-                                solution.creatorName = nil
+                                solution.creatorUsername = nil
                             }
                             return solution
                         }
                 }
             }
-        }
-
-        static func createSolutionForOutOfSyncTasks(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            conn.raw(#"SELECT * FROM "Task" LEFT OUTER JOIN "TaskSolution" ON "Task"."id" = "TaskSolution"."taskID" WHERE "TaskSolution"."taskID" IS NULL;"#)
-                .all(decoding: Task.self)
-                .flatMap { tasks in
-
-                    return tasks.compactMap { (task: Task) -> Future<TaskSolution>? in
-                        if let solution = task.solution, let id = task.id {
-                            return TaskSolution(data: .init(solution: solution, presentUser: true, taskID: id), creatorID: task.creatorId)
-                                .save(on: conn)
-                        } else {
-                            return nil
-                        }
-                    }
-                    .flatten(on: conn)
-                    .transform(to: ())
-            }
-        }
-    }
-}
-
-
-extension TaskSolution {
-    struct ConvertMigration: PostgreSQLMigration {
-        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            Task.Repository.all(on: conn).flatMap { (tasks: [Task]) in
-                return tasks.compactMap { (task: Task) -> Future<TaskSolution>? in
-                    if let solution = task.solution, let id = task.id {
-                        return TaskSolution(data: .init(solution: solution, presentUser: true, taskID: id), creatorID: task.creatorId)
-                            .save(on: conn)
-                    } else {
-                        return nil
-                    }
-                }
-                .flatten(on: conn)
-                .transform(to: ())
-            }
-        }
-
-        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            conn.future()
-        }
-    }
-}
-
-extension TaskSolution {
-    struct MissingSolutionBugMigration: PostgreSQLMigration {
-        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            TaskSolution.Repository
-                .createSolutionForOutOfSyncTasks(on: conn)
-        }
-
-        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            conn.future()
         }
     }
 }
