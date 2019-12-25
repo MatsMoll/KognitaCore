@@ -68,9 +68,7 @@ function generate_new_release_data {
     NEXT_VERSION="$MAJOR_VERSION.$MINOR_VERSION.$BUILD_VERSION"
 
     git tag $NEXT_VERSION
-    CHANGE_LOG="$(finch compare --release-manager="mem@mollestad.no" --project-dir="." --config="./CI/finch-config.yml" --no-fetch)"
-    CHANGE_LOG=${CHANGE_LOG//(- |\ - [Commit](/commit/|\  ) - |\)}
-    CHANGE_LOG=${CHANGE_LOG//(- |/ - [Commit](/commit/|/  ) - |/)}
+    CHANGE_LOG="$(finch compare --release-manager="mem@mollestad.no" --project-dir="." --config="./CI/finch-config.yml" --no-fetch --use-newline-char)"
 
     cat << EOF > new_release_data
 {
