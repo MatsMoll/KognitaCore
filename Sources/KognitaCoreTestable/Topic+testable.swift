@@ -15,12 +15,12 @@ extension Topic {
         
         let createSubject = try subject ?? Subject.create(creator: creator, on: conn)
         
-        return try Topic.create(name: name, chapter: chapter, creatorId: createSubject.creatorId, subjectId: createSubject.requireID(), on: conn)
+        return try Topic.create(name: name, chapter: chapter, subjectId: createSubject.requireID(), on: conn)
     }
     
-    public static func create(name: String = "Topic", chapter: Int = 1, creatorId: User.ID, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
+    public static func create(name: String = "Topic", chapter: Int = 1, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
         
-        return try Topic(name: name, description: "", chapter: chapter, subjectId: subjectId, creatorId: creatorId)
+        return try Topic(name: name, description: "", chapter: chapter, subjectId: subjectId)
             .save(on: conn)
             .wait()
     }
