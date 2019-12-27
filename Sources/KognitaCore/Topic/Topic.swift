@@ -33,7 +33,7 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
     public var updatedAt: Date?
     
     
-    public init(name: String, description: String, chapter: Int, subjectId: Subject.ID, creatorId: User.ID) throws {
+    public init(name: String, description: String, chapter: Int, subjectId: Subject.ID) throws {
         self.name           = name
         self.description    = description
         self.chapter        = chapter
@@ -136,7 +136,7 @@ extension Subtopic {
 }
 
 extension Topic {
-    public static let unselected = try! Topic(name: "Velg ...", description: "", chapter: 0, subjectId: 0, creatorId: 0)
+    public static let unselected = try! Topic(name: "Velg ...", description: "", chapter: 0, subjectId: 0)
 }
 
 extension Topic.Response {
