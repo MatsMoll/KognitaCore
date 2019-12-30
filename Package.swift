@@ -34,8 +34,6 @@ let package = Package(
             dependencies: [
                 "Authentication",
                 "FluentPostgreSQL",
-//                "SwifQL",
-//                "SwifQLVapor"
             ]
         ),
         .target(
