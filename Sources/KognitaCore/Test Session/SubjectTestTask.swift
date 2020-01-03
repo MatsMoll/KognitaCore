@@ -76,7 +76,6 @@ extension SubjectTest.Pivot.Task {
     }
 
 
-    @available(OSX 10.15, *)
     struct Repository: SubjectTestTaskRepositoring {
 
         static func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
@@ -126,7 +125,6 @@ extension Array where Element : Hashable {
         case remove(Element)
     }
 
-    @available(OSX 10.15, *)
     func changes<T: BidirectionalCollection>(from collection: T) -> [Change] where T.Element == Element {
         difference(from: collection)
             .reduce(into: Dictionary<Element, Int>()) { changes, change in

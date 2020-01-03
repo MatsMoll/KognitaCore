@@ -72,7 +72,6 @@ public protocol SubjectTestRepositoring:
 
 extension SubjectTest {
 
-    @available(OSX 10.15, *)
     struct Repository: SubjectTestRepositoring {
 
         static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
