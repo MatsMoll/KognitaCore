@@ -80,7 +80,8 @@ extension User.DatabaseRepository: UserRepository {
             username: content.username,
             email: content.email,
             passwordHash: hash,
-            role: .user
+            role: .user,
+            canPractice: true
         )
 
         return User.query(on: conn)

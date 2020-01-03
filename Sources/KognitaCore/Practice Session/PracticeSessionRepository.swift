@@ -40,6 +40,9 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
+        guard user.canPractice else {
+            throw Abort(.forbidden)
+        }
 
         if let topicIDs = content.topicIDs {
             return try create(
@@ -391,7 +394,6 @@ extension PracticeSession.DatabaseRepository {
         on conn: DatabaseConnectable
     ) throws -> Future<T> {
         
-
         return try PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
