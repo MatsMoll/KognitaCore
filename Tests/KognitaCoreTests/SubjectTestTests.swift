@@ -162,9 +162,106 @@ class SubjectTestTests: VaporTestCase {
             let flashAnswers = try FlashCardAnswer.query(on: conn).all().wait()
             let taskIDs = Set(flashAnswers.map { $0.taskID })
 
-            XCTAssert(try answers.allSatisfy({ try $0.testID == test.requireID() }))
+            XCTAssert(try answers.allSatisfy({ try $0.sessionID == test.requireID() }))
             XCTAssertEqual(answers.count, 3)
             XCTAssertEqual(flashAnswers.count, 3)
+            XCTAssertEqual(taskIDs.count, 3)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
+
+        let firstTask = try FlashCardTask.create(on: conn)
+        let secondTask = try FlashCardTask.create(on: conn)
+        let thiredTask = try FlashCardTask.create(on: conn)
+        _ = try FlashCardTask.create(on: conn)
+        _ = try FlashCardTask.create(on: conn)
+        _ = try FlashCardTask.create(on: conn)
+
+        let userOne = try User.create(on: conn)
+        let userTwo = try User.create(on: conn)
+
+        let data = try SubjectTest.Create.Data(
+            tasks: [
+                firstTask.requireID(),
+                secondTask.requireID(),
+                thiredTask.requireID()
+            ],
+            duration: .minutes(10),
+            opensAt: .now
+        )
+        var taskAnswer = FlashCardTask.Submit(
+            timeUsed: .seconds(20),
+            knowledge: 0,
+            taskIndex: 1,
+            answer: "Some answer"
+        )
+        let otherAnswer = FlashCardTask.Submit(
+            timeUsed: .seconds(20),
+            knowledge: 0,
+            taskIndex: 2,
+            answer: "Other"
+        )
+
+        do {
+            let test = try SubjectTest.DatabaseRepository
+                .create(from: data, by: userOne, on: conn).wait()
+
+            let sessionOne = try SubjectTest.DatabaseRepository
+                .enter(test: test, by: userOne, on: conn).wait()
+            let sessionTwo = try SubjectTest.DatabaseRepository
+                .enter(test: test, by: userTwo, on: conn).wait()
+
+            XCTAssertEqual(sessionOne.testID, test.id)
+            XCTAssertEqual(sessionOne.userID, userOne.id)
+            XCTAssertEqual(sessionTwo.testID, test.id)
+            XCTAssertEqual(sessionTwo.userID, userTwo.id)
+
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            taskAnswer.taskIndex = 2
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+
+            XCTAssertThrowsError( // Submitting to a session that is not the user's
+                try TestSession.DatabaseRepository
+                    .submit(content: taskAnswer, for: sessionOne, by: userTwo, on: conn).wait()
+            )
+
+            try TestSession.DatabaseRepository
+                .submit(content: otherAnswer, for: sessionOne, by: userOne, on: conn).wait()
+
+            taskAnswer.taskIndex = 3
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            taskAnswer.taskIndex = 4
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository
+                    .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            )
+
+            let answers = try SubjectTestAnswer.query(on: conn).all().wait()
+            let flashAnswers = try FlashCardAnswer.query(on: conn).all().wait()
+            let taskIDs = Set(flashAnswers.map { $0.taskID })
+            let sessionIDs = Set(answers.map { $0.sessionID })
+            let userSessions = try Set([sessionOne.requireID(), sessionTwo.requireID()])
+
+            let groupedAnswers = flashAnswers.group(by: \.answer)
+
+            XCTAssertEqual(groupedAnswers.count, 2)
+            XCTAssertEqual(groupedAnswers[otherAnswer.answer]?.count, 1)
+            XCTAssertEqual(groupedAnswers[taskAnswer.answer]?.count, 4)
+            XCTAssertEqual(userSessions, sessionIDs)
+            XCTAssertEqual(answers.count, 5)
+            XCTAssertEqual(flashAnswers.count, 5)
             XCTAssertEqual(taskIDs.count, 3)
         } catch {
             XCTFail(error.localizedDescription)

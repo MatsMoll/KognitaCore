@@ -41,8 +41,8 @@ extension TestSession {
                         .from(SubjectTest.Pivot.Task.self)
                         .join(\SubjectTest.Pivot.Task.taskID,   to: \SubjectTest.id)
                         .join(\SubjectTest.id,                  to: \TestSession.testID)
-                        .join(\TestSession.id,                  to: \SubjectTestAnswer.testID,  method: .left)
-                        .join(\SubjectTestAnswer.taskAnswerID,  to: \FlashCardAnswer.id,        method: .left)
+                        .join(\TestSession.id,                  to: \SubjectTestAnswer.sessionID,   method: .left)
+                        .join(\SubjectTestAnswer.taskAnswerID,  to: \FlashCardAnswer.id,            method: .left)
                         .where(\TestSession.userID == user.requireID())
                         .orderBy(\SubjectTest.Pivot.Task.createdAt, .ascending)
                         .offset(content.taskIndex - 1)
@@ -57,9 +57,9 @@ extension TestSession {
             }
         }
 
-        static func save(answer: TaskAnswer, to test: TestSession, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        static func save(answer: TaskAnswer, to session: TestSession, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             try SubjectTestAnswer(
-                testID: test.requireID(),
+                sessionID: session.requireID(),
                 taskAnswerID: answer.requireID()
             )
             .create(on: conn)

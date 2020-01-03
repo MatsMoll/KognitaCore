@@ -11,18 +11,18 @@ public final class SubjectTestAnswer: KognitaPersistenceModel {
 
     public var taskAnswerID: TaskAnswer.ID
 
-    public var testID: TestSession.ID
+    public var sessionID: TestSession.ID
 
-    init(testID: TestSession.ID, taskAnswerID: TaskAnswer.ID) {
-        self.testID = testID
+    init(sessionID: TestSession.ID, taskAnswerID: TaskAnswer.ID) {
+        self.sessionID = sessionID
         self.taskAnswerID = taskAnswerID
     }
 
     public static func addTableConstraints(to builder: SchemaCreator<SubjectTestAnswer>) {
 
-        builder.unique(on: \.testID, \.taskAnswerID)
+        builder.unique(on: \.sessionID, \.taskAnswerID)
 
-        builder.reference(from: \.testID, to: \TestSession.id, onUpdate: .cascade, onDelete: .cascade)
+        builder.reference(from: \.sessionID, to: \TestSession.id, onUpdate: .cascade, onDelete: .cascade)
         builder.reference(from: \.taskAnswerID, to: \TaskAnswer.id, onUpdate: .cascade, onDelete: .cascade)
     }
 }
