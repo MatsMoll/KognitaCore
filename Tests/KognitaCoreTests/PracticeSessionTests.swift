@@ -228,32 +228,35 @@ final class PracticeSessionTests: VaporTestCase {
             choises: [],
             taskIndex: 1
         )
-        _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
-        submit.taskIndex = 2
-        _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
+        do {
+            _ = try PracticeSession.DatabaseRepository
+                .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
+            submit.taskIndex = 2
+            _ = try PracticeSession.DatabaseRepository
+                .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
 
-        submit.taskIndex = 1
-        XCTAssertNoThrow(
+            submit.taskIndex = 1
             _ = try PracticeSession.DatabaseRepository
                 .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
-        )
-        submit.taskIndex = 2
-        XCTAssertNoThrow(
+            submit.taskIndex = 2
             _ = try PracticeSession.DatabaseRepository
                 .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
-        )
-        submit.taskIndex = 3
-        XCTAssertThrowsError(
-            _ = try PracticeSession.DatabaseRepository
-                .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
-        )
+
+            // taskIndex 3 should not exist and therefore throw
+            submit.taskIndex = 3
+            XCTAssertThrowsError(
+                _ = try PracticeSession.DatabaseRepository
+                    .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
     }
 
     static let allTests = [
         ("testIncorrectTaskIndex", testIncorrectTaskIndex),
         ("testPracticeSessionAssignment", testPracticeSessionAssignment),
+        ("testPracticeSessionAssignmentWithoutPracticeCapability", testPracticeSessionAssignmentWithoutPracticeCapability),
         ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple),
         ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
         ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),

@@ -394,7 +394,6 @@ extension PracticeSession.DatabaseRepository {
         on conn: DatabaseConnectable
     ) throws -> Future<T> {
         
-
         return try PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
