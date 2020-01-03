@@ -181,9 +181,11 @@ class MultipleChoiseTaskTests: VaporTestCase {
         _ = try PracticeSession.DatabaseRepository
             .submitMultipleChoise(secondSubmit, in: session, by: user, on: conn).wait()
 
+        let sessionAnswers = try PracticeSessionAnswer.query(on: conn).all().wait()
+
         let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
         XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
-        XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+        XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
         XCTAssert(answers.contains { $0.choiseID == firstChoises.first?.id })
         XCTAssert(answers.contains { answer in secondChoises.contains { answer.choiseID == $0.id }})
     }

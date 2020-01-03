@@ -90,8 +90,10 @@ class FlashCardTaskTests: VaporTestCase {
             let answerSet = Set(answers.map { $0.answer })
             let taskIDSet = Set(answers.map { $0.taskID })
 
+            let sessionAnswers = try PracticeSessionAnswer.query(on: conn).all().wait()
+
             XCTAssertEqual(answers.count, 2)
-            XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+            XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
             XCTAssertTrue(answerSet.contains(firstSubmit.answer), "First submitted answer not found in \(answerSet)")
             XCTAssertTrue(answerSet.contains(secondSubmit.answer), "Second submitted answer not found in \(answerSet)")
             XCTAssertTrue(try taskIDSet.contains(firstTask.requireID()), "First submitted task id not found in \(taskIDSet)")

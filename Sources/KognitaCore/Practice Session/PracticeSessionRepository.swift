@@ -351,33 +351,38 @@ extension PracticeSession.DatabaseRepository {
         
         return try get(FlashCardTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
-            try FlashCardTask.DatabaseRepository
-                .createAnswer(in: session, for: task, with: submit, on: conn)
-                .flatMap {
+            FlashCardTask.DatabaseRepository
+                .createAnswer(for: task, with: submit, on: conn)
+                .flatMap { answer in
 
-                    let score = ScoreEvaluater.shared
-                        .compress(score: submit.knowledge, range: 0...4)
+                    try PracticeSession.DatabaseRepository
+                        .save(answer: answer, to: session, on: conn)
+                        .flatMap {
 
-                    let result = PracticeSessionResult(
-                        result:     submit,
-                        score:      score,
-                        progress:   0
-                    )
+                            let score = ScoreEvaluater.shared
+                                .compress(score: submit.knowledge, range: 0...4)
 
-                    let submitResult = try TaskSubmitResult(
-                        submit: submit,
-                        result: result,
-                        taskID: task.requireID()
-                    )
+                            let result = PracticeSessionResult(
+                                result:     submit,
+                                score:      score,
+                                progress:   0
+                            )
 
-                    return try PracticeSession.DatabaseRepository
-                        .register(submitResult, result: result, in: session, by: user, on: conn)
-                        .flatMap { _ in
+                            let submitResult = try TaskSubmitResult(
+                                submit: submit,
+                                result: result,
+                                taskID: task.requireID()
+                            )
 
-                            try session.goalProgress(on: conn)
-                                .map { progress in
-                                    result.progress = Double(progress)
-                                    return result
+                            return try PracticeSession.DatabaseRepository
+                                .register(submitResult, result: result, in: session, by: user, on: conn)
+                                .flatMap { _ in
+
+                                    try session.goalProgress(on: conn)
+                                        .map { progress in
+                                            result.progress = Double(progress)
+                                            return result
+                                    }
                             }
                     }
             }
@@ -389,7 +394,7 @@ extension PracticeSession.DatabaseRepository {
         at index: Int,
         for session: PracticeSession,
         on conn: DatabaseConnectable
-    ) throws -> Future<T> {
+    ) throws -> EventLoopFuture<T> {
         
 
         return try PracticeSession.Pivot.Task
@@ -407,7 +412,7 @@ extension PracticeSession.DatabaseRepository {
         taskID: Task.ID,
         in session: PracticeSession,
         on conn: DatabaseConnectable
-    ) throws -> Future<Void> {
+    ) throws -> EventLoopFuture<Void> {
 
         return try session.assignedTasks
             .pivots(on: conn)
@@ -430,7 +435,7 @@ extension PracticeSession.DatabaseRepository {
         _ session: PracticeSession,
         for user: User,
         on conn: DatabaseConnectable
-    ) throws -> Future<PracticeSession> {
+    ) throws -> EventLoopFuture<PracticeSession> {
 
         guard try session.userID == user.requireID() else {
             throw Abort(.forbidden)
@@ -616,6 +621,15 @@ extension PracticeSession.DatabaseRepository {
             .join(\Task.subtopicID, to: \PracticeSession.Pivot.Subtopic.subtopicID)
             .filter(\PracticeSession.Pivot.Subtopic.sessionID == session.requireID())
             .count()
+    }
+
+    public static func save(answer: TaskAnswer, to session: PracticeSession, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        try PracticeSessionAnswer(
+            sessionID: session.requireID(),
+            taskAnswerID: answer.requireID()
+        )
+        .create(on: conn)
+        .transform(to: ())
     }
 }
 

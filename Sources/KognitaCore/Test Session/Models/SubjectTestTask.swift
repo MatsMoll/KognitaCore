@@ -76,7 +76,7 @@ extension SubjectTest.Pivot.Task {
     }
 
 
-    struct Repository: SubjectTestTaskRepositoring {
+    struct DatabaseRepository: SubjectTestTaskRepositoring {
 
         static func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
             content.taskIDs.map {

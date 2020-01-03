@@ -39,10 +39,14 @@ public class DatabaseMigrations {
         migrations.add(model: PracticeSession.Pivot.Subtopic.self,  database: .psql)
         migrations.add(model: FlashCardTask.self,                   database: .psql)
         migrations.add(model: TaskResult.self,                      database: .psql)
+        migrations.add(model: TaskAnswer.self,                      database: .psql)
         migrations.add(model: MultipleChoiseTaskAnswer.self,        database: .psql)
         migrations.add(model: FlashCardAnswer.self,                 database: .psql)
+        migrations.add(model: TestSession.self,                     database: .psql)
         migrations.add(model: SubjectTest.self,                     database: .psql)
         migrations.add(model: SubjectTest.Pivot.Task.self,          database: .psql)
+        migrations.add(model: SubjectTestAnswer.self,               database: .psql)
+        migrations.add(model: PracticeSessionAnswer.self,           database: .psql)
     }
 
     static func extraDatabase(migrations: inout MigrationConfig) {

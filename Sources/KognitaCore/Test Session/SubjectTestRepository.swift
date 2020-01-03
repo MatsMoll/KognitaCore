@@ -1,62 +1,5 @@
-import FluentPostgreSQL
 import FluentSQL
 import Vapor
-
-/// A practice session object
-public final class SubjectTest: KognitaPersistenceModel {
-
-    /// The session id
-    public var id: Int?
-
-    /// The date the session was ended
-    public private(set) var endedAt: Date
-
-    /// The time the test is possible to start
-    public var opensAt: Date
-
-    /// The date when the session was started
-    public var createdAt: Date?
-
-    public var updatedAt: Date?
-
-
-    init(opensAt: Date, duration: TimeInterval) {
-        self.opensAt = opensAt
-        self.endedAt = opensAt.addingTimeInterval(abs(duration))
-    }
-
-    convenience init(data: SubjectTest.Create.Data) {
-        self.init(opensAt: data.opensAt, duration: data.duration)
-    }
-
-    public func update(duration: TimeInterval) {
-        self.endedAt = opensAt.addingTimeInterval(abs(duration))
-    }
-
-    public func update(with content: Update.Data) -> SubjectTest {
-        self.opensAt = content.opensAt
-        self.update(duration: content.duration)
-        return self
-    }
-
-    public static var deletedAtKey: WritableKeyPath<SubjectTest, Date>? = \.endedAt
-}
-
-
-extension SubjectTest {
-    public enum Create {
-        public struct Data: Decodable {
-            let tasks: [Task.ID]
-            let duration: TimeInterval
-            let opensAt: Date
-        }
-
-        public typealias Response = SubjectTest
-    }
-
-    public typealias Update = Create
-}
-
 
 public protocol SubjectTestRepositoring:
     CreateModelRepository,
@@ -72,7 +15,11 @@ public protocol SubjectTestRepositoring:
 
 extension SubjectTest {
 
-    struct Repository: SubjectTestRepositoring {
+    struct DatabaseRepository: SubjectTestRepositoring {
+
+        public enum Errors: Error {
+            case testIsClosed
+        }
 
         static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
             guard let user = user else {
@@ -84,7 +31,8 @@ extension SubjectTest {
             return SubjectTest(data: content)
                 .create(on: conn)
                 .flatMap { test in
-                    try SubjectTest.Pivot.Task.Repository
+                    try SubjectTest.Pivot.Task
+                        .DatabaseRepository
                         .create(
                             from: .init(
                                 testID: test.requireID(),
@@ -105,7 +53,7 @@ extension SubjectTest {
                 .save(on: conn)
                 .flatMap { test in
                     try SubjectTest.Pivot.Task
-                        .Repository
+                        .DatabaseRepository
                         .update(
                             model: test,
                             to: data.tasks,
@@ -115,5 +63,17 @@ extension SubjectTest {
                     .transform(to: test)
             }
         }
+
+        static func enter(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession> {
+            guard test.isOpen else {
+                throw Errors.testIsClosed
+            }
+            return try TestSession(
+                testID: test.requireID(),
+                userID: user.requireID()
+            )
+            .save(on: conn)
+        }
     }
 }
+

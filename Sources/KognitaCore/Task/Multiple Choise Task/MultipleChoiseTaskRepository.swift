@@ -273,9 +273,14 @@ extension MultipleChoiseTask.DatabaseRepository {
         with submit: MultipleChoiseTask.Submit,
         on conn: DatabaseConnectable
     ) -> EventLoopFuture<Void> {
-        submit.choises.map {
-            MultipleChoiseTaskAnswer(sessionID: sessionID, choiseID: $0)
+        
+        submit.choises.map { choise in
+            TaskAnswer()
                 .save(on: conn)
+                .flatMap {
+                    try MultipleChoiseTaskAnswer(answerID: $0.requireID(), choiseID: choise)
+                        .create(on: conn)
+            }
         }
         .flatten(on: conn)
         .transform(to: ())
