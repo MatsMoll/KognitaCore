@@ -134,6 +134,30 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertNotNil(secondTask.multipleChoise)
         try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
     }
+
+    func testPracticeSessionAssignmentWithoutPracticeCapability() throws {
+
+        let user = try User.create(canPractice: false, on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+
+        let create = try PracticeSession.Create.Data(
+            numberOfTaskGoal: 2,
+            subtopicsIDs: [
+                subtopic.requireID()
+            ],
+            topicIDs: nil
+        )
+
+        XCTAssertThrowsError(
+            try PracticeSession.DatabaseRepository
+                .create(from: create, by: user, on: conn).wait()
+        )
+        XCTAssertEqual(try PracticeSession.query(on: conn).count().wait(), 0)
+    }
     
     func testPracticeSessionAssignmentMultiple() throws {
         
