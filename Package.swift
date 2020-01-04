@@ -35,6 +35,7 @@ let package = Package(
             dependencies: [
                 "Authentication",
                 "FluentPostgreSQL",
+                "Vapor"
             ]
         ),
         .target(

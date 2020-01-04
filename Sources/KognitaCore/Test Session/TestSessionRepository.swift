@@ -25,7 +25,7 @@ extension TestSession {
                                         .createAnswer(for: task, with: content, on: conn)
                                         .flatMap { answer in
 
-                                            try save(answer: answer, to: session, on: conn)
+                                            try save(answer: answer, to: session.requireID(), on: conn)
                                     }
                             }
                     }
@@ -57,9 +57,9 @@ extension TestSession {
             }
         }
 
-        static func save(answer: TaskAnswer, to session: TestSession, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        static func save(answer: TaskAnswer, to sessionID: TestSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             try SubjectTestAnswer(
-                sessionID: session.requireID(),
+                sessionID: sessionID,
                 taskAnswerID: answer.requireID()
             )
             .create(on: conn)
@@ -67,7 +67,8 @@ extension TestSession {
         }
 
         static func flashCard(at index: Int, on conn: DatabaseConnectable) -> EventLoopFuture<FlashCardTask> {
-            SubjectTest.Pivot.Task.query(on: conn)
+            SubjectTest.Pivot.Task
+                .query(on: conn)
                 .join(\FlashCardTask.id, to: \SubjectTest.Pivot.Task.taskID)
                 .sort(\.createdAt, .ascending)
                 .range(lower: index - 1, upper: index)

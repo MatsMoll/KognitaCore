@@ -272,7 +272,8 @@ class SubjectTestTests: VaporTestCase {
         ("testCreateTest", testCreateTest),
         ("testCreateTestUnauthorized", testCreateTestUnauthorized),
         ("testCreateTestUnprivileged", testCreateTestUnprivileged),
-        ("testSubmittingAndUpdatingAnswer", testSubmittingAndUpdatingAnswer)
+        ("testSubmittingAndUpdatingAnswer", testSubmittingAndUpdatingAnswer),
+        ("testSubmittingAndUpdatingAnswerMultipleUsers", testSubmittingAndUpdatingAnswerMultipleUsers)
     ]
 }
 

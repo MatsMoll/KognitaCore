@@ -64,6 +64,11 @@ class FlashCardTaskTests: VaporTestCase {
         do {
             let session = try PracticeSession.DatabaseRepository
                 .create(from: create, by: user, on: conn).wait()
+            let superSession = try TaskSession
+                .find(session.requireID(), on: conn)
+                .unwrap(or: Abort(.internalServerError))
+                .wait()
+            let sessionRepresentable = session.representable(with: superSession)
 
             let firstSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -72,7 +77,7 @@ class FlashCardTaskTests: VaporTestCase {
                 answer: "First Answer"
             )
             _ = try PracticeSession.DatabaseRepository
-                .submitFlashCard(firstSubmit, in: session, by: user, on: conn).wait()
+                .submit(firstSubmit, in: sessionRepresentable, by: user, on: conn).wait()
 
             let secondSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -82,7 +87,7 @@ class FlashCardTaskTests: VaporTestCase {
             )
 
             _ = try PracticeSession.DatabaseRepository
-                .submitFlashCard(secondSubmit, in: session, by: user, on: conn).wait()
+                .submit(secondSubmit, in: sessionRepresentable, by: user, on: conn).wait()
 
             let answers = try FlashCardAnswer.query(on: conn)
                 .all()

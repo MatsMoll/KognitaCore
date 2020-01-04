@@ -40,21 +40,19 @@ public final class TaskResult: PostgreSQLModel, Codable {
 
     public var timeUsed: TimeInterval
 
-    public var sessionID: PracticeSession.ID?
+    public var sessionID: TaskSession.ID?
 
 
-    init(result: TaskSubmitResult, userID: User.ID, session: PracticeSession? = nil) {
+    init(result: TaskSubmitResult, userID: User.ID, sessionID: TaskSession.ID? = nil) {
         self.taskID = result.taskID
         self.userID = userID
         self.timeUsed = result.submit.timeUsed
         self.resultScore = result.result.score.clamped(to: 0...1)
-        self.sessionID = session?.id
-
-        let referanceDate = session?.createdAt ?? Date()
+        self.sessionID = sessionID
 
         let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: resultScore)
         let interval = Double(numberOfDays) * 60 * 60 * 24
-        self.revisitDate = referanceDate.addingTimeInterval(interval)
+        self.revisitDate = Date().addingTimeInterval(interval)
     }
 }
 
