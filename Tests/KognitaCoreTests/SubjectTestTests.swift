@@ -9,34 +9,24 @@ class SubjectTestTests: VaporTestCase {
 
     func testCreateTest() throws {
 
-        let firstTask = try Task.create(on: conn)
-        let secondTask = try Task.create(on: conn)
-        let thiredTask = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-
-        let user = try User.create(on: conn)
-        let data = try SubjectTest.Create.Data(
-            tasks: [
-                firstTask.requireID(),
-                secondTask.requireID(),
-                thiredTask.requireID()
-            ],
-            duration: .minutes(10),
-            opensAt: .now
-        )
+        let opensAt: Date = .now
+        let duration: TimeInterval = .minutes(20)
+        let numberOfTasks = 3
 
         do {
-            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            let test = try setupTestWithTasks(
+                openingAt: opensAt,
+                duration: duration,
+                numberOfTasks: numberOfTasks
+            )
             let testTasks = try SubjectTest.Pivot.Task
                 .query(on: conn)
                 .all()
                 .wait()
 
-            XCTAssertEqual(test.opensAt, data.opensAt)
-            XCTAssertEqual(test.endedAt, data.opensAt.addingTimeInterval(data.duration))
-            XCTAssertEqual(testTasks.count, data.tasks.count)
+            XCTAssertEqual(test.opensAt, opensAt)
+            XCTAssertEqual(test.endedAt, opensAt.addingTimeInterval(duration))
+            XCTAssertEqual(testTasks.count, numberOfTasks)
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -66,28 +56,13 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func testStartingTestWhenClosed() throws {
-        let firstTask = try Task.create(on: conn)
-        let secondTask = try Task.create(on: conn)
-        let thiredTask = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
 
         let user = try User.create(on: conn)
-        let data = try SubjectTest.Create.Data(
-            tasks: [
-                firstTask.requireID(),
-                secondTask.requireID(),
-                thiredTask.requireID()
-            ],
-            duration: .minutes(10),
-            opensAt: Date().addingTimeInterval(.minutes(20))
-        )
 
         do {
-            let test = try SubjectTest.DatabaseRepository
-                .create(from: data, by: user, on: conn).wait()
-
+            let test = try setupTestWithTasks(
+                openingAt: Date().addingTimeInterval(.minutes(2))
+            )
             XCTAssertThrowsError(
                 try SubjectTest.DatabaseRepository
                     .enter(test: test, by: user, on: conn).wait()
@@ -97,168 +72,62 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
-    func testSubmittingAndUpdatingAnswer() throws {
-
-        let firstTask = try FlashCardTask.create(on: conn)
-        let secondTask = try FlashCardTask.create(on: conn)
-        let thiredTask = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
-
-        let user = try User.create(on: conn)
-        let data = try SubjectTest.Create.Data(
-            tasks: [
-                firstTask.requireID(),
-                secondTask.requireID(),
-                thiredTask.requireID()
-            ],
-            duration: .minutes(10),
-            opensAt: .now
-        )
-        var taskAnswer = FlashCardTask.Submit(
-            timeUsed: .seconds(20),
-            knowledge: 0,
-            taskIndex: 1,
-            answer: "Some answer"
-        )
-        let otherAnswer = FlashCardTask.Submit(
-            timeUsed: .seconds(20),
-            knowledge: 0,
-            taskIndex: 2,
-            answer: "Other"
-        )
-
-        do {
-            let test = try SubjectTest.DatabaseRepository
-                .create(from: data, by: user, on: conn).wait()
-
-            let session = try SubjectTest.DatabaseRepository
-                .enter(test: test, by: user, on: conn).wait()
-
-            XCTAssertEqual(session.testID, test.id)
-
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: session, by: user, on: conn).wait()
-
-            taskAnswer.taskIndex = 2
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: session, by: user, on: conn).wait()
-
-            try TestSession.DatabaseRepository
-                .submit(content: otherAnswer, for: session, by: user, on: conn).wait()
-
-            taskAnswer.taskIndex = 3
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: session, by: user, on: conn).wait()
-
-            taskAnswer.taskIndex = 4
-            XCTAssertThrowsError(
-                try TestSession.DatabaseRepository
-                    .submit(content: taskAnswer, for: session, by: user, on: conn).wait()
-            )
-
-            let answers = try SubjectTestAnswer.query(on: conn).all().wait()
-            let flashAnswers = try FlashCardAnswer.query(on: conn).all().wait()
-            let taskIDs = Set(flashAnswers.map { $0.taskID })
-
-            XCTAssert(try answers.allSatisfy({ try $0.sessionID == test.requireID() }))
-            XCTAssertEqual(answers.count, 3)
-            XCTAssertEqual(flashAnswers.count, 3)
-            XCTAssertEqual(taskIDs.count, 3)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
-    }
-
     func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
-
-        let firstTask = try FlashCardTask.create(on: conn)
-        let secondTask = try FlashCardTask.create(on: conn)
-        let thiredTask = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
-        _ = try FlashCardTask.create(on: conn)
 
         let userOne = try User.create(on: conn)
         let userTwo = try User.create(on: conn)
 
-        let data = try SubjectTest.Create.Data(
-            tasks: [
-                firstTask.requireID(),
-                secondTask.requireID(),
-                thiredTask.requireID()
-            ],
-            duration: .minutes(10),
-            opensAt: .now
-        )
-        var taskAnswer = FlashCardTask.Submit(
-            timeUsed: .seconds(20),
-            knowledge: 0,
-            taskIndex: 1,
-            answer: "Some answer"
-        )
-        let otherAnswer = FlashCardTask.Submit(
-            timeUsed: .seconds(20),
-            knowledge: 0,
-            taskIndex: 2,
-            answer: "Other"
-        )
-
         do {
-            let test = try SubjectTest.DatabaseRepository
-                .create(from: data, by: userOne, on: conn).wait()
+            let test = try setupTestWithTasks()
 
-            let sessionOne = try SubjectTest.DatabaseRepository
-                .enter(test: test, by: userOne, on: conn).wait()
-            let sessionTwo = try SubjectTest.DatabaseRepository
-                .enter(test: test, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
 
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            try XCTAssertNotEqual(sessionOne.requireID(), sessionTwo.requireID())
             XCTAssertEqual(sessionOne.testID, test.id)
             XCTAssertEqual(sessionOne.userID, userOne.id)
             XCTAssertEqual(sessionTwo.testID, test.id)
             XCTAssertEqual(sessionTwo.userID, userTwo.id)
 
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+            let firstSubmit                 = try submittionAt(index: 1, for: test)
+            var secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let secondCorrectSubmittion     = try submittionAt(index: 2, for: test, isCorrect: true)
+            var thiredSubmit                = try submittionAt(index: 3, for: test)
 
-            taskAnswer.taskIndex = 2
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionTwo, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
 
-            XCTAssertThrowsError( // Submitting to a session that is not the user's
-                try TestSession.DatabaseRepository
-                    .submit(content: taskAnswer, for: sessionOne, by: userTwo, on: conn).wait()
+
+            // Submitting a choise to a task that do not contain the choise
+            secondIncorrectSubmittion.taskIndex = 1
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
             )
+            // Submitting to a session that is not the user's
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userTwo, on: conn).wait()
+            )
+            // Updating old submittion
+            try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
 
-            try TestSession.DatabaseRepository
-                .submit(content: otherAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thiredSubmit, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thiredSubmit, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            taskAnswer.taskIndex = 3
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
-
-            taskAnswer.taskIndex = 4
+            thiredSubmit.taskIndex = 4
             XCTAssertThrowsError(
                 try TestSession.DatabaseRepository
-                    .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+                    .submit(content: thiredSubmit, for: sessionOne, by: userOne, on: conn).wait()
             )
+            let answers         = try TaskSessionAnswer.query(on: conn).all().wait()
+            let flashAnswers    = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
+            let taskIDs         = Set(flashAnswers.map { $0.choiseID })
+            let sessionIDs      = Set(answers.map { $0.sessionID })
+            let userSessions    = try Set([sessionOne.requireID(), sessionTwo.requireID()])
 
-            let answers = try SubjectTestAnswer.query(on: conn).all().wait()
-            let flashAnswers = try FlashCardAnswer.query(on: conn).all().wait()
-            let taskIDs = Set(flashAnswers.map { $0.taskID })
-            let sessionIDs = Set(answers.map { $0.sessionID })
-            let userSessions = try Set([sessionOne.requireID(), sessionTwo.requireID()])
-
-            let groupedAnswers = flashAnswers.group(by: \.answer)
-
-            XCTAssertEqual(groupedAnswers.count, 2)
-            XCTAssertEqual(groupedAnswers[otherAnswer.answer]?.count, 1)
-            XCTAssertEqual(groupedAnswers[taskAnswer.answer]?.count, 4)
             XCTAssertEqual(userSessions, sessionIDs)
             XCTAssertEqual(answers.count, 5)
             XCTAssertEqual(flashAnswers.count, 5)
@@ -268,12 +137,174 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testUpdateAnswerInSession() throws {
+
+        let user = try User.create(on: conn)
+
+        do {
+            let test = try setupTestWithTasks()
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: user, on: conn).wait()
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let secondCorrectSubmittion     = try submittionAt(index: 2, for: test, isCorrect: true)
+
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: user, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: user, on: conn).wait()
+            // Updating old submittion
+            try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: user, on: conn).wait()
+
+            let answers = try TaskSessionAnswer.query(on: conn).all().wait()
+            let choises = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
+            let taskAnswers = try TaskAnswer.query(on: conn).all().wait()
+
+            let choisesIDs = Set(choises.map { $0.choiseID })
+            let submittedChoisesIDs = Set(firstSubmittion.choises + secondCorrectSubmittion.choises)
+
+            XCTAssertEqual(taskAnswers.count, 2)
+            XCTAssertEqual(answers.count, 2)
+            XCTAssertEqual(choises.count, 2)
+            XCTAssertEqual(choisesIDs, submittedChoisesIDs)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testEnteringMultipleTimes() throws {
+
+        let userOne = try User.create(on: conn)
+        let userTwo = try User.create(on: conn)
+
+        do {
+            let test = try setupTestWithTasks()
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
+
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            XCTAssertEqual(sessionOne.testID, test.id)
+            XCTAssertEqual(sessionOne.userID, userOne.id)
+            XCTAssertEqual(sessionTwo.testID, test.id)
+            XCTAssertEqual(sessionTwo.userID, userTwo.id)
+
+            XCTAssertThrowsError(
+                _ = try SubjectTest.DatabaseRepository
+                    .enter(test: test, by: userOne, on: conn).wait()
+            )
+
+            let sessions = try TestSession.query(on: conn).all().wait()
+            XCTAssertEqual(sessions.count, 2)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testSubmittingTestSession() throws {
+
+        let userOne = try User.create(on: conn)
+        let userTwo = try User.create(on: conn)
+
+        var taskAnswer = MultipleChoiseTask.Submit(
+            timeUsed: .seconds(20),
+            choises: [2],
+            taskIndex: 1
+        )
+
+        do {
+            let test = try setupTestWithTasks()
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
+
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            taskAnswer.taskIndex = 2
+            try TestSession.DatabaseRepository
+                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+
+            taskAnswer.taskIndex = 3
+            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            _ = try TestSession.DatabaseRepository.submit(test: sessionOneEntry, on: conn).wait()
+
+            let sessions = try TestSession.query(on: conn).all().wait()
+            XCTAssertEqual(sessions.count, 2)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+
+
+    func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
+        let choises = try choisesAt(index: index, for: test)
+        return try MultipleChoiseTask.Submit(
+            timeUsed: .seconds(20),
+            choises: choises.filter { $0.isCorrect == isCorrect }.map { try $0.requireID() },
+            taskIndex: index
+        )
+    }
+
+    func choisesAt(index: Int, for test: SubjectTest) throws -> [MultipleChoiseTaskChoise] {
+        try SubjectTest.Pivot.Task
+            .query(on: conn)
+            .sort(\.createdAt)
+            .filter(\.testID, .equal, test.requireID())
+            .filter(\.id, .equal, index)
+            .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
+            .decode(MultipleChoiseTaskChoise.self)
+            .all()
+            .wait()
+    }
+
+    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.ID]) -> MultipleChoiseTask.Submit {
+        .init(
+            timeUsed: .seconds(20),
+            choises: choises,
+            taskIndex: 1
+        )
+    }
+
+    func setupTestWithTasks(openingAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
+        let subtopic = try Subtopic.create(on: conn)
+        let taskIds = try (0..<numberOfTasks).map { _ in
+            try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+                .requireID()
+        }
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+
+        let user = try User.create(on: conn)
+
+        let data = SubjectTest.Create.Data(
+            tasks: taskIds,
+            duration: duration,
+            opensAt: openingAt
+        )
+
+        return try SubjectTest.DatabaseRepository
+            .create(from: data, by: user, on: conn).wait()
+    }
+
     static let allTests = [
         ("testCreateTest", testCreateTest),
         ("testCreateTestUnauthorized", testCreateTestUnauthorized),
         ("testCreateTestUnprivileged", testCreateTestUnprivileged),
-        ("testSubmittingAndUpdatingAnswer", testSubmittingAndUpdatingAnswer),
-        ("testSubmittingAndUpdatingAnswerMultipleUsers", testSubmittingAndUpdatingAnswerMultipleUsers)
+        ("testStartingTestWhenClosed", testStartingTestWhenClosed),
+        ("testUpdateAnswerInSession", testUpdateAnswerInSession),
+        ("testSubmittingAndUpdatingAnswerMultipleUsers", testSubmittingAndUpdatingAnswerMultipleUsers),
+        ("testEnteringMultipleTimes", testEnteringMultipleTimes),
+        ("testSubmittingTestSession", testSubmittingTestSession)
     ]
 }
 

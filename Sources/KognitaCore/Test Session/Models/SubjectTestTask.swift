@@ -31,7 +31,7 @@ extension SubjectTest {
 
 extension SubjectTest.Pivot.Task: Migration {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.create(SubjectTest.Pivot.Task.self, on: conn) { builder in
             try addProperties(to: builder)
             builder.unique(on: \.taskID, \.testID)
@@ -41,7 +41,7 @@ extension SubjectTest.Pivot.Task: Migration {
         }
     }
 
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
+    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.delete(SubjectTest.Pivot.Task.self, on: connection)
     }
 }

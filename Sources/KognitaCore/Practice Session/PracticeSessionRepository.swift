@@ -295,7 +295,7 @@ extension PracticeSession.DatabaseRepository {
         in session: PracticeSessionRepresentable,
         by user: User,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    ) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
@@ -303,12 +303,12 @@ extension PracticeSession.DatabaseRepository {
 
         return try get(MultipleChoiseTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
-            try MultipleChoiseTask.DatabaseRepository
-                .createAnswer(in: session.requireID(), with: submit, on: conn)
+            MultipleChoiseTask.DatabaseRepository
+                .create(answer: submit, on: conn)
                 .flatMap { _ in
 
                     try MultipleChoiseTask.DatabaseRepository
-                        .evaluate(submit, for: task, on: conn)
+                        .evaluate(submit.choises, for: task, on: conn)
                         .flatMap { result in
 
                             let submitResult = try TaskSubmitResult(
@@ -337,7 +337,7 @@ extension PracticeSession.DatabaseRepository {
         in session: PracticeSessionRepresentable,
         by user: User,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<PracticeSessionResult<FlashCardTask.Submit>> {
+    ) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>> {
 
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
@@ -356,7 +356,7 @@ extension PracticeSession.DatabaseRepository {
                             let score = ScoreEvaluater.shared
                                 .compress(score: submit.knowledge, range: 0...4)
 
-                            let result = PracticeSessionResult(
+                            let result = TaskSessionResult(
                                 result:     submit,
                                 score:      score,
                                 progress:   0
@@ -541,7 +541,7 @@ extension PracticeSession.DatabaseRepository {
 
     static func register<T: Content>(
         _ submitResult: TaskSubmitResult,
-        result: PracticeSessionResult<T>,
+        result: TaskSessionResult<T>,
         in session: PracticeSessionRepresentable,
         by user: User,
         on conn: DatabaseConnectable
@@ -624,7 +624,7 @@ extension PracticeSession.DatabaseRepository {
     }
 
     public static func save(answer: TaskAnswer, to sessionID: PracticeSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-        try PracticeSessionAnswer(
+        try TaskSessionAnswer(
             sessionID: sessionID,
             taskAnswerID: answer.requireID()
         )

@@ -95,7 +95,7 @@ class FlashCardTaskTests: VaporTestCase {
             let answerSet = Set(answers.map { $0.answer })
             let taskIDSet = Set(answers.map { $0.taskID })
 
-            let sessionAnswers = try PracticeSessionAnswer.query(on: conn).all().wait()
+            let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
 
             XCTAssertEqual(answers.count, 2)
             XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })

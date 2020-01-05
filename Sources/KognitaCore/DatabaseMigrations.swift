@@ -46,8 +46,7 @@ public class DatabaseMigrations {
         migrations.add(model: TestSession.self,                     database: .psql)
         migrations.add(model: SubjectTest.self,                     database: .psql)
         migrations.add(model: SubjectTest.Pivot.Task.self,          database: .psql)
-        migrations.add(model: SubjectTestAnswer.self,               database: .psql)
-        migrations.add(model: PracticeSessionAnswer.self,           database: .psql)
+        migrations.add(model: TaskSessionAnswer.self,               database: .psql)
     }
 
     static func extraDatabase(migrations: inout MigrationConfig) {

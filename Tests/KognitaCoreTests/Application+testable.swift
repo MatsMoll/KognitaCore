@@ -109,6 +109,7 @@ struct EmptyContent: Content {}
 private func setupDatabase(for enviroment: Environment, in services: inout Services) {
 
     // Configure a PostgreSQL database
+    services.register(DatabaseConnectionPoolConfig(maxConnections: 1))
 
     let hostname = Environment.get("DATABASE_HOSTNAME") ?? "localhost"
     let username = Environment.get("DATABASE_USER") ?? "matsmollestad"

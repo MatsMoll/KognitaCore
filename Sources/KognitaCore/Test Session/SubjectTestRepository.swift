@@ -19,6 +19,7 @@ extension SubjectTest {
 
         public enum Errors: Error {
             case testIsClosed
+            case alreadyEntered
         }
 
         static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
@@ -68,11 +69,27 @@ extension SubjectTest {
             guard test.isOpen else {
                 throw Errors.testIsClosed
             }
-            return try TestSession(
-                testID: test.requireID(),
-                userID: user.requireID()
-            )
-            .save(on: conn)
+            return try TestSession.query(on: conn)
+                .join(\TaskSession.id, to: \TestSession.id)
+                .filter(\TaskSession.userID == user.requireID())
+                .filter(\TestSession.testID == test.requireID())
+                .first()
+                .flatMap { session in
+
+                    guard session == nil else {
+                        throw Errors.alreadyEntered
+                    }
+                    return try TaskSession(userID: user.requireID())
+                        .create(on: conn)
+                        .flatMap { session in
+
+                            try TestSession(
+                                sessionID: session.requireID(),
+                                testID: test.requireID()
+                            )
+                            .create(on: conn)
+                    }
+            }
         }
     }
 }

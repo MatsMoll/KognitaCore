@@ -22,12 +22,10 @@ public protocol RenderTaskPracticing {
     ///
     /// - Returns:
     ///     A renderd `View` of the task
-    func render(session: PracticeSession, for user: User, on conn: DatabaseConnectable) throws -> Future<HTTPResponse>
+    func render(session: PracticeSession, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<HTTPResponse>
 }
 
-public final class PracticeSessionResult<T: Content>: Content, TaskSubmitResultable {
-
-    public var change: Double?
+public final class TaskSessionResult<T: Content>: Content, TaskSubmitResultable {
 
     public let score: Double
 
@@ -39,12 +37,10 @@ public final class PracticeSessionResult<T: Content>: Content, TaskSubmitResulta
     init(
         result: T,
         score: Double,
-        progress: Double,
-        change: Double? = nil
+        progress: Double
     ) {
         self.result = result
         self.score = score
-        self.progress = progress
-        self.change = change        
+        self.progress = progress        
     }
 }

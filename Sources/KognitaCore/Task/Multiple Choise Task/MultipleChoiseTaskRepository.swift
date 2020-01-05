@@ -228,10 +228,10 @@ extension MultipleChoiseTask.DatabaseRepository {
 
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
     static func evaluate(
-        _ submit: MultipleChoiseTask.Submit,
+        _ choises: [MultipleChoiseTaskChoise.ID],
         for task: MultipleChoiseTask,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    ) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         return try task.choises
             .query(on: conn)
@@ -239,51 +239,63 @@ extension MultipleChoiseTask.DatabaseRepository {
             .all()
             .map { correctChoises in
 
-                var numberOfCorrect = 0
-                var numberOfIncorrect = 0
-                var missingAnswers = correctChoises
-                var results = [MultipleChoiseTaskChoise.Result]()
-
-                for choise in submit.choises {
-                    if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
-                        numberOfCorrect += 1
-                        missingAnswers.remove(at: index)
-                        results.append(.init(id: choise, isCorrect: true))
-                    } else {
-                        numberOfIncorrect += 1
-                        results.append(.init(id: choise, isCorrect: false))
-                    }
-                }
-                try results += missingAnswers.map {
-                    try .init(id: $0.requireID(), isCorrect: true)
-                }
-
-                let score = Double(numberOfCorrect) / Double(correctChoises.count)
-
-                return PracticeSessionResult(
-                    result: results,
-                    score: score,
-                    progress: 0
-                )
+                try evaluate(choises, agenst: correctChoises)
         }
     }
 
-    public static func createAnswer(
-        in sessionID: PracticeSession.ID,
-        with submit: MultipleChoiseTask.Submit,
-        on conn: DatabaseConnectable
-    ) -> EventLoopFuture<Void> {
-        
-        submit.choises.map { choise in
-            TaskAnswer()
-                .save(on: conn)
-                .flatMap {
-                    try MultipleChoiseTaskAnswer(answerID: $0.requireID(), choiseID: choise)
-                        .create(on: conn)
+    /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
+    static func evaluate(
+        _ choises: [MultipleChoiseTaskChoise.ID],
+        agenst correctChoises: [MultipleChoiseTaskChoise]
+    ) throws -> TaskSessionResult<[MultipleChoiseTaskChoise.Result]> {
+
+        var numberOfCorrect = 0
+        var numberOfIncorrect = 0
+        var missingAnswers = correctChoises.filter({ $0.isCorrect })
+        var results = [MultipleChoiseTaskChoise.Result]()
+
+        for choise in choises {
+            if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
+                numberOfCorrect += 1
+                missingAnswers.remove(at: index)
+                results.append(.init(id: choise, isCorrect: true))
+            } else {
+                numberOfIncorrect += 1
+                results.append(.init(id: choise, isCorrect: false))
             }
         }
+        try results += missingAnswers.map {
+            try .init(id: $0.requireID(), isCorrect: true)
+        }
+
+        let score = Double(numberOfCorrect) / Double(correctChoises.count)
+
+        return TaskSessionResult(
+            result: results,
+            score: score,
+            progress: 0
+        )
+    }
+
+    public static func create(
+        answer submit: MultipleChoiseTask.Submit,
+        on conn: DatabaseConnectable
+    ) -> EventLoopFuture<[TaskAnswer]> {
+        
+        submit.choises.map { choise in
+            createAnswer(choiseID: choise, on: conn)
+        }
         .flatten(on: conn)
-        .transform(to: ())
+    }
+
+    public static func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskAnswer> {
+        TaskAnswer()
+            .save(on: conn)
+            .flatMap { answer in
+                try MultipleChoiseTaskAnswer(answerID: answer.requireID(), choiseID: choiseID)
+                    .create(on: conn)
+                    .transform(to: answer)
+        }
     }
 }
 

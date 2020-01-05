@@ -182,7 +182,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         _ = try PracticeSession.DatabaseRepository
             .submit(secondSubmit, in: representable, by: user, on: conn).wait()
 
-        let sessionAnswers = try PracticeSessionAnswer.query(on: conn).all().wait()
+        let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
 
         let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
         XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
