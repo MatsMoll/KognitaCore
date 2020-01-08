@@ -9,13 +9,13 @@ class SubjectTestTests: VaporTestCase {
 
     func testCreateTest() throws {
 
-        let opensAt: Date = .now
+        let scheduledAt: Date = .now
         let duration: TimeInterval = .minutes(20)
         let numberOfTasks = 3
 
         do {
             let test = try setupTestWithTasks(
-                openingAt: opensAt,
+                scheduledAt: scheduledAt,
                 duration: duration,
                 numberOfTasks: numberOfTasks
             )
@@ -24,8 +24,8 @@ class SubjectTestTests: VaporTestCase {
                 .all()
                 .wait()
 
-            XCTAssertEqual(test.opensAt, opensAt)
-            XCTAssertEqual(test.endedAt, opensAt.addingTimeInterval(duration))
+            XCTAssertEqual(test.scheduledAt, scheduledAt)
+            XCTAssertEqual(test.duration, duration)
             XCTAssertEqual(testTasks.count, numberOfTasks)
         } catch {
             XCTFail(error.localizedDescription)
@@ -36,7 +36,9 @@ class SubjectTestTests: VaporTestCase {
         let data = SubjectTest.Create.Data(
             tasks: [],
             duration: .minutes(10),
-            opensAt: .now
+            scheduledAt: .now,
+            password: "password",
+            title: "Testing"
         )
         XCTAssertThrowsError(
             _ = try SubjectTest.DatabaseRepository.create(from: data, by: nil, on: conn).wait()
@@ -48,24 +50,50 @@ class SubjectTestTests: VaporTestCase {
         let data = SubjectTest.Create.Data(
             tasks: [],
             duration: .minutes(10),
-            opensAt: .now
+            scheduledAt: .now,
+            password: "password",
+            title: "Testing"
         )
         XCTAssertThrowsError(
             _ = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
         )
     }
 
-    func testStartingTestWhenClosed() throws {
+    func testOpeningTestWhenUnprivileged() throws {
+        let user = try User.create(role: .user, on: conn)
+
+        let test = try setupTestWithTasks()
+        XCTAssertThrowsError(
+            try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+        )
+    }
+
+    func testEnteringTestWhenClosed() throws {
 
         let user = try User.create(on: conn)
 
         do {
             let test = try setupTestWithTasks(
-                openingAt: Date().addingTimeInterval(.minutes(2))
+                scheduledAt: Date().addingTimeInterval(.minutes(2))
             )
             XCTAssertThrowsError(
                 try SubjectTest.DatabaseRepository
-                    .enter(test: test, by: user, on: conn).wait()
+                    .enter(test: test, with: enterRequest, by: user, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testEnteringWithIncorrectPassword() throws {
+
+        let user = try User.create(on: conn)
+
+        do {
+            let test = try setupTestWithTasks()
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository
+                    .enter(test: test, with: .init(password: "incorrect"), by: user, on: conn).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -80,8 +108,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -144,7 +172,7 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: user, on: conn).wait()
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
 
             let firstSubmittion             = try submittionAt(index: 1, for: test)
@@ -180,8 +208,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -193,7 +221,7 @@ class SubjectTestTests: VaporTestCase {
 
             XCTAssertThrowsError(
                 _ = try SubjectTest.DatabaseRepository
-                    .enter(test: test, by: userOne, on: conn).wait()
+                    .enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
             )
 
             let sessions = try TestSession.query(on: conn).all().wait()
@@ -211,8 +239,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -290,7 +318,7 @@ class SubjectTestTests: VaporTestCase {
         )
     }
 
-    func setupTestWithTasks(openingAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
+    func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
         let subtopic = try Subtopic.create(on: conn)
         let taskIds = try (0..<numberOfTasks).map { _ in
             try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
@@ -303,29 +331,37 @@ class SubjectTestTests: VaporTestCase {
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
-            tasks: taskIds,
-            duration: duration,
-            opensAt: openingAt
+            tasks:          taskIds,
+            duration:       duration,
+            scheduledAt:    scheduledAt,
+            password:       "password",
+            title:          "Testing"
         )
 
-        return try SubjectTest.DatabaseRepository
-            .create(from: data, by: user, on: conn).wait()
+        if scheduledAt.timeIntervalSinceNow < 0 {
+            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            return try test.open(on: conn).wait()
+        } else {
+            return try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+        }
+    }
+
+    var enterRequest: SubjectTest.Enter.Request {
+        .init(password: "password")
     }
 
     static let allTests = [
-        ("testCreateTest", testCreateTest),
-        ("testCreateTestUnauthorized", testCreateTestUnauthorized),
-        ("testCreateTestUnprivileged", testCreateTestUnprivileged),
-        ("testStartingTestWhenClosed", testStartingTestWhenClosed),
-        ("testUpdateAnswerInSession", testUpdateAnswerInSession),
-        ("testSubmittingAndUpdatingAnswerMultipleUsers", testSubmittingAndUpdatingAnswerMultipleUsers),
-        ("testEnteringMultipleTimes", testEnteringMultipleTimes),
-        ("testSubmittingTestSession", testSubmittingTestSession)
+        ("testCreateTest",                                  testCreateTest),
+        ("testCreateTestUnauthorized",                      testCreateTestUnauthorized),
+        ("testCreateTestUnprivileged",                      testCreateTestUnprivileged),
+        ("testOpeningTestWhenUnprivileged",                 testOpeningTestWhenUnprivileged),
+        ("testEnteringTestWhenClosed",                      testEnteringTestWhenClosed),
+        ("testEnteringWithIncorrectPassword",               testEnteringWithIncorrectPassword),
+        ("testUpdateAnswerInSession",                       testUpdateAnswerInSession),
+        ("testSubmittingAndUpdatingAnswerMultipleUsers",    testSubmittingAndUpdatingAnswerMultipleUsers),
+        ("testEnteringMultipleTimes",                       testEnteringMultipleTimes),
+        ("testSubmittingTestSession",                       testSubmittingTestSession)
     ]
-}
-
-extension Date {
-    static var now: Date { Date() }
 }
 
 extension TimeInterval {

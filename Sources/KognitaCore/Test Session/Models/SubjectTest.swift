@@ -8,40 +8,65 @@ public final class SubjectTest: KognitaPersistenceModel {
     /// The session id
     public var id: Int?
 
-    /// The date the session was ended
-    public private(set) var endedAt: Date
-
-    /// The time the test is possible to start
-    public var opensAt: Date
-
     /// The date when the session was started
     public var createdAt: Date?
 
     public var updatedAt: Date?
 
-    public var isOpen: Bool { opensAt.timeIntervalSinceNow < 0 && endedAt.timeIntervalSinceNow > 0 }
+
+    /// The duratino of the test
+    public var duration: TimeInterval
+
+    /// The time the test is open for entering
+    public var openedAt: Date?
+
+    /// The date the test is suppose to be held at
+    public var scheduledAt: Date
+
+    /// The password that is needed in order to enter
+    public var password: String
+
+    /// A title describing the test
+    public var title: String
 
 
-    init(opensAt: Date, duration: TimeInterval) {
-        self.opensAt = opensAt
-        self.endedAt = opensAt.addingTimeInterval(abs(duration))
+    public var isOpen: Bool {
+        guard let openedAt = openedAt else {
+            return false
+        }
+        let endsAt = openedAt.addingTimeInterval(abs(duration))
+        return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
+    }
+
+
+    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String) {
+        self.scheduledAt    = scheduledAt
+        self.duration       = duration
+        self.password       = password
+        self.title          = title
     }
 
     convenience init(data: SubjectTest.Create.Data) {
-        self.init(opensAt: data.opensAt, duration: data.duration)
+        self.init(
+            scheduledAt:    data.scheduledAt,
+            duration:       data.duration,
+            password:       data.password,
+            title:          data.title
+        )
     }
 
-    public func update(duration: TimeInterval) {
-        self.endedAt = opensAt.addingTimeInterval(abs(duration))
-    }
-
-    public func update(with content: Update.Data) -> SubjectTest {
-        self.opensAt = content.opensAt
-        self.update(duration: content.duration)
+    public func update(with data: Update.Data) -> SubjectTest {
+        self.scheduledAt    = data.scheduledAt
+        self.duration       = data.duration
+        self.password       = data.password
+        self.title          = data.title
         return self
     }
 
-    public static var deletedAtKey: WritableKeyPath<SubjectTest, Date>? = \.endedAt
+    public func open(on conn: DatabaseConnectable) -> EventLoopFuture<SubjectTest> {
+        self.openedAt = .now
+        return self.save(on: conn)
+    }
 }
 
 
@@ -50,11 +75,23 @@ extension SubjectTest {
         public struct Data: Decodable {
             let tasks: [Task.ID]
             let duration: TimeInterval
-            let opensAt: Date
+            let scheduledAt: Date
+            let password: String
+            let title: String
         }
 
         public typealias Response = SubjectTest
     }
 
     public typealias Update = Create
+
+    public enum Enter {
+        public struct Request: Decodable {
+            let password: String
+        }
+    }
+}
+
+extension Date {
+    public static var now: Date { Date() }
 }

@@ -20,6 +20,7 @@ extension SubjectTest {
         public enum Errors: Error {
             case testIsClosed
             case alreadyEntered
+            case incorrectPassword
         }
 
         static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
@@ -65,9 +66,12 @@ extension SubjectTest {
             }
         }
 
-        static func enter(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession> {
+        static func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession> {
             guard test.isOpen else {
                 throw Errors.testIsClosed
+            }
+            guard test.password == request.password else {
+                throw Errors.incorrectPassword
             }
             return try TestSession.query(on: conn)
                 .join(\TaskSession.id, to: \TestSession.id)
@@ -90,6 +94,13 @@ extension SubjectTest {
                             .create(on: conn)
                     }
             }
+        }
+
+        static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
+            guard user.isCreator else {
+                throw Abort(.forbidden)
+            }
+            return test.open(on: conn)
         }
     }
 }
