@@ -38,6 +38,9 @@ public final class User: KognitaCRUDModel, UserContent {
     /// The role of the User
     public private(set) var role: Role
 
+    /// A bool determing if the User has access to the practice mode
+    public var canPractice: Bool
+
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
 
@@ -50,12 +53,13 @@ public final class User: KognitaCRUDModel, UserContent {
 //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, username: String, email: String, passwordHash: String, role: Role) {
+    init(id: Int? = nil, username: String, email: String, passwordHash: String, role: Role, canPractice: Bool) {
         self.id = id
         self.username = username
         self.email = email.lowercased()
         self.passwordHash = passwordHash
         self.role = role
+        self.canPractice = canPractice
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
@@ -121,7 +125,8 @@ extension User {
                     username: "Unknown",
                     email: "unknown@kognita.no",
                     passwordHash: hash,
-                    role: .user
+                    role: .user,
+                    canPractice: true
                 )
                     .create(on: conn)
                     .transform(to: ())
