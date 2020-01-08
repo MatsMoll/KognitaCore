@@ -333,8 +333,8 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    static func createResult(from result: TaskSubmitResultRepresentable, by user: User, on conn: DatabaseConnectable, in session: PracticeSessionRepresentable? = nil) throws -> EventLoopFuture<TaskResult> {
-        return try TaskResult(result: result, userID: user.requireID(), sessionID: session?.requireID())
+    static func createResult(from result: TaskSubmitResultRepresentable, by user: User, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult> {
+        return try TaskResult(result: result, userID: user.requireID(), sessionID: sessionID)
             .save(on: conn)
     }
 

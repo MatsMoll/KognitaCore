@@ -66,7 +66,7 @@ extension TaskResult: Migration {
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-            builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .setNull)
+            builder.reference(from: \.sessionID, to: \TaskSession.id, onUpdate: .cascade, onDelete: .setNull)
 
             builder.unique(on: \.sessionID, \.taskID)
         }.flatMap {

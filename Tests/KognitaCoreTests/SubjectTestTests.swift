@@ -243,6 +243,17 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(results.count, 5)
             XCTAssertNotNil(sessionOneEntry.submittedAt)
             XCTAssertNotNil(sessionTwoEntry.submittedAt)
+            XCTAssertEqual(results.filter({ $0.sessionID == sessionOneEntry.id }).count, 3)
+            XCTAssertEqual(results.filter({ $0.sessionID == sessionTwoEntry.id }).count, 2)
+
+            // Should throw when submtting an answer after submitting results
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            )
+            // Should throw when submtting the second time
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+            )
         } catch {
             XCTFail(error.localizedDescription)
         }

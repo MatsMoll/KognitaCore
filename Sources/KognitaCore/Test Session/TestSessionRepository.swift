@@ -51,7 +51,6 @@ extension TestSession {
             guard session.submittedAt == nil else {
                 throw Abort(.badRequest)
             }
-            try print("-- Submitting to: \(session.requireID())")
             return SubjectTest.find(session.testID, on: conn)
                 .unwrap(or: Abort(.badRequest))
                 .flatMap { test in
@@ -70,7 +69,6 @@ extension TestSession {
                             return update(answer: content, for: session, by: user, on: conn)
                                 .catchFlatMap { _ in
 
-                                    try print("-- Creating ansers for: \(session.requireID())")
                                     return MultipleChoiseTask.DatabaseRepository
                                         .create(answer: content, on: conn)
                                         .flatMap { answers in
@@ -103,10 +101,8 @@ extension TestSession {
                         .all(decoding: MultipleChoiseTaskAnswer.self, TaskAnswer.self)
                         .flatMap { answers in
                             guard answers.isEmpty == false else {
-                                try print("-- Aborting for: \(session.requireID())")
                                 throw Abort(.badRequest)
                             }
-                            try print("-- Updating for: \(session.requireID())")
                             let choisesIDs = answers.map { $0.0.choiseID }
                             return content.choises
                                 .changes(from: choisesIDs)
@@ -154,7 +150,6 @@ extension TestSession {
         }
 
         static func save(answer: TaskAnswer, to sessionID: TestSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-            print("-- Saving to: \(sessionID)")
             return try TaskSessionAnswer(
                 sessionID: sessionID,
                 taskAnswerID: answer.requireID()
@@ -229,7 +224,7 @@ extension TestSession {
                             .flatMap { results in
                                 try results.map { result in
                                     try TaskResult.DatabaseRepository
-                                        .createResult(from: result, by: user, on: psqlConn)
+                                        .createResult(from: result, by: user, with: test.requireID(), on: psqlConn)
                                 }
                                 .flatten(on: psqlConn)
                             }
