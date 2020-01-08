@@ -333,7 +333,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    static func createResult(from result: TaskSubmitResult, by user: User, on conn: DatabaseConnectable, in session: PracticeSessionRepresentable? = nil) throws -> EventLoopFuture<TaskResult> {
+    static func createResult(from result: TaskSubmitResultRepresentable, by user: User, on conn: DatabaseConnectable, in session: PracticeSessionRepresentable? = nil) throws -> EventLoopFuture<TaskResult> {
         return try TaskResult(result: result, userID: user.requireID(), sessionID: session?.requireID())
             .save(on: conn)
     }
@@ -455,10 +455,17 @@ extension TaskResult.DatabaseRepository {
     }
 }
 
-struct TaskSubmitResult {
+public protocol TaskSubmitResultRepresentable: TaskSubmitResultable, TaskSubmitable {
+    var taskID: Task.ID { get }
+}
+
+struct TaskSubmitResult: TaskSubmitResultRepresentable {
     public let submit: TaskSubmitable
     public let result: TaskSubmitResultable
     public let taskID: Task.ID
+
+    var timeUsed: TimeInterval?     { submit.timeUsed }
+    var score: Double               { result.score }
 }
 
 extension User {

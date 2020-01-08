@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 public protocol TaskSubmitable {
-    var timeUsed: TimeInterval { get }
+    var timeUsed: TimeInterval? { get }
 }
 
 public protocol TaskSubmitResultable {
@@ -38,16 +38,16 @@ public final class TaskResult: PostgreSQLModel, Codable {
 
     public var resultScore: Double
 
-    public var timeUsed: TimeInterval
+    public var timeUsed: TimeInterval?
 
     public var sessionID: TaskSession.ID?
 
 
-    init(result: TaskSubmitResult, userID: User.ID, sessionID: TaskSession.ID? = nil) {
+    init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.ID? = nil) {
         self.taskID = result.taskID
         self.userID = userID
-        self.timeUsed = result.submit.timeUsed
-        self.resultScore = result.result.score.clamped(to: 0...1)
+        self.timeUsed = result.timeUsed
+        self.resultScore = result.score.clamped(to: 0...1)
         self.sessionID = sessionID
 
         let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: resultScore)

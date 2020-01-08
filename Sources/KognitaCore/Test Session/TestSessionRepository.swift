@@ -191,40 +191,51 @@ extension TestSession {
             let count: Int
         }
 
-        static func submit(test: TestSession, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        static func submit(test: TestSession, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard test.submittedAt == nil else {
                 throw Abort(.badRequest)
             }
+
             test.submittedAt = Date()
 
-            return conn.databaseConnection(to: .psql)
-                .flatMap { conn in
+            return test.save(on: conn)
+                .flatMap { _ in
+                    conn.databaseConnection(to: .psql)
+                        .flatMap { psqlConn in
 
-                    try conn.select()
-                        .all(table: MultipleChoiseTaskChoise.self)
-                        .column(.count(\MultipleChoiseTaskChoise.isCorrect), as: "count")
-                        .from(TaskSessionAnswer.self)
-                        .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
-                        .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
-                        .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
-                        .where(\TaskSessionAnswer.sessionID == test.requireID())
-                        .groupBy(\MultipleChoiseTaskChoise.id)
-                        .all(decoding: MultipleChoiseTaskChoise.self, Test.self)
-                        .map {
-                            print($0)
+                            try psqlConn.select()
+                                .all(table: MultipleChoiseTaskChoise.self)
+                                .from(TaskSessionAnswer.self)
+                                .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
+                                .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
+                                .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
+                                .where(\TaskSessionAnswer.sessionID == test.requireID())
+                                .all(decoding: MultipleChoiseTaskChoise.self)
+                                .flatMap { choises in
+                                    choises.group(by: \.taskId)
+                                        .map { taskID, choises in
+
+                                            MultipleChoiseTask.DatabaseRepository
+                                                .choisesFor(taskID: taskID, on: psqlConn)
+                                                .map { correctChoises in
+
+                                                    try MultipleChoiseTask.DatabaseRepository
+                                                        .evaluate(choises.map { try $0.requireID() }, agenst: correctChoises)
+                                                        .representableWith(taskID: taskID)
+                                            }
+                                    }
+                                    .flatten(on: psqlConn)
+                            }
+                            .flatMap { results in
+                                try results.map { result in
+                                    try TaskResult.DatabaseRepository
+                                        .createResult(from: result, by: user, on: psqlConn)
+                                }
+                                .flatten(on: psqlConn)
+                            }
+                            .transform(to: ())
                     }
             }
-//            return try TaskSessionAnswer.query(on: conn)
-//                .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
-//                .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
-//                .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
-//                .filter(\TaskSessionAnswer.sessionID == test.requireID())
-//                .filter(\MultipleChoiseTaskChoise.isCorrect == true)
-//                .decode(MultipleChoiseTaskChoise.self)
-//                .all()
-//                .flatMap { (choises: [MultipleChoiseTaskChoise]) in
-//                    return conn.future()
-//            }
         }
     }
 }

@@ -297,6 +297,12 @@ extension MultipleChoiseTask.DatabaseRepository {
                     .transform(to: answer)
         }
     }
+
+    public static func choisesFor(taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[MultipleChoiseTaskChoise]> {
+        MultipleChoiseTaskChoise.query(on: conn)
+            .filter(\.taskId == taskID)
+            .all()
+    }
 }
 
 

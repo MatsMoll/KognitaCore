@@ -208,12 +208,6 @@ class SubjectTestTests: VaporTestCase {
         let userOne = try User.create(on: conn)
         let userTwo = try User.create(on: conn)
 
-        var taskAnswer = MultipleChoiseTask.Submit(
-            timeUsed: .seconds(20),
-            choises: [2],
-            taskIndex: 1
-        )
-
         do {
             let test = try setupTestWithTasks()
 
@@ -223,21 +217,32 @@ class SubjectTestTests: VaporTestCase {
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
 
-            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+            let firstSubmittion     = try submittionAt(index: 1, for: test)
+            let secondSubmittion    = try submittionAt(index: 2, for: test)
+            let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            taskAnswer.taskIndex = 2
-            try TestSession.DatabaseRepository
-                .submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            taskAnswer.taskIndex = 3
-            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: taskAnswer, for: sessionTwo, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
 
-            _ = try TestSession.DatabaseRepository.submit(test: sessionOneEntry, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            let sessions = try TestSession.query(on: conn).all().wait()
-            XCTAssertEqual(sessions.count, 2)
+            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+
+            var results = try TaskResult.query(on: conn).all().wait()
+
+            XCTAssertEqual(results.count, 3)
+            XCTAssertNotNil(sessionOneEntry.submittedAt)
+            XCTAssertNil(sessionTwoEntry.submittedAt)
+
+            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+            results = try TaskResult.query(on: conn).all().wait()
+
+            XCTAssertEqual(results.count, 5)
+            XCTAssertNotNil(sessionOneEntry.submittedAt)
+            XCTAssertNotNil(sessionTwoEntry.submittedAt)
         } catch {
             XCTFail(error.localizedDescription)
         }

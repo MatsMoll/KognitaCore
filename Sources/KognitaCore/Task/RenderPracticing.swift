@@ -43,4 +43,16 @@ public final class TaskSessionResult<T: Content>: Content, TaskSubmitResultable 
         self.score = score
         self.progress = progress        
     }
+
+    public struct Representable: TaskSubmitResultRepresentable {
+        public let result: TaskSessionResult
+        public let taskID: Task.ID
+
+        public var timeUsed: TimeInterval? { nil }
+        public var score: Double { result.score }
+    }
+
+    func representableWith(taskID: Task.ID) -> Representable {
+        .init(result: self, taskID: taskID)
+    }
 }
