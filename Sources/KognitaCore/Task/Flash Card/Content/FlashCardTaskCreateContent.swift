@@ -21,7 +21,7 @@ extension FlashCardTask {
 
             public let solution: String
 
-            public var isExaminable: Bool
+            public var isTestable: Bool
 
             public var examPaperSemester: Task.ExamSemester?
 
@@ -34,9 +34,7 @@ extension FlashCardTask {
                 guard !solution.isEmpty else {
                     throw Abort(.badRequest)
                 }
-                examPaperYear = nil
-                examPaperSemester = nil
-                isExaminable = false
+                isTestable = false
             }
         }
         

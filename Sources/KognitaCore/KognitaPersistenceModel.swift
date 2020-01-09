@@ -86,6 +86,7 @@ public protocol KognitaCRUDModel : KognitaPersistenceModel {
 
 public protocol SoftDeleatableModel : KognitaPersistenceModel {
 
+    /// The date a modal was deleted at
     var deletedAt: Date? { get set }
 }
 

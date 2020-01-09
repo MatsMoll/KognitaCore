@@ -25,7 +25,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -63,7 +63,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -85,7 +85,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -120,7 +120,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: startingMultiple.isMultipleSelect,
             examPaperSemester: startingTask.examPaperSemester,
             examPaperYear: startingTask.examPaperYear,
-            isExaminable: startingTask.isExaminable,
+            isTestable: startingTask.isTestable,
             choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
         )
 

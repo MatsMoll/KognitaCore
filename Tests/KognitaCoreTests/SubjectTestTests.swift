@@ -212,7 +212,8 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
             XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
             XCTAssertEqual(userOneTaskContent.choises.count, 3)
-            XCTAssertTrue(userOneTaskContent.choises.contains(where: { $0.isCorrect && $0.isSelected }))
+            XCTAssertEqual(userOneTaskContent.choises.filter({ $0.isCorrect && $0.isSelected }).count, 1)
+
 
             XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
             XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)

@@ -21,7 +21,7 @@ class FlashCardTaskTests: VaporTestCase {
             description: nil,
             question: "Test",
             solution: "Some solution",
-            isExaminable: false,
+            isTestable: false,
             examPaperSemester: nil,
             examPaperYear: nil
         )
