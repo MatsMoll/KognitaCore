@@ -211,7 +211,7 @@ extension TestSession {
                                         .map { taskID, choises in
 
                                             MultipleChoiseTask.DatabaseRepository
-                                                .choisesFor(taskID: taskID, on: psqlConn)
+                                                .correctChoisesFor(taskID: taskID, on: psqlConn)
                                                 .map { correctChoises in
 
                                                     try MultipleChoiseTask.DatabaseRepository
@@ -229,6 +229,68 @@ extension TestSession {
                                 .flatten(on: psqlConn)
                             }
                             .transform(to: ())
+                    }
+            }
+        }
+
+
+        public static func results(in test: SubjectTest, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+
+            return try TestSession.query(on: conn)
+                .join(\TaskSession.id, to: \TestSession.id)
+                .join(\SubjectTest.id, to: \TestSession.testID)
+                .join(\TaskResult.sessionID, to: \TestSession.id)
+                .filter(\TaskSession.userID == user.requireID())
+                .filter(\TestSession.testID == test.requireID())
+                .decode(SubjectTest.self)
+                .alsoDecode(TaskResult.self)
+                .all()
+                .flatMap { results in
+
+                    guard let test = results.first?.0 else {
+                        throw Abort(.internalServerError)
+                    }
+
+                    return try SubjectTest.Pivot.Task.query(on: conn)
+                        .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
+                        .join(\Subtopic.id, to: \Task.subtopicID)
+                        .join(\Topic.id, to: \Subtopic.topicId)
+                        .filter(\.testID == test.requireID())
+                        .decode(Task.self)
+                        .alsoDecode(Topic.self)
+                        .all()
+                        .map { tasks in
+
+                            // Registrating the score for a given task
+                            let taskResults = results.reduce(
+                                into: [Task.ID : Double]()
+                            ) { taskResults, result in
+                                taskResults[result.1.taskID] = result.1.resultScore
+                            }
+
+                            return Results(
+                                testTitle: test.title,
+                                executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
+                                shouldPresentDetails: false,
+                                topicResults: tasks.group(by: \.1.id) // Grouping by topic id
+                                    .compactMap { (_, topicTasks) in
+
+                                        guard let topic = topicTasks.first?.1 else {
+                                            return nil
+                                        }
+
+                                        return Results.Topic(
+                                            name: topic.name,
+                                            taskResults: topicTasks.map { task in
+                                                // Calculating the score for a given task and defaulting to 0 in score
+                                                Results.Task(
+                                                    question: task.0.question,
+                                                    score: taskResults[task.0.id ?? 0] ?? 0
+                                                )
+                                            }
+                                        )
+                                }
+                            )
                     }
             }
         }
