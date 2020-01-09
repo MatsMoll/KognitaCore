@@ -97,6 +97,47 @@ extension SubjectTest {
 
         public var hasEveryoneCompleted: Bool { amountOfEnteredUsers == amountOfCompletedUsers }
     }
+
+    public struct MultipleChoiseTaskContent: Decodable {
+
+        public struct Choise: Decodable {
+            let choise: String
+            let isCorrect: Bool
+            let isSelected: Bool
+        }
+
+        public struct TestTask: Decodable {
+            let testTaskID: SubjectTest.Pivot.Task.ID
+            let isCurrent: Bool
+        }
+
+        public let task: Task
+        public let isMultipleSelect: Bool
+        public let choises: [Choise]
+
+        public let testTasks: [TestTask]
+
+        init(task: Task, multipleChoiseTask: KognitaCore.MultipleChoiseTask, choises: [MultipleChoiseTaskChoise], selectedChoises: [MultipleChoiseTaskAnswer], testTasks: [SubjectTest.Pivot.Task]) {
+            self.task = task
+            self.isMultipleSelect = multipleChoiseTask.isMultipleSelect
+            self.choises = choises.map { choise in
+                Choise(
+                    choise: choise.choise,
+                    isCorrect: choise.isCorrect,
+                    isSelected: selectedChoises.contains(where: { $0.choiseID == choise.id })
+                )
+            }
+            self.testTasks = testTasks.compactMap { testTask in
+                guard let taskID = testTask.id else {
+                    return nil
+                }
+                return TestTask(
+                    testTaskID: taskID,
+                    isCurrent: taskID == task.id
+                )
+            }
+        }
+    }
 }
 
 extension Date {

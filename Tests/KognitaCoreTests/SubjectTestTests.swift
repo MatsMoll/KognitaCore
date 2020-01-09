@@ -173,6 +173,67 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testRetrivingTaskContent() throws {
+        do {
+            let test = try setupTestWithTasks(numberOfTasks: 3)
+
+            let userOne = try User.create(role: .user, on: conn)
+            let userTwo = try User.create(role: .user, on: conn)
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            let firstSubmittion     = try submittionAt(index: 1, for: test)
+            let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
+
+            var userOneTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionOne, for: userOne, on: conn).wait()
+            var userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userTwo, on: conn).wait()
+
+            XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
+            XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
+            XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
+            XCTAssertTrue(userOneTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+
+            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+            XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
+            XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
+            XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            userOneTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionOne, for: userOne, on: conn).wait()
+            userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userTwo, on: conn).wait()
+
+            XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
+            XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
+            XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
+            XCTAssertEqual(userOneTaskContent.choises.count, 3)
+            XCTAssertTrue(userOneTaskContent.choises.contains(where: { $0.isCorrect && $0.isSelected }))
+
+            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+            XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
+            XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
+            XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+
+            userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 2, in: sessionTwo, for: userTwo, on: conn).wait()
+
+            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+            XCTAssertEqual(userTwoTaskContent.testTasks.filter({ $0.testTaskID == 2 }).first?.isCurrent, true)
+            XCTAssertEqual(userTwoTaskContent.choises.count, 3)
+            XCTAssertEqual(userTwoTaskContent.choises.filter({ $0.isSelected && $0.isCorrect == false }).count, 2)
+
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userOne, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
@@ -243,7 +304,8 @@ class SubjectTestTests: VaporTestCase {
         ("testEnteringTestWhenClosed",                      testEnteringTestWhenClosed),
         ("testEnteringWithIncorrectPassword",               testEnteringWithIncorrectPassword),
         ("testEnteringMultipleTimes",                       testEnteringMultipleTimes),
-        ("testCompletionStatus",                            testCompletionStatus)
+        ("testCompletionStatus",                            testCompletionStatus),
+        ("testRetrivingTaskContent",                        testRetrivingTaskContent)
     ]
 }
 

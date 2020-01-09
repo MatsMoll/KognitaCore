@@ -127,6 +127,59 @@ extension SubjectTest {
 
             }
         }
+
+
+        public static func taskWith(id: SubjectTest.Pivot.Task.ID, in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
+
+            guard try session.userID == user.requireID() else {
+                throw Abort(.forbidden)
+            }
+
+            return SubjectTest.Pivot.Task
+                .query(on: conn)
+                .join(\Task.id,                         to: \SubjectTest.Pivot.Task.taskID)
+                .join(\MultipleChoiseTask.id,           to: \Task.id)
+                .join(\MultipleChoiseTaskChoise.taskId, to: \MultipleChoiseTask.id)
+                .filter(\SubjectTest.Pivot.Task.testID == session.testID)
+                .filter(\SubjectTest.Pivot.Task.id == id)
+                .decode(Task.self)
+                .alsoDecode(MultipleChoiseTask.self)
+                .alsoDecode(MultipleChoiseTaskChoise.self)
+                .all()
+                .flatMap { taskContent in
+
+                    guard
+                        let task = taskContent.first?.0.0,
+                        let multipleChoiseTask = taskContent.first?.0.1
+                    else {
+                        throw Abort(.internalServerError)
+                    }
+
+                    return try TaskSessionAnswer.query(on: conn)
+                        .join(\MultipleChoiseTaskAnswer.id, to: \TaskSessionAnswer.taskAnswerID)
+                        .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
+                        .filter(\TaskSessionAnswer.sessionID == session.requireID())
+                        .filter(\MultipleChoiseTaskChoise.taskId == task.requireID())
+                        .decode(MultipleChoiseTaskAnswer.self)
+                        .all()
+                        .flatMap { answers in
+
+                            SubjectTest.Pivot.Task.query(on: conn)
+                                .filter(\.testID == session.testID)
+                                .all()
+                                .map { testTasks in
+
+                                    SubjectTest.MultipleChoiseTaskContent(
+                                        task: task,
+                                        multipleChoiseTask: multipleChoiseTask,
+                                        choises: taskContent.map { $0.1 },
+                                        selectedChoises: answers,
+                                        testTasks: testTasks
+                                    )
+                            }
+                    }
+            }
+        }
     }
 }
 
