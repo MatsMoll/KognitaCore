@@ -131,6 +131,48 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testCompletionStatus() {
+        do {
+            let test = try setupTestWithTasks()
+
+            let teacher = try User.create(on: conn)
+            let userOne = try User.create(role: .user, on: conn)
+            let userTwo = try User.create(role: .user, on: conn)
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+
+            var status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+
+            // Students / users should not be able to see the completion status of the test
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: userOne, on: conn).wait()
+            )
+
+            XCTAssertEqual(status.amountOfEnteredUsers, 2)
+            XCTAssertEqual(status.amountOfCompletedUsers, 0)
+            XCTAssertEqual(status.hasEveryoneCompleted, false)
+
+            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+
+            status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+
+            XCTAssertEqual(status.amountOfEnteredUsers, 2)
+            XCTAssertEqual(status.amountOfCompletedUsers, 1)
+            XCTAssertEqual(status.hasEveryoneCompleted, false)
+
+            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+
+            status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+
+            XCTAssertEqual(status.amountOfEnteredUsers, 2)
+            XCTAssertEqual(status.amountOfCompletedUsers, 2)
+            XCTAssertEqual(status.hasEveryoneCompleted, true)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
@@ -201,6 +243,7 @@ class SubjectTestTests: VaporTestCase {
         ("testEnteringTestWhenClosed",                      testEnteringTestWhenClosed),
         ("testEnteringWithIncorrectPassword",               testEnteringWithIncorrectPassword),
         ("testEnteringMultipleTimes",                       testEnteringMultipleTimes),
+        ("testCompletionStatus",                            testCompletionStatus)
     ]
 }
 

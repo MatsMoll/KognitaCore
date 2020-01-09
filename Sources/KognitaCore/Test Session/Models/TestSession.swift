@@ -14,6 +14,8 @@ public final class TestSession: KognitaPersistenceModel {
 
     public var testID: SubjectTest.ID
 
+    public var hasSubmitted: Bool { submittedAt != nil }
+
     init(sessionID: TaskSession.ID, testID: SubjectTest.ID) {
         self.id = sessionID
         self.testID = testID

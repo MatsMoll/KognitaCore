@@ -90,6 +90,13 @@ extension SubjectTest {
             let password: String
         }
     }
+
+    public struct CompletionStatus: Decodable {
+        public internal(set) var amountOfCompletedUsers: Int
+        public internal(set) var amountOfEnteredUsers: Int
+
+        public var hasEveryoneCompleted: Bool { amountOfEnteredUsers == amountOfCompletedUsers }
+    }
 }
 
 extension Date {

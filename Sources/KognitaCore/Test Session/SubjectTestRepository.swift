@@ -102,6 +102,31 @@ extension SubjectTest {
             }
             return test.open(on: conn)
         }
+
+        public static func userCompletionStatus(in test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<CompletionStatus> {
+
+            guard user.isCreator else {
+                throw Abort(.forbidden)
+            }
+
+            return try TestSession.query(on: conn)
+                .filter(\.testID == test.requireID())
+                .all()
+                .map { sessions in
+                    sessions.reduce(
+                        into: CompletionStatus(
+                            amountOfCompletedUsers: 0,
+                            amountOfEnteredUsers: 0
+                        )
+                    ) { status, session in
+                        status.amountOfEnteredUsers += 1
+                        if session.hasSubmitted {
+                            status.amountOfCompletedUsers += 1
+                        }
+                    }
+
+            }
+        }
     }
 }
 
