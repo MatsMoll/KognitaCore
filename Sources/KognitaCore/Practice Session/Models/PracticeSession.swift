@@ -98,7 +98,7 @@ extension PracticeSession {
 
     public func taskAt(index: Int, on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
         return try DatabaseRepository
-            .taskAt(index: index, in: self, on: conn)
+            .taskAt(index: index, in: requireID(), on: conn)
     }
     
     public func pathFor(index: Int) throws -> String {
@@ -144,12 +144,12 @@ public struct TaskType: Content {
 extension PracticeSession {
     public struct CurrentTask: Content {
 
-        public let session: PracticeSession
+        public let session: TaskSession.PracticeParameter
         public let task: TaskType
         public let index: Int
         public let user: User.Response
 
-        public init(session: PracticeSession, task: TaskType, index: Int, user: User.Response) {
+        public init(session: TaskSession.PracticeParameter, task: TaskType, index: Int, user: User.Response) {
             self.session = session
             self.task = task
             self.index = index

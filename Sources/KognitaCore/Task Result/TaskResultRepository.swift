@@ -13,12 +13,15 @@ extension TaskResult {
     public class DatabaseRepository: TaskResultRepositoring {}
 }
 
-public protocol PracticeSessionRepresentable {
+public protocol PracticeSessionRepresentable: Codable {
     var userID: User.ID { get }
     var createdAt: Date? { get }
+    var endedAt: Date? { get }
     var numberOfTaskGoal: Int { get }
 
     func requireID() throws -> Int
+
+    func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
 }
 
 extension TaskResult.DatabaseRepository {
