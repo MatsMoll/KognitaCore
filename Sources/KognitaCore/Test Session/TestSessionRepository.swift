@@ -182,10 +182,6 @@ extension TestSession {
                 .all()
         }
 
-        struct Test: Codable {
-            let count: Int
-        }
-
         static func submit(test: TestSession, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard test.submittedAt == nil else {
                 throw Abort(.badRequest)

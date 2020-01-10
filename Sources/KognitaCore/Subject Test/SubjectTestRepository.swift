@@ -21,6 +21,7 @@ extension SubjectTest {
             case testIsClosed
             case alreadyEntered
             case incorrectPassword
+            case testHasNotBeenHeldYet
         }
 
         static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
@@ -100,6 +101,9 @@ extension SubjectTest {
             guard user.isCreator else {
                 throw Abort(.forbidden)
             }
+            guard test.openedAt == nil else {
+                throw Abort(.badRequest)
+            }
             return test.open(on: conn)
         }
 
@@ -177,6 +181,65 @@ extension SubjectTest {
                                         testTasks: testTasks
                                     )
                             }
+                    }
+            }
+        }
+
+        struct MultipleChoiseTaskAnswerCount: Codable {
+            let numberOfAnswers: Int
+        }
+
+        public static func results(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+            guard user.isCreator else {
+                throw Abort(.forbidden)
+            }
+            guard let heldAt = test.openedAt else {
+                throw Errors.testHasNotBeenHeldYet
+            }
+
+            return conn.databaseConnection(to: .psql)
+                .flatMap { conn in
+
+                    try conn.select()
+                        .all(table: Task.self)
+                        .all(table: MultipleChoiseTaskChoise.self)
+                        .column(.count(\MultipleChoiseTaskAnswer.id), as: "numberOfAnswers")
+                        .from(SubjectTest.Pivot.Task.self)
+                        .join(\SubjectTest.Pivot.Task.taskID,   to: \Task.id)
+                        .join(\Task.id,                         to: \MultipleChoiseTaskChoise.taskId)
+                        .join(\MultipleChoiseTaskChoise.id,     to: \MultipleChoiseTaskAnswer.choiseID, method: .left)
+                        .join(\MultipleChoiseTaskAnswer.id,     to: \TaskSessionAnswer.taskAnswerID,    method: .left)
+                        .join(\TaskSessionAnswer.sessionID,     to: \TestSession.id,                    method: .left)
+                        .where(\SubjectTest.Pivot.Task.testID == test.requireID())
+                        .groupBy(\Task.id)
+                        .groupBy(\MultipleChoiseTaskChoise.id)
+                        .all(decoding: Task.self, MultipleChoiseTaskChoise.self, MultipleChoiseTaskAnswerCount.self)
+                        .map { tasks in
+                            return Results(
+                                title: test.title,
+                                heldAt: heldAt,
+                                taskResults: tasks.group(by: \.0.id)
+                                    .compactMap { _, info in
+
+                                        guard let task = info.first?.0 else {
+                                            return nil
+                                        }
+                                        let totalCount = info.reduce(0) { $0 + $1.2.numberOfAnswers }
+
+                                        return try? Results.MultipleChoiseTaskResult(
+                                            taskID: task.requireID(),
+                                            question: task.question,
+                                            choises: info.map { _, choise, count in
+
+                                                Results.MultipleChoiseTaskResult.Choise(
+                                                    choise: choise.choise,
+                                                    numberOfSubmissions: count.numberOfAnswers,
+                                                    percentage: Double(count.numberOfAnswers) / Double(totalCount)
+                                                )
+                                            }
+                                        )
+                                }
+                            )
                     }
             }
         }

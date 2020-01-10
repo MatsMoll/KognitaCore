@@ -138,6 +138,26 @@ extension SubjectTest {
             }
         }
     }
+
+    public struct Results: Decodable {
+
+        public struct MultipleChoiseTaskResult: Decodable {
+
+            public struct Choise: Decodable {
+                let choise: String
+                let numberOfSubmissions: Int
+                let percentage: Double
+            }
+
+            let taskID: Task.ID
+            let question: String
+            let choises: [Choise]
+        }
+
+        let title: String
+        let heldAt: Date
+        let taskResults: [MultipleChoiseTaskResult]
+    }
 }
 
 extension Date {

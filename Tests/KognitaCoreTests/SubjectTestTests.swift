@@ -235,6 +235,71 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testResultStatistics() {
+        do {
+            let test = try setupTestWithTasks()
+
+            let teacher = try User.create(on: conn)
+            let userOne = try User.create(role: .user, on: conn)
+            let userTwo = try User.create(role: .user, on: conn)
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondSubmittion            = try submittionAt(index: 2, for: test)
+            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: secondSubmittionIncorrect, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+
+            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
+
+            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+
+            XCTAssertEqual(result.title, test.title)
+            XCTAssertEqual(result.heldAt, test.openedAt)
+
+            let firstTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == firstTaskID }))
+            XCTAssertEqual(firstTaskResult.choises.count, 3)
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
+
+            let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
+            XCTAssertEqual(secondTaskResult.choises.count, 3)
+            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
+            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
+
+            let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
+            XCTAssertEqual(thirdTaskResult.choises.count, 3)
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
+
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
@@ -254,6 +319,14 @@ class SubjectTestTests: VaporTestCase {
             .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
             .decode(MultipleChoiseTaskChoise.self)
             .all()
+            .wait()
+    }
+
+    func taskID(for subjectTaskID: SubjectTest.Pivot.Task.ID) throws -> Task.ID {
+        try SubjectTest.Pivot.Task
+            .find(subjectTaskID, on: conn)
+            .unwrap(or: Errors.badTest)
+            .map { $0.taskID }
             .wait()
     }
 
@@ -298,15 +371,16 @@ class SubjectTestTests: VaporTestCase {
     }
 
     static let allTests = [
-        ("testCreateTest",                                  testCreateTest),
-        ("testCreateTestUnauthorized",                      testCreateTestUnauthorized),
-        ("testCreateTestUnprivileged",                      testCreateTestUnprivileged),
-        ("testOpeningTestWhenUnprivileged",                 testOpeningTestWhenUnprivileged),
-        ("testEnteringTestWhenClosed",                      testEnteringTestWhenClosed),
-        ("testEnteringWithIncorrectPassword",               testEnteringWithIncorrectPassword),
-        ("testEnteringMultipleTimes",                       testEnteringMultipleTimes),
-        ("testCompletionStatus",                            testCompletionStatus),
-        ("testRetrivingTaskContent",                        testRetrivingTaskContent)
+        ("testCreateTest",                      testCreateTest),
+        ("testCreateTestUnauthorized",          testCreateTestUnauthorized),
+        ("testCreateTestUnprivileged",          testCreateTestUnprivileged),
+        ("testOpeningTestWhenUnprivileged",     testOpeningTestWhenUnprivileged),
+        ("testEnteringTestWhenClosed",          testEnteringTestWhenClosed),
+        ("testEnteringWithIncorrectPassword",   testEnteringWithIncorrectPassword),
+        ("testEnteringMultipleTimes",           testEnteringMultipleTimes),
+        ("testCompletionStatus",                testCompletionStatus),
+        ("testRetrivingTaskContent",            testRetrivingTaskContent),
+        ("testResultStatistics",                testResultStatistics)
     ]
 }
 
