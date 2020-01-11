@@ -80,27 +80,8 @@ extension MultipleChoiseTask {
 //                .first()
 //        }
 //    }
-
-    /// Evaluate the answer submitted, and returns the result
-    ///
-    /// - Parameters:
-    ///   - submit: The submitted answers
-    ///   - conn: A connection to the database
-    /// - Returns: The results
-    /// - Throws: If there was an error with the database query
-    func evaluateAnswer(_ submit: MultipleChoiseTask.Submit, on conn: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
-        
-        return try DatabaseRepository
-            .evaluate(submit, for: self, on: conn)
-    }
 }
 
-extension MultipleChoiseTask {
-
-    func practiceResult(for submit: MultipleChoiseTask.Submit, on connection: DatabaseConnectable) throws -> Future<PracticeSessionResult<[MultipleChoiseTaskChoise.Result]>> {
-        return try evaluateAnswer(submit, on: connection)
-    }
-}
 
 extension MultipleChoiseTask {
 

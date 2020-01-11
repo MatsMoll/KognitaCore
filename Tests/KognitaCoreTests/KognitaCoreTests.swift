@@ -17,7 +17,9 @@ public func allTests() -> [XCTestCaseEntry] {
         testCase(PracticeSessionTests.allTests),
         testCase(SubjectTests.allTests),
 //        testCase(WorkPointTests.allTests),
-        testCase(FlashCardTaskTests.allTests)
+        testCase(FlashCardTaskTests.allTests),
+        testCase(SubjectTestTests.allTests),
+        testCase(TestSessionTests.allTests),
     ]
 }
 #endif

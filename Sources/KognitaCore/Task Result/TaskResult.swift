@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 public protocol TaskSubmitable {
-    var timeUsed: TimeInterval { get }
+    var timeUsed: TimeInterval? { get }
 }
 
 public protocol TaskSubmitResultable {
@@ -38,23 +38,21 @@ public final class TaskResult: PostgreSQLModel, Codable {
 
     public var resultScore: Double
 
-    public var timeUsed: TimeInterval
+    public var timeUsed: TimeInterval?
 
-    public var sessionID: PracticeSession.ID?
+    public var sessionID: TaskSession.ID?
 
 
-    init(result: TaskSubmitResult, userID: User.ID, session: PracticeSession? = nil) {
+    init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.ID? = nil) {
         self.taskID = result.taskID
         self.userID = userID
-        self.timeUsed = result.submit.timeUsed
-        self.resultScore = result.result.score.clamped(to: 0...1)
-        self.sessionID = session?.id
-
-        let referanceDate = session?.createdAt ?? Date()
+        self.timeUsed = result.timeUsed
+        self.resultScore = result.score.clamped(to: 0...1)
+        self.sessionID = sessionID
 
         let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: resultScore)
         let interval = Double(numberOfDays) * 60 * 60 * 24
-        self.revisitDate = referanceDate.addingTimeInterval(interval)
+        self.revisitDate = Date().addingTimeInterval(interval)
     }
 }
 
@@ -68,7 +66,7 @@ extension TaskResult: Migration {
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-            builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .setNull)
+            builder.reference(from: \.sessionID, to: \TaskSession.id, onUpdate: .cascade, onDelete: .setNull)
 
             builder.unique(on: \.sessionID, \.taskID)
         }.flatMap {

@@ -11,7 +11,7 @@ import Vapor
 public protocol TaskCreationContentable {
     var description: String? { get }
     var question: String { get }
-    var isExaminable: Bool { get }
+    var isTestable: Bool { get }
 
     /// The semester of the exam
     var examPaperSemester: Task.ExamSemester? { get }

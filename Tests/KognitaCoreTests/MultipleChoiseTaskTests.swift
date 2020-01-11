@@ -25,7 +25,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -63,7 +63,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -85,7 +85,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: false,
             examPaperSemester: nil,
             examPaperYear: nil,
-            isExaminable: true,
+            isTestable: true,
             choises: [
                 .init(choise: "not", isCorrect: false),
                 .init(choise: "yes", isCorrect: true)
@@ -120,7 +120,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: startingMultiple.isMultipleSelect,
             examPaperSemester: startingTask.examPaperSemester,
             examPaperYear: startingTask.examPaperYear,
-            isExaminable: startingTask.isExaminable,
+            isTestable: startingTask.isTestable,
             choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
         )
 
@@ -157,6 +157,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
         let session = try PracticeSession.DatabaseRepository
             .create(from: create, by: user, on: conn).wait()
+        let representable = try session.representable(on: conn).wait()
 
         let firstTask = try session.currentTask(on: conn).wait()
         let firstChoises = try firstTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == true).all().wait()
@@ -167,7 +168,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             taskIndex: 1
         )
         _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(firstSubmit, in: session, by: user, on: conn).wait()
+            .submit(firstSubmit, in: representable, by: user, on: conn).wait()
 
         let secondTask = try session.currentTask(on: conn).wait()
         let secondChoises = try secondTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == false).all().wait()
@@ -179,11 +180,13 @@ class MultipleChoiseTaskTests: VaporTestCase {
         )
 
         _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(secondSubmit, in: session, by: user, on: conn).wait()
+            .submit(secondSubmit, in: representable, by: user, on: conn).wait()
+
+        let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
 
         let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
         XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
-        XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+        XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
         XCTAssert(answers.contains { $0.choiseID == firstChoises.first?.id })
         XCTAssert(answers.contains { answer in secondChoises.contains { answer.choiseID == $0.id }})
     }

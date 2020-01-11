@@ -175,10 +175,17 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public static func createAnswer(in session: PracticeSession, for task: FlashCardTask, with submit: FlashCardTask.Submit, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-
-        try FlashCardAnswer(sessionID: session.requireID(), taskID: task.requireID(), answer: submit.answer)
-            .save(on: conn)
-            .transform(to: ())
+    public static func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit, on conn: DatabaseConnectable) -> EventLoopFuture<TaskAnswer> {
+        TaskAnswer()
+            .create(on: conn)
+            .flatMap { answer in
+                try FlashCardAnswer(
+                    answerID: answer.requireID(),
+                    taskID: task.requireID(),
+                    answer: submit.answer
+                )
+                .create(on: conn)
+                .transform(to: answer)
+        }
     }
 }
