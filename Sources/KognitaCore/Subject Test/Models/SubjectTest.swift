@@ -69,10 +69,11 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 }
 
+extension SubjectTest: Content {}
 
 extension SubjectTest {
     public enum Create {
-        public struct Data: Decodable {
+        public struct Data: Codable {
             let tasks: [Task.ID]
             let duration: TimeInterval
             let scheduledAt: Date
