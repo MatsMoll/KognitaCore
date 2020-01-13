@@ -12,12 +12,12 @@ import Crypto
 
 
 extension User {
-    public static func create(username: String = "Mats", email: String? = nil, role: Role = .creator, canPractice: Bool = true, on conn: PostgreSQLConnection) throws -> User {
-        
+    public static func create(username: String = "Mats", email: String? = nil, isAdmin: Bool = true, on conn: PostgreSQLConnection) throws -> User {
+
         let createEmail = email ?? UUID().uuidString + "@email.com"
         
         let password = try BCrypt.hash("password")
-        let user = User(username: username, email: createEmail, passwordHash: password, role: role, canPractice: canPractice)
+        let user = User(username: username, email: createEmail, passwordHash: password, isAdmin: isAdmin)
         return try user.save(on: conn).wait()
     }
 }

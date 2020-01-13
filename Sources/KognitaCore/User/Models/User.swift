@@ -7,18 +7,10 @@ public protocol UserContent {
     var userId: Int { get }
     var username: String { get }
     var email: String { get }
-    var isCreator: Bool { get }
 }
 
 /// A registered user, capable of owning todo items.
-public final class User: KognitaCRUDModel, UserContent {
-
-    public enum Role: String, PostgreSQLEnum, PostgreSQLMigration {
-        case none
-        case user
-        case creator
-        case admin
-    }
+public final class User: KognitaCRUDModel {
 
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
@@ -36,10 +28,7 @@ public final class User: KognitaCRUDModel, UserContent {
     public private(set) var passwordHash: String
 
     /// The role of the User
-    public private(set) var role: Role
-
-    /// A bool determing if the User has access to the practice mode
-    public var canPractice: Bool
+    public private(set) var isAdmin: Bool
 
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
@@ -53,13 +42,12 @@ public final class User: KognitaCRUDModel, UserContent {
 //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, username: String, email: String, passwordHash: String, role: Role, canPractice: Bool) {
+    init(id: Int? = nil, username: String, email: String, passwordHash: String, isAdmin: Bool = false) {
         self.id = id
         self.username = username
         self.email = email.lowercased()
         self.passwordHash = passwordHash
-        self.role = role
-        self.canPractice = canPractice
+        self.isAdmin = isAdmin
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
@@ -84,7 +72,7 @@ extension User: PasswordAuthenticatable {
 extension User: TokenAuthenticatable {
 
     /// See `TokenAuthenticatable`.
-    public typealias TokenType = UserToken
+    public typealias TokenType = User.Login.Token
 }
 
 extension User: SessionAuthenticatable { }
@@ -94,24 +82,14 @@ extension User: Parameter { }
 
 
 extension User {
-    /// A bool indicating if the user is a creator
-    public var isCreator: Bool { return role == .creator || role == .admin }
     
     public func content() throws -> User.Response {
-        return try User.Response(
+        try User.Response(
             userId:             requireID(),
             username:           username,
             email:              email,
-            registrationDate:   createdAt ?? Date(),
-            isCreator:          isCreator
+            registrationDate:   createdAt ?? Date()
         )
-    }
-}
-
-extension User : KognitaModelUpdatable {
-    
-    public func updateValues(with content: User.Edit.Data) throws {
-//        self.name = content.name
     }
 }
 
@@ -124,9 +102,7 @@ extension User {
                     id: nil,
                     username: "Unknown",
                     email: "unknown@kognita.no",
-                    passwordHash: hash,
-                    role: .user,
-                    canPractice: true
+                    passwordHash: hash
                 )
                     .create(on: conn)
                     .transform(to: ())

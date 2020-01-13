@@ -50,24 +50,28 @@ extension Topic.DatabaseRepository: TopicRepository {
     
     public static func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
         
-        guard let user = user,
-            user.isCreator else { throw Abort(.forbidden) }
+        guard let user = user else { throw Abort(.forbidden) }
 
-        return Subject.DatabaseRepository
-            .getSubjectWith(id: content.subjectId, on: conn)
-            .flatMap { subject in
-                try Topic(content: content, subject: subject, creator: user)
-                    .create(on: conn)
-                    .flatMap { topic in
-                        try Subtopic(
-                            content: Subtopic.Create.Data(
-                                name: "Generelt",
-                                topicId: topic.requireID(),
-                                chapter: 1
-                            )
-                        )
-                        .save(on: conn)
-                        .transform(to: topic)
+        return try User.DatabaseRepository
+            .isModerator(user: user, subjectID: content.subjectId, on: conn)
+            .flatMap {
+
+                Subject.DatabaseRepository
+                    .getSubjectWith(id: content.subjectId, on: conn)
+                    .flatMap { subject in
+                        try Topic(content: content, subject: subject, creator: user)
+                            .create(on: conn)
+                            .flatMap { topic in
+                                try Subtopic(
+                                    content: Subtopic.Create.Data(
+                                        name: "Generelt",
+                                        topicId: topic.requireID(),
+                                        chapter: 1
+                                    )
+                                )
+                                .save(on: conn)
+                                .transform(to: topic)
+                        }
                 }
         }
     }

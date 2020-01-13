@@ -13,6 +13,8 @@ public final class SubjectTest: KognitaPersistenceModel {
 
     public var updatedAt: Date?
 
+    /// The id of the subject to test
+    public var subjectID: Subject.ID
 
     /// The duratino of the test
     public var duration: TimeInterval
@@ -39,11 +41,12 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 
 
-    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String) {
+    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID) {
         self.scheduledAt    = scheduledAt
         self.duration       = duration
         self.password       = password
         self.title          = title
+        self.subjectID      = subjectID
     }
 
     convenience init(data: SubjectTest.Create.Data) {
@@ -51,7 +54,8 @@ public final class SubjectTest: KognitaPersistenceModel {
             scheduledAt:    data.scheduledAt,
             duration:       data.duration,
             password:       data.password,
-            title:          data.title
+            title:          data.title,
+            subjectID:      data.subjectID
         )
     }
 
@@ -76,6 +80,7 @@ extension SubjectTest {
     public enum Create {
         public struct Data: Content {
             let tasks: [Task.ID]
+            let subjectID: Subject.ID
             let duration: TimeInterval
             let scheduledAt: Date
             let password: String

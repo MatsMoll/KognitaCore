@@ -249,7 +249,8 @@ class TestSessionTests: VaporTestCase {
     }
 
     func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
-        let subtopic = try Subtopic.create(on: conn)
+        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
         let taskIds = try (0..<numberOfTasks).map { _ in
             try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
                 .requireID()
@@ -262,6 +263,7 @@ class TestSessionTests: VaporTestCase {
 
         let data = SubjectTest.Create.Data(
             tasks:          taskIds,
+            subjectID:      topic.subjectId,
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",

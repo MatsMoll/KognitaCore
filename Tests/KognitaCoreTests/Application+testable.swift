@@ -74,7 +74,7 @@ extension Application {
             tokenHeaders.basicAuthorization = credentials
             
             let tokenResponse = try self.sendRequest(to: "/api/users/login", method: HTTPMethod.POST, headers: tokenHeaders)
-            let token = try tokenResponse.content.syncDecode(UserToken.self)
+            let token = try tokenResponse.content.syncDecode(User.Login.Token.self)
             headers.add(name: .authorization, value: "Bearer \(token.bearerToken)")
         }
         
@@ -109,7 +109,7 @@ struct EmptyContent: Content {}
 private func setupDatabase(for enviroment: Environment, in services: inout Services) {
 
     // Configure a PostgreSQL database
-    services.register(DatabaseConnectionPoolConfig(maxConnections: 1))
+    services.register(DatabaseConnectionPoolConfig(maxConnections: 2))
 
     let hostname = Environment.get("DATABASE_HOSTNAME") ?? "localhost"
     let username = Environment.get("DATABASE_USER") ?? "matsmollestad"

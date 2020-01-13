@@ -145,7 +145,7 @@ final class PracticeSessionTests: VaporTestCase {
 
     func testPracticeSessionAssignmentWithoutPracticeCapability() throws {
 
-        let user = try User.create(canPractice: false, on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
 
         let subtopic = try Subtopic.create(on: conn)
 

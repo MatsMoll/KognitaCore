@@ -40,22 +40,42 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        guard user.canPractice else {
-            throw Abort(.forbidden)
-        }
 
         if let topicIDs = content.topicIDs {
-            return try create(
-                topicIDs: topicIDs,
-                numberOfTaskGoal: content.numberOfTaskGoal,
-                user: user,
-                on: conn)
+            return Subject.DatabaseRepository
+                .subjectIDFor(topicIDs: Array(topicIDs), on: conn)
+                .flatMap { subjectID in
+
+                    try User.DatabaseRepository
+                        .canPractice(user: user, subjectID: subjectID, on: conn)
+                        .flatMap {
+
+                            try create(
+                                topicIDs: topicIDs,
+                                numberOfTaskGoal: content.numberOfTaskGoal,
+                                user: user,
+                                on: conn
+                            )
+                    }
+            }
         } else if let subtopicIDs = content.subtopicsIDs {
-            return try create(
-                subtopicIDs: subtopicIDs,
-                numberOfTaskGoal: content.numberOfTaskGoal,
-                user: user,
-                on: conn)
+
+            return Subject.DatabaseRepository
+                .subjectIDFor(subtopicIDs: Array(subtopicIDs), on: conn)
+                .flatMap { subjectID in
+
+                    try User.DatabaseRepository
+                        .canPractice(user: user, subjectID: subjectID, on: conn)
+                        .flatMap {
+
+                            try create(
+                                subtopicIDs: subtopicIDs,
+                                numberOfTaskGoal: content.numberOfTaskGoal,
+                                user: user,
+                                on: conn
+                            )
+                    }
+            }
         } else {
             throw Abort(.badRequest)
         }

@@ -14,6 +14,9 @@ extension User {
     public enum ResetPassword {
             
         public struct Token : KognitaPersistenceModel, SoftDeleatableModel {
+
+            public static var entity: String = "User.ResetPassword.Token"
+            public static var name: String = "User.ResetPassword.Token"
             
             public var id: Int?
             

@@ -35,6 +35,7 @@ class SubjectTestTests: VaporTestCase {
     func testCreateTestUnauthorized() {
         let data = SubjectTest.Create.Data(
             tasks: [],
+            subjectID: 1,
             duration: .minutes(10),
             scheduledAt: .now,
             password: "password",
@@ -46,9 +47,10 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func testCreateTestUnprivileged() throws {
-        let user = try User.create(role: .user, on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
         let data = SubjectTest.Create.Data(
             tasks: [],
+            subjectID: 1,
             duration: .minutes(10),
             scheduledAt: .now,
             password: "password",
@@ -60,7 +62,7 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func testOpeningTestWhenUnprivileged() throws {
-        let user = try User.create(role: .user, on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
 
         let test = try setupTestWithTasks()
         XCTAssertThrowsError(
@@ -136,8 +138,8 @@ class SubjectTestTests: VaporTestCase {
             let test = try setupTestWithTasks()
 
             let teacher = try User.create(on: conn)
-            let userOne = try User.create(role: .user, on: conn)
-            let userTwo = try User.create(role: .user, on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
 
             let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
             let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
@@ -180,8 +182,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks(numberOfTasks: 3)
 
-            let userOne = try User.create(role: .user, on: conn)
-            let userTwo = try User.create(role: .user, on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
 
             let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
             let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
@@ -243,8 +245,8 @@ class SubjectTestTests: VaporTestCase {
             let test = try setupTestWithTasks()
 
             let teacher = try User.create(on: conn)
-            let userOne = try User.create(role: .user, on: conn)
-            let userTwo = try User.create(role: .user, on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
 
             let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
             let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
@@ -342,7 +344,8 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
-        let subtopic = try Subtopic.create(on: conn)
+        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
         let taskIds = try (0..<numberOfTasks).map { _ in
             try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
                 .requireID()
@@ -355,6 +358,7 @@ class SubjectTestTests: VaporTestCase {
 
         let data = SubjectTest.Create.Data(
             tasks:          taskIds,
+            subjectID:      topic.subjectId,
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",

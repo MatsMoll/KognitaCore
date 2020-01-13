@@ -14,6 +14,7 @@ extension TaskResult {
 }
 
 public protocol PracticeSessionRepresentable: Codable {
+    var id: Int? { get }
     var userID: User.ID { get }
     var createdAt: Date? { get }
     var endedAt: Date? { get }

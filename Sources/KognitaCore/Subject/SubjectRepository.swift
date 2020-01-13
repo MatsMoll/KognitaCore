@@ -20,7 +20,12 @@ public protocol SubjectRepositoring:
     UpdateData      == Subject.Edit.Data,
     UpdateResponse  == Subject.Edit.Response,
     ResponseModel   == Subject
-{}
+{
+    static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]>
+    static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+}
 
 extension Subject {
     
