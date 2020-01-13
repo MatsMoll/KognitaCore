@@ -39,11 +39,11 @@ extension User.DatabaseRepository: UserRepository {
 
         public var errorDescription: String? {
             switch self {
-            case .missingInput: return "Sjekk at all informasjon er skrevet inn"
-            case .passwordMismatch: return "Passordet må skrives likt to ganger"
-            case .unauthorized: return "Sjekk at epost og passord stemmer"
-            case .existingUser(let email): return "Det finnes allerede en bruker med epost: \(email)"
-            case .invalidRecruterToken: return "Ugyldig rekruterings kode"
+            case .missingInput:                     return "Sjekk at all informasjon er skrevet inn"
+            case .passwordMismatch:                 return "Passordet må skrives likt to ganger"
+            case .unauthorized:                     return "Sjekk at epost og passord stemmer"
+            case .existingUser(let email):          return "Det finnes allerede en bruker med epost: \(email)"
+            case .invalidRecruterToken:             return "Ugyldig rekruterings kode"
             case .misformed(let field, let reason): return "Ugylding formentert \(field), fordi det \(reason)"
             }
         }

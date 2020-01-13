@@ -50,7 +50,7 @@ extension MultipleChoiseTask {
 
             public let examPaperYear: Int?
 
-            public let isExaminable: Bool
+            public let isTestable: Bool
 
             public let choises: [MultipleChoiseTaskChoise.Data]
 

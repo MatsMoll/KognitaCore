@@ -25,10 +25,10 @@ class TaskResultRepoTests: VaporTestCase {
         let sessionOne = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
         let sessionTwo = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-        _ = try TaskResult.create(task: taskOne, session: sessionOne, user: user, on: conn)
-        _ = try TaskResult.create(task: taskTwo, session: sessionOne, user: user, on: conn)
-        _ = try TaskResult.create(task: taskOne, session: sessionTwo, user: user, on: conn)
-        _ = try TaskResult.create(task: taskTwo, session: sessionTwo, user: user, on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: sessionOne.requireID(), user: user, on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: sessionOne.requireID(), user: user, on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: sessionTwo.requireID(), user: user, on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: sessionTwo.requireID(), user: user, on: conn)
 
         let firstHistogram = try TaskResult.DatabaseRepository
             .getAmountHistory(for: user, on: conn)
@@ -60,14 +60,14 @@ class TaskResultRepoTests: VaporTestCase {
         let taskType = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
-        _ = try TaskResult.create(task: taskOne, session: lastSession, user: user, score: 0.4,  on: conn)
-        _ = try TaskResult.create(task: taskTwo, session: lastSession, user: user, score: 0.6,  on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6,  on: conn)
 
         let taskTypeOne = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskTwo.id)
 
-        _ = try TaskResult.create(task: taskTwo, session: newSession, user: user, score: 0.5,    on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5,    on: conn)
         let taskTypeTwo = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
 
         XCTAssertNotNil(taskTypeTwo)

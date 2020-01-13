@@ -21,7 +21,7 @@ class FlashCardTaskTests: VaporTestCase {
             description: nil,
             question: "Test",
             solution: "Some solution",
-            isExaminable: false,
+            isTestable: false,
             examPaperSemester: nil,
             examPaperYear: nil
         )
@@ -64,6 +64,11 @@ class FlashCardTaskTests: VaporTestCase {
         do {
             let session = try PracticeSession.DatabaseRepository
                 .create(from: create, by: user, on: conn).wait()
+            let superSession = try TaskSession
+                .find(session.requireID(), on: conn)
+                .unwrap(or: Abort(.internalServerError))
+                .wait()
+            let sessionRepresentable = session.representable(with: superSession)
 
             let firstSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -72,7 +77,7 @@ class FlashCardTaskTests: VaporTestCase {
                 answer: "First Answer"
             )
             _ = try PracticeSession.DatabaseRepository
-                .submitFlashCard(firstSubmit, in: session, by: user, on: conn).wait()
+                .submit(firstSubmit, in: sessionRepresentable, by: user, on: conn).wait()
 
             let secondSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -82,7 +87,7 @@ class FlashCardTaskTests: VaporTestCase {
             )
 
             _ = try PracticeSession.DatabaseRepository
-                .submitFlashCard(secondSubmit, in: session, by: user, on: conn).wait()
+                .submit(secondSubmit, in: sessionRepresentable, by: user, on: conn).wait()
 
             let answers = try FlashCardAnswer.query(on: conn)
                 .all()
@@ -90,8 +95,10 @@ class FlashCardTaskTests: VaporTestCase {
             let answerSet = Set(answers.map { $0.answer })
             let taskIDSet = Set(answers.map { $0.taskID })
 
+            let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
+
             XCTAssertEqual(answers.count, 2)
-            XCTAssert(answers.allSatisfy { $0.sessionID == session.id })
+            XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
             XCTAssertTrue(answerSet.contains(firstSubmit.answer), "First submitted answer not found in \(answerSet)")
             XCTAssertTrue(answerSet.contains(secondSubmit.answer), "Second submitted answer not found in \(answerSet)")
             XCTAssertTrue(try taskIDSet.contains(firstTask.requireID()), "First submitted task id not found in \(taskIDSet)")

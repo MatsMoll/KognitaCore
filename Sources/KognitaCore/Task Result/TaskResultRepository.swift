@@ -7,9 +7,21 @@
 
 import FluentPostgreSQL
 import FluentSQL
+import Vapor
 
 extension TaskResult {
     public class DatabaseRepository: TaskResultRepositoring {}
+}
+
+public protocol PracticeSessionRepresentable: Codable {
+    var userID: User.ID { get }
+    var createdAt: Date? { get }
+    var endedAt: Date? { get }
+    var numberOfTaskGoal: Int { get }
+
+    func requireID() throws -> Int
+
+    func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
 }
 
 extension TaskResult.DatabaseRepository {
@@ -120,7 +132,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getFlowZoneTasks(for session: PracticeSession, on conn: PostgreSQLConnection) throws -> Future<FlowZoneTaskResult?> {
+    public static func getFlowZoneTasks(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<FlowZoneTaskResult?> {
 
 //        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
         let scoreThreshold: Double = 0.8
@@ -134,7 +146,7 @@ extension TaskResult.DatabaseRepository {
             .first(decoding: FlowZoneTaskResult.self)
     }
 
-    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> Future<[TaskResult]> {
+    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> EventLoopFuture<[TaskResult]> {
 
         let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
 
@@ -166,7 +178,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> Future<[TopicResultContent]> {
+    public static func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> EventLoopFuture<[TopicResultContent]> {
 
         return try Query.results(
             revisitingAfter: Date(),
@@ -208,7 +220,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> Future<[TaskResult.History]> {
+    public static func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
 
         let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
@@ -264,7 +276,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> Future<[TaskResult.History]> {
+    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
 
         let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
@@ -324,12 +336,12 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    static func createResult(from result: TaskSubmitResult, by user: User, on conn: DatabaseConnectable, in session: PracticeSession? = nil) throws -> Future<TaskResult> {
-        return try TaskResult(result: result, userID: user.requireID(), session: session)
+    static func createResult(from result: TaskSubmitResultRepresentable, by user: User, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult> {
+        return try TaskResult(result: result, userID: user.requireID(), sessionID: sessionID)
             .save(on: conn)
     }
 
-    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: DatabaseConnectable) throws -> Future<[User.TopicLevel]> {
+    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: DatabaseConnectable) throws -> EventLoopFuture<[User.TopicLevel]> {
 
         return conn.databaseConnection(to: .psql)
             .flatMap { psqlConn in
@@ -372,7 +384,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: DatabaseConnectable) throws -> Future<User.SubjectLevel> {
+    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.SubjectLevel> {
 
         conn.databaseConnection(to: .psql)
             .flatMap { psqlConn in
@@ -446,10 +458,17 @@ extension TaskResult.DatabaseRepository {
     }
 }
 
-struct TaskSubmitResult {
+public protocol TaskSubmitResultRepresentable: TaskSubmitResultable, TaskSubmitable {
+    var taskID: Task.ID { get }
+}
+
+struct TaskSubmitResult: TaskSubmitResultRepresentable {
     public let submit: TaskSubmitable
     public let result: TaskSubmitResultable
     public let taskID: Task.ID
+
+    var timeUsed: TimeInterval?     { submit.timeUsed }
+    var score: Double               { result.score }
 }
 
 extension User {

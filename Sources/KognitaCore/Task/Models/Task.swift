@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 /// The superclass of all task types
-public final class Task: KognitaPersistenceModel {
+public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
 
     /// The semester a exam was taken
     ///
@@ -47,8 +47,8 @@ public final class Task: KognitaPersistenceModel {
     /// The year of the exam
     public var examPaperYear: Int?
 
-    /// A bool containing the info if the task may be used in a exam / test
-    public var isExaminable: Bool
+    /// If the task can be used for testing
+    public var isTestable: Bool
 
     /// The date the task was created at
     public var createdAt: Date?
@@ -57,13 +57,10 @@ public final class Task: KognitaPersistenceModel {
     /// - Note: Usually a task will be marked as isOutdated and create a new `Task` when updated
     public var updatedAt: Date?
 
-
     public var deletedAt: Date?
 
     /// The id of the new edited task if there exists one
     public var editedTaskID: Task.ID?
-
-    public static var deletedAtKey: TimestampKey? = \.deletedAt
 
 
     init(
@@ -73,13 +70,13 @@ public final class Task: KognitaPersistenceModel {
         creatorID: User.ID,
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
-        isExaminable: Bool = true
+        isTestable: Bool = true
     ) {
         self.subtopicID     = subtopicID
         self.description    = description
         self.question       = question
         self.creatorID      = creatorID
-        self.isExaminable   = isExaminable
+        self.isTestable     = isTestable
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
             self.examPaperSemester = examPaperSemester
@@ -95,7 +92,7 @@ public final class Task: KognitaPersistenceModel {
         self.subtopicID     = subtopicID
         self.description    = content.description
         self.question       = content.question
-        self.isExaminable   = content.isExaminable
+        self.isTestable     = content.isTestable
         self.creatorID      = try creator.requireID()
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
@@ -140,7 +137,6 @@ extension Task {
             solution: nil,
             examPaperSemester: examPaperSemester,
             examPaperYear: examPaperYear,
-            isExaminable: isExaminable,
             editedTaskID: editedTaskID
         )
     }
@@ -211,9 +207,6 @@ extension Task {
 
         /// The year of the exam
         public var examPaperYear: Int?
-
-        /// A bool containing the info if the task may be used in a exam / test
-        public var isExaminable: Bool
 
         /// The id of the new edited task if there exists one
         public var editedTaskID: Task.ID?

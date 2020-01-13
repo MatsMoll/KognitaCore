@@ -198,6 +198,23 @@ extension Task.Repository {
             .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
             .first(decoding: Task.self, MultipleChoiseTask?.self)
     }
+
+    public static func taskWith(
+        id: Int,
+        on conn: PostgreSQLConnection
+    ) throws -> EventLoopFuture<TaskType> {
+
+        return conn.select()
+            .all(table: Task.self)
+            .all(table: MultipleChoiseTask.self)
+            .from(Task.self)
+            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiseTask?.self)
+            .unwrap(or: Abort(.badRequest))
+            .map { taskContent in
+                TaskType(content: taskContent)
+        }
+    }
 }
 
 

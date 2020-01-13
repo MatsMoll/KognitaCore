@@ -14,7 +14,7 @@ extension MultipleChoiseTask {
     public struct Submit: Content, TaskSubmitable {
 
         /// The time used to answer the question
-        public let timeUsed: TimeInterval
+        public let timeUsed: TimeInterval?
 
         /// The choise id's
         public let choises: [MultipleChoiseTaskChoise.ID]

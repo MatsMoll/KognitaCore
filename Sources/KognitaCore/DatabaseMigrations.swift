@@ -34,13 +34,19 @@ public class DatabaseMigrations {
         migrations.add(model: TaskSolution.self,                    database: .psql)
         migrations.add(model: MultipleChoiseTask.self,              database: .psql)
         migrations.add(model: MultipleChoiseTaskChoise.self,        database: .psql)
+        migrations.add(model: TaskSession.self,                     database: .psql)
         migrations.add(model: PracticeSession.self,                 database: .psql)
         migrations.add(model: PracticeSession.Pivot.Task.self,      database: .psql)
         migrations.add(model: PracticeSession.Pivot.Subtopic.self,  database: .psql)
         migrations.add(model: FlashCardTask.self,                   database: .psql)
         migrations.add(model: TaskResult.self,                      database: .psql)
+        migrations.add(model: TaskAnswer.self,                      database: .psql)
         migrations.add(model: MultipleChoiseTaskAnswer.self,        database: .psql)
         migrations.add(model: FlashCardAnswer.self,                 database: .psql)
+        migrations.add(model: TestSession.self,                     database: .psql)
+        migrations.add(model: SubjectTest.self,                     database: .psql)
+        migrations.add(model: SubjectTest.Pivot.Task.self,          database: .psql)
+        migrations.add(model: TaskSessionAnswer.self,               database: .psql)
     }
 
     static func extraDatabase(migrations: inout MigrationConfig) {

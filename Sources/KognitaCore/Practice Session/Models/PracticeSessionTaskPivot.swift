@@ -44,15 +44,15 @@ extension PracticeSession.Pivot {
             self.index = index
         }
 
-        static func create(session: PracticeSession, task: KognitaCore.Task, index: Int, on conn: DatabaseConnectable)
-            throws -> Future<PracticeSession.Pivot.Task> {
+        static func create(session: PracticeSessionRepresentable, task: KognitaCore.Task, index: Int, on conn: DatabaseConnectable)
+            throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
                 
             return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: task.requireID(), index: index)
                 .create(on: conn)
         }
 
-        static func create(session: PracticeSession, taskID: KognitaCore.Task.ID, index: Int, on conn: DatabaseConnectable)
-            throws -> Future<PracticeSession.Pivot.Task> {
+        static func create(session: PracticeSessionRepresentable, taskID: KognitaCore.Task.ID, index: Int, on conn: DatabaseConnectable)
+            throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
 
             return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: taskID, index: index)
                 .create(on: conn)
@@ -62,7 +62,7 @@ extension PracticeSession.Pivot {
 
 extension PracticeSession.Pivot.Task: Migration {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.create(PracticeSession.Pivot.Task.self, on: conn) { builder in
             try addProperties(to: builder)
 
@@ -73,7 +73,7 @@ extension PracticeSession.Pivot.Task: Migration {
         }
     }
 
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
+    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.delete(PracticeSession.Pivot.Task.self, on: connection)
     }
 }

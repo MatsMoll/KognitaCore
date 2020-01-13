@@ -30,11 +30,12 @@ final class PracticeSessionTests: VaporTestCase {
             taskIndex: 1,
             answer: ""
         )
-        XCTAssertNoThrow(try session.submit(answer, by: user, with: conn).wait())
+
+        XCTAssertNoThrow(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
         answer.taskIndex = 2
-        XCTAssertNoThrow(try session.submit(answer, by: user, with: conn).wait())
+        XCTAssertNoThrow(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
         answer.taskIndex = 2
-        XCTAssertThrowsError(try session.submit(answer, by: user, with: conn).wait())
+        XCTAssertThrowsError(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
     }
 
     func testNumberOfCompletedTasksFlashCard() throws {
@@ -56,11 +57,11 @@ final class PracticeSessionTests: VaporTestCase {
             taskIndex: 1,
             answer: ""
         )
-        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let firstResult     = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
         answer.taskIndex = 2
-        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
         answer.taskIndex = 3
-        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
 
         XCTAssertEqual(firstResult.progress, 20)
         XCTAssertEqual(secondResult.progress, 40)
@@ -85,11 +86,11 @@ final class PracticeSessionTests: VaporTestCase {
             choises: [],
             taskIndex: 1
         )
-        let firstResult     = try session.submit(answer, by: user, with: conn).wait()
+        let firstResult     = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
         answer.taskIndex = 2
-        let secondResult    = try session.submit(answer, by: user, with: conn).wait()
+        let secondResult    = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
         answer.taskIndex = 3
-        let lastResult      = try session.submit(answer, by: user, with: conn).wait()
+        let lastResult      = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
         
         XCTAssertEqual(firstResult.progress, 20)
         XCTAssertEqual(secondResult.progress, 40)
@@ -97,42 +98,49 @@ final class PracticeSessionTests: VaporTestCase {
     }
 
     func testPracticeSessionAssignment() throws {
+        do {
+            let user = try User.create(on: conn)
 
-        let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: conn)
 
-        let subtopic = try Subtopic.create(on: conn)
+            let taskOne = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            let taskTwo = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
 
-        let taskOne = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        let taskTwo = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        
-        let create = try PracticeSession.Create.Data(
-            numberOfTaskGoal: 2,
-            subtopicsIDs: [
-                subtopic.requireID()
-            ],
-            topicIDs: nil
-        )
-        
-        let session = try PracticeSession.DatabaseRepository
-            .create(from: create, by: user, on: conn).wait()
-        
-        let firstTask = try session.currentTask(on: conn).wait()
+            let create = try PracticeSession.Create.Data(
+                numberOfTaskGoal: 2,
+                subtopicsIDs: [
+                    subtopic.requireID()
+                ],
+                topicIDs: nil
+            )
 
-        XCTAssertNotNil(firstTask.multipleChoise)
-        XCTAssert(try firstTask.task.requireID() == taskOne.requireID() || firstTask.task.requireID() == taskTwo.requireID())
-        
-        let submit = MultipleChoiseTask.Submit(
-            timeUsed: 20,
-            choises: [],
-            taskIndex: 1
-        )
-        _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(submit, in: session, by: user, on: conn).wait()
-        
-        let secondTask = try session.currentTask(on: conn).wait()
-        
-        XCTAssertNotNil(secondTask.multipleChoise)
-        try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
+            let session = try PracticeSession.DatabaseRepository.create(from: create, by: user, on: conn).wait()
+            let representable = try session.representable(on: conn).wait()
+
+            let firstTask = try session.currentTask(on: conn).wait()
+
+            XCTAssertNotNil(firstTask.multipleChoise)
+            XCTAssert(try firstTask.task.requireID() == taskOne.requireID() || firstTask.task.requireID() == taskTwo.requireID())
+
+            let submit = MultipleChoiseTask.Submit(
+                timeUsed: 20,
+                choises: [],
+                taskIndex: 1
+            )
+            _ = try PracticeSession.DatabaseRepository.submit(submit, in: representable, by: user, on: conn).wait()
+
+            let secondTask = try session.currentTask(on: conn).wait()
+
+            XCTAssertNotNil(secondTask.multipleChoise)
+            try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
+
+            _ = try PracticeSession.DatabaseRepository.end(representable, for: user, on: conn).wait()
+
+            XCTAssertNotNil(representable.endedAt)
+
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
     }
 
     func testPracticeSessionAssignmentWithoutPracticeCapability() throws {
@@ -180,6 +188,7 @@ final class PracticeSessionTests: VaporTestCase {
             .create(from: create, by: user, on: conn).wait()
         let session = try PracticeSession.DatabaseRepository
             .create(from: create, by: user, on: conn).wait()
+        let representable = try session.representable(on: conn).wait()
         
         let firstTask = try session.currentTask(on: conn).wait()
         
@@ -192,7 +201,7 @@ final class PracticeSessionTests: VaporTestCase {
             taskIndex: 1
         )
         _ = try PracticeSession.DatabaseRepository
-            .submitMultipleChoise(submit, in: session, by: user, on: conn).wait()
+            .submit(submit, in: representable, by: user, on: conn).wait()
         
         let secondTask = try session.currentTask(on: conn).wait()
         
@@ -223,34 +232,54 @@ final class PracticeSessionTests: VaporTestCase {
         let secondSession = try PracticeSession.DatabaseRepository
             .create(from: create, by: user, on: conn).wait()
 
+        let firstRepresentable = try firstSession.representable(on: conn).wait()
+        let secondRepresentable = try secondSession.representable(on: conn).wait()
+
         var submit = MultipleChoiseTask.Submit(
             timeUsed: 20,
             choises: [],
             taskIndex: 1
+            
         )
         do {
             _ = try PracticeSession.DatabaseRepository
-                .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
+                .submit(submit, in: firstRepresentable, by: user, on: conn).wait()
             submit.taskIndex = 2
             _ = try PracticeSession.DatabaseRepository
-                .submitMultipleChoise(submit, in: firstSession, by: user, on: conn).wait()
+                .submit(submit, in: firstRepresentable, by: user, on: conn).wait()
 
             submit.taskIndex = 1
             _ = try PracticeSession.DatabaseRepository
-                .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
+                .submit(submit, in: secondRepresentable, by: user, on: conn).wait()
             submit.taskIndex = 2
             _ = try PracticeSession.DatabaseRepository
-                .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
-
-            // taskIndex 3 should not exist and therefore throw
+                .submit(submit, in: secondRepresentable, by: user, on: conn).wait()
             submit.taskIndex = 3
             XCTAssertThrowsError(
                 _ = try PracticeSession.DatabaseRepository
-                    .submitMultipleChoise(submit, in: secondSession, by: user, on: conn).wait()
+                    .submit(submit, in: secondRepresentable, by: user, on: conn).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
         }
+    }
+
+    func testTaskSessionPracticeParameter() throws {
+
+        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiseTask.create(on: conn)
+        let createdSesssion = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+
+        let parameterSession = try TaskSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", on: app).wait()
+
+        XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.practiceSession.id)
+        XCTAssertEqual(createdSesssion.practiceSession.createdAt,   parameterSession.practiceSession.createdAt)
+        XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.session.id)
     }
 
     static let allTests = [
