@@ -69,10 +69,12 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 }
 
+extension SubjectTest: Content {}
+extension SubjectTest: Parameter {}
 
 extension SubjectTest {
     public enum Create {
-        public struct Data: Decodable {
+        public struct Data: Content {
             let tasks: [Task.ID]
             let duration: TimeInterval
             let scheduledAt: Date
@@ -91,22 +93,22 @@ extension SubjectTest {
         }
     }
 
-    public struct CompletionStatus: Decodable {
+    public struct CompletionStatus: Content {
         public internal(set) var amountOfCompletedUsers: Int
         public internal(set) var amountOfEnteredUsers: Int
 
         public var hasEveryoneCompleted: Bool { amountOfEnteredUsers == amountOfCompletedUsers }
     }
 
-    public struct MultipleChoiseTaskContent: Decodable {
+    public struct MultipleChoiseTaskContent: Content {
 
-        public struct Choise: Decodable {
+        public struct Choise: Content {
             let choise: String
             let isCorrect: Bool
             let isSelected: Bool
         }
 
-        public struct TestTask: Decodable {
+        public struct TestTask: Content {
             let testTaskID: SubjectTest.Pivot.Task.ID
             let isCurrent: Bool
         }
@@ -139,11 +141,11 @@ extension SubjectTest {
         }
     }
 
-    public struct Results: Decodable {
+    public struct Results: Content {
 
-        public struct MultipleChoiseTaskResult: Decodable {
+        public struct MultipleChoiseTaskResult: Content {
 
-            public struct Choise: Decodable {
+            public struct Choise: Content {
                 let choise: String
                 let numberOfSubmissions: Int
                 let percentage: Double

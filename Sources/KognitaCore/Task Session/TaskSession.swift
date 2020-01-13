@@ -39,13 +39,14 @@ extension TaskSession {
 
 
 extension TaskSession {
-    public struct PracticeParameter: Parameter, Codable, PracticeSessionRepresentable {
+    public struct PracticeParameter: Parameter, Content, PracticeSessionRepresentable {
 
         let session: TaskSession
         let practiceSession: PracticeSession
 
         public var userID: User.ID              { session.userID }
         public var createdAt: Date?             { session.createdAt }
+        public var endedAt: Date?               { practiceSession.endedAt }
         public var numberOfTaskGoal: Int        { practiceSession.numberOfTaskGoal }
         public func requireID() throws -> Int   { try session.requireID() }
 
@@ -67,6 +68,19 @@ extension TaskSession {
                         .map {
                             PracticeParameter(session: $0.0, practiceSession: $0.1)
                     }
+            }
+        }
+
+        public func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
+            let session = self.session
+            practiceSession.endedAt = .now
+            return practiceSession.save(on: conn)
+                .map { practiceSession in
+                    
+                    TaskSession.PracticeParameter(
+                        session: session,
+                        practiceSession: practiceSession
+                    )
             }
         }
     }

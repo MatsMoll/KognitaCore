@@ -33,6 +33,8 @@ public final class TestSession: KognitaPersistenceModel {
     }
 }
 
+extension TestSession: Content {}
+
 
 extension TaskSession {
 
@@ -47,6 +49,12 @@ extension TaskSession {
         public var submittedAt: Date?           { testSession.submittedAt }
 
         public func requireID() throws -> Int   { try session.requireID() }
+
+        public func submit(on conn: DatabaseConnectable) -> EventLoopFuture<TestSessionRepresentable> {
+            testSession.submittedAt = .now
+            return testSession.save(on: conn)
+                .transform(to: self)
+        }
 
 
         public typealias ResolvedParameter = EventLoopFuture<TestParameter>
@@ -74,14 +82,14 @@ extension TaskSession {
 
 extension TestSession {
 
-    public struct Results: Decodable {
+    public struct Results: Content {
 
-        public struct Task: Decodable {
+        public struct Task: Content {
             public let question: String
             public let score: Double
         }
 
-        public struct Topic: Decodable {
+        public struct Topic: Content {
             public let name: String
             public let taskResults: [Task]
 

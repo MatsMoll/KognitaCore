@@ -8,11 +8,37 @@ public protocol TestSessionRepresentable {
     var submittedAt: Date? { get }
 
     func requireID() throws -> Int
+    func submit(on conn: DatabaseConnectable) -> EventLoopFuture<TestSessionRepresentable>
+}
+
+public protocol TestSessionRepositoring {
+    /// Submits a answer to a task
+    /// - Parameters:
+    ///   - content: The metadata needed to submit a answer
+    ///   - session: The session to submit the answer to
+    ///   - user: The user that is submitting the answer
+    ///   - conn: The database conenction
+    static func submit(content: MultipleChoiseTask.Submit, for session: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    /// Submits a test session to be evaluated
+    /// - Parameters:
+    ///   - test: The session to submit
+    ///   - user: The user submitting the session
+    ///   - conn: The database connection
+    static func submit(test: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    /// Fetches the results in a test for a given user
+    /// - Parameters:
+    ///   - test: The test to fetch the results from
+    ///   - user: The user to fetch the result for
+    ///   - conn: The database connection
+    /// - Returns: The results from a session
+    static func results(in test: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.Results>
 }
 
 
 extension TestSession {
-    public class DatabaseRepository {
+    public class DatabaseRepository: TestSessionRepositoring {
 
         public static func submit(content: FlashCardTask.Submit, for session: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard user.id == session.userID else {
@@ -182,14 +208,15 @@ extension TestSession {
                 .all()
         }
 
-        static func submit(test: TestSession, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public static func submit(test: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard test.submittedAt == nil else {
                 throw Abort(.badRequest)
             }
+            guard try test.userID == user.requireID() else {
+                throw Abort(.forbidden)
+            }
 
-            test.submittedAt = Date()
-
-            return test.save(on: conn)
+            return test.submit(on: conn)
                 .flatMap { _ in
                     conn.databaseConnection(to: .psql)
                         .flatMap { psqlConn in
@@ -230,14 +257,16 @@ extension TestSession {
         }
 
 
-        public static func results(in test: SubjectTest, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+        public static func results(in test: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+
+            guard try test.userID == user.requireID() else {
+                throw Abort(.forbidden)
+            }
 
             return try TestSession.query(on: conn)
-                .join(\TaskSession.id, to: \TestSession.id)
                 .join(\SubjectTest.id, to: \TestSession.testID)
                 .join(\TaskResult.sessionID, to: \TestSession.id)
-                .filter(\TaskSession.userID == user.requireID())
-                .filter(\TestSession.testID == test.requireID())
+                .filter(\TestSession.id == test.requireID())
                 .decode(SubjectTest.self)
                 .alsoDecode(TaskResult.self)
                 .all()

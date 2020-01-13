@@ -253,15 +253,15 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
     public static func taskAt(
         index: Int,
-        in session: PracticeSession,
+        in sessionID: PracticeSession.ID,
         on conn: PostgreSQLConnection
     ) throws -> EventLoopFuture<TaskType> {
 
-        return try conn.select()
+        return conn.select()
             .all(table: Task.self)
             .all(table: MultipleChoiseTask.self)
             .from(PracticeSession.Pivot.Task.self)
-            .where(\PracticeSession.Pivot.Task.sessionID == session.requireID())
+            .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
             .where(\PracticeSession.Pivot.Task.index == index)
             .orderBy(\PracticeSession.Pivot.Task.index, .descending)
             .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
@@ -275,19 +275,17 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
     public static func taskID(
         index: Int,
-        in session: PracticeSession,
+        in sessionID: PracticeSession.ID,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<Task.ID> {
+    ) -> EventLoopFuture<Task.ID> {
 
-        try PracticeSession.Pivot.Task
+        PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\.index == index)
-            .filter(\.sessionID == session.requireID())
+            .filter(\.sessionID == sessionID)
             .first()
             .unwrap(or: Abort(.badRequest))
-            .map {
-                $0.taskID
-        }
+            .map { $0.taskID }
     }
 }
 
@@ -428,21 +426,19 @@ extension PracticeSession.DatabaseRepository {
     }
 
     public static func end(
-        _ session: TaskSession,
+        _ session: PracticeSessionRepresentable,
         for user: User,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<PracticeSession> {
+    ) throws -> EventLoopFuture<PracticeSessionRepresentable> {
 
-        throw Abort(.notImplemented)
-//        guard try session.userID == user.requireID() else {
-//            throw Abort(.forbidden)
-//        }
-//
-//        guard session.endedAt == nil else {
-//            return conn.future(session)
-//        }
-//        session.endedAt = Date()
-//        return session.save(on: conn)
+        guard try session.userID == user.requireID() else {
+            throw Abort(.forbidden)
+        }
+
+        guard session.endedAt == nil else {
+            return conn.future(session)
+        }
+        return session.end(on: conn)
     }
 
     public static func goalProgress(
@@ -479,12 +475,12 @@ extension PracticeSession.DatabaseRepository {
     }
 
     public static func getResult(
-        for session: PracticeSession,
+        for sessionID: PracticeSession.ID,
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<[PSTaskResult]> {
 
-        return try TaskResult.query(on: conn)
-            .filter(\TaskResult.sessionID == session.requireID())
+        return TaskResult.query(on: conn)
+            .filter(\TaskResult.sessionID == sessionID)
             .join(\Task.id, to: \TaskResult.taskID)
             .join(\Subtopic.id, to: \Task.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
