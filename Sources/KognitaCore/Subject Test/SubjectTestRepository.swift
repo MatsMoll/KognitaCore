@@ -7,15 +7,58 @@ public protocol SubjectTestRepositoring:
     where
     CreateData      == SubjectTest.Create.Data,
     CreateResponse  == SubjectTest.Create.Response,
-    UpdateData      == SubjectTest.Create.Data,
-    UpdateResponse  == SubjectTest.Create.Response,
+    UpdateData      == SubjectTest.Update.Data,
+    UpdateResponse  == SubjectTest.Update.Response,
     Model           == SubjectTest
-{}
+{
+    /// Opens a test so users can enter
+    /// - Parameters:
+    ///   - test: The test to open
+    ///   - user: The user that opens the test
+    ///   - conn: The database connection
+    /// - Returns: A future that contains the opend test
+    static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest>
+
+
+    /// A user enters a test in order to submit answers etc
+    /// - Parameters:
+    ///   - test: The test to enter
+    ///   - request: The needed metadata to enter the test
+    ///   - user: The user that enters the test
+    ///   - conn: The database connection
+    /// - Returns: A `TestSession` for the user
+    static func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession>
+
+    /// Retrive data about the test
+    /// - Parameters:
+    ///   - test: The test to get the status for
+    ///   - user: The user requesting the data
+    ///   - conn: The database connection
+    /// - Returns: A `SubjectTest.CompletionStatus` for a test
+    static func userCompletionStatus(in test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.CompletionStatus>
+
+    /// Fetches the task and it's metadata
+    /// - Parameters:
+    ///   - id: The id of the task to fetch
+    ///   - session: The test session
+    ///   - user: The user to fetch the data for
+    ///   - conn: The database connection
+    /// - Returns: The data needed to present a task
+    static func taskWith(id: SubjectTest.Pivot.Task.ID, in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent>
+
+    /// Fetches the general results on a test
+    /// - Parameters:
+    ///   - test: The test to fetch the data for
+    ///   - user: The user requesting the data
+    ///   - conn: The database connection
+    /// - Returns: The results of the test
+    static func results(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Results>
+}
 
 
 extension SubjectTest {
 
-    struct DatabaseRepository: SubjectTestRepositoring {
+    public struct DatabaseRepository: SubjectTestRepositoring {
 
         public enum Errors: Error {
             case testIsClosed
@@ -24,7 +67,7 @@ extension SubjectTest {
             case testHasNotBeenHeldYet
         }
 
-        static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
+        public static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
@@ -48,7 +91,7 @@ extension SubjectTest {
             }
         }
 
-        static func update(model: SubjectTest, to data: SubjectTest.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
+        public static func update(model: SubjectTest, to data: SubjectTest.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
             guard user.isCreator else {
                 throw Abort(.forbidden)
             }
@@ -67,7 +110,7 @@ extension SubjectTest {
             }
         }
 
-        static func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession> {
+        public static func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession> {
             guard test.isOpen else {
                 throw Errors.testIsClosed
             }
@@ -97,7 +140,7 @@ extension SubjectTest {
             }
         }
 
-        static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
+        public static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
             guard user.isCreator else {
                 throw Abort(.forbidden)
             }

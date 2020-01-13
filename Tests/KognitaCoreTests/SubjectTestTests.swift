@@ -142,6 +142,9 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
             let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
 
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
             var status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
 
             // Students / users should not be able to see the completion status of the test
@@ -153,7 +156,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(status.amountOfCompletedUsers, 0)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
 
             status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
 
@@ -161,7 +164,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(status.amountOfCompletedUsers, 1)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
 
             status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
 
@@ -263,8 +266,8 @@ class SubjectTestTests: VaporTestCase {
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
 
             let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
 

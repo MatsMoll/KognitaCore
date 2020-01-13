@@ -133,7 +133,7 @@ class TestSessionTests: VaporTestCase {
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
 
             var results = try TaskResult.query(on: conn).all().wait()
 
@@ -141,7 +141,7 @@ class TestSessionTests: VaporTestCase {
             XCTAssertNotNil(sessionOneEntry.submittedAt)
             XCTAssertNil(sessionTwoEntry.submittedAt)
 
-            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
             results = try TaskResult.query(on: conn).all().wait()
 
             XCTAssertEqual(results.count, 5)
@@ -157,7 +157,7 @@ class TestSessionTests: VaporTestCase {
             )
             // Should throw when submtting the second time
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
+                try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -191,15 +191,18 @@ class TestSessionTests: VaporTestCase {
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
             try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
 
-            try TestSession.DatabaseRepository.submit(test: sessionOneEntry, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(test: sessionTwoEntry, by: userTwo, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
 
 
-            let userOneResults = try TestSession.DatabaseRepository.results(in: test, for: userOne, on: conn).wait()
-            let userTwoResults = try TestSession.DatabaseRepository.results(in: test, for: userTwo, on: conn).wait()
+            let userOneResults = try TestSession.DatabaseRepository.results(in: sessionOne, for: userOne, on: conn).wait()
+            let userTwoResults = try TestSession.DatabaseRepository.results(in: sessionTwo, for: userTwo, on: conn).wait()
 
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.results(in: test, for: userThree, on: conn).wait()
+                try TestSession.DatabaseRepository.results(in: sessionOne, for: userThree, on: conn).wait()
+            )
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.results(in: sessionOne, for: userTwo, on: conn).wait()
             )
 
             XCTAssertEqual(userOneResults.score, 3)
