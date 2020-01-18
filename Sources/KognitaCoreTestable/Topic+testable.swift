@@ -19,8 +19,8 @@ extension Topic {
     }
     
     public static func create(name: String = "Topic", chapter: Int = 1, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
-        
-        return try Topic(name: name, description: "", chapter: chapter, subjectId: subjectId)
+
+        return try Topic(name: name, chapter: chapter, subjectId: subjectId)
             .save(on: conn)
             .wait()
     }

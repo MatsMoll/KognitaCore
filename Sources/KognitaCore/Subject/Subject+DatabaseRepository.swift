@@ -192,4 +192,23 @@ extension Subject.DatabaseRepository {
                 }
         }
     }
+
+//    public static func isActive(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Bool> {
+//
+//        try User.ActiveSubject.query(on: conn)
+//            .filter(\.userID == user.requireID())
+//            .filter(\.subjectID == subject.requireID())
+//            .first()
+//            .map { active in
+//                return active != nil
+//        }
+//    }
+
+    public static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?> {
+
+        try User.ActiveSubject.query(on: conn)
+            .filter(\.userID == user.requireID())
+            .filter(\.subjectID == subject.requireID())
+            .first()
+    }
 }

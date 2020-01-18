@@ -35,7 +35,36 @@ struct TopicTaskCount: Codable {
     let taskCount: Int
 }
 
+public struct CompetenceData {
+    public let userScore: Double
+    public let maxScore: Double
+
+    public var percentage: Double {
+        guard maxScore > 0 else {
+            return 0
+        }
+        return ((userScore / maxScore) * 10000).rounded() / 100
+    }
+
+    public init(userScore: Double, maxScore: Double) {
+        self.userScore = userScore
+        self.maxScore = maxScore
+    }
+}
+
 extension Topic {
+
+    public struct UserOverview: Content {
+        public let id: Topic.ID
+        public let name: String
+        public let numberOfTasks: Int
+        public internal(set) var userScore: Double
+
+        public var competence: CompetenceData {
+            .init(userScore: userScore, maxScore: Double(numberOfTasks))
+        }
+    }
+
     public struct WithTaskCount: Content {
         public let topic: Topic
         public let taskCount: Int
@@ -132,6 +161,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 .join(\Subtopic.id, to: \Task.subtopicID)
                 .groupBy(\Topic.id)
                 .where(\Topic.subjectId == subject.requireID())
+                .where(\Task.isTestable == false)
                 .all(decoding: Topic.self, TopicTaskCount.self)
                 .map { topics in
                     topics.map { data in

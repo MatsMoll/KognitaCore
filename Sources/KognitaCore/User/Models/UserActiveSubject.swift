@@ -13,7 +13,7 @@ extension User {
 
         let userID: User.ID
         let subjectID: Subject.ID
-        var canPractice: Bool
+        public var canPractice: Bool
 
         init(userID: User.ID, subjectID: Subject.ID, canPractice: Bool) {
             self.userID = userID

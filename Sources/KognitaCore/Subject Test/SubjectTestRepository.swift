@@ -3,7 +3,8 @@ import Vapor
 
 public protocol SubjectTestRepositoring:
     CreateModelRepository,
-    UpdateModelRepository
+    UpdateModelRepository,
+    DeleteModelRepository
     where
     CreateData      == SubjectTest.Create.Data,
     CreateResponse  == SubjectTest.Create.Response,
@@ -58,6 +59,21 @@ public protocol SubjectTestRepositoring:
     /// - Parameter user: The user to find the tests for
     /// - Parameter conn: The database connection
     static func currentlyOpenTest(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?>
+
+    /// Returns a list of all the different tests in a subject
+    /// - Parameter subject: The subject the tests is for
+    /// - Parameter user: The user that requests the tests
+    /// - Parameter conn: The database connectino
+    static func all(in subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest]>
+
+    /// Returns a test response for a given id
+    /// - Parameters:
+    ///   - id: The id of the test
+    ///   - user: The user requestiong the test
+    ///   - conn: The database connection
+    static func taskIDsFor(testID id: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Task.ID]>
+
+    static func firstTaskID(testID: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?>
 }
 
 
@@ -242,18 +258,26 @@ extension SubjectTest {
                         .all()
                         .flatMap { answers in
 
-                            SubjectTest.Pivot.Task.query(on: conn)
+                            SubjectTest.Pivot.Task
+                                .query(on: conn)
                                 .filter(\.testID == session.testID)
                                 .all()
-                                .map { testTasks in
+                                .flatMap { testTasks in
 
-                                    SubjectTest.MultipleChoiseTaskContent(
-                                        task: task,
-                                        multipleChoiseTask: multipleChoiseTask,
-                                        choises: taskContent.map { $0.1 },
-                                        selectedChoises: answers,
-                                        testTasks: testTasks
-                                    )
+                                    SubjectTest
+                                        .find(session.testID, on: conn)
+                                        .unwrap(or: Abort(.internalServerError))
+                                        .map { test in
+
+                                            SubjectTest.MultipleChoiseTaskContent(
+                                                test: test,
+                                                task: task,
+                                                multipleChoiseTask: multipleChoiseTask,
+                                                choises: taskContent.map { $0.1 },
+                                                selectedChoises: answers,
+                                                testTasks: testTasks
+                                            )
+                                    }
                             }
                     }
             }
@@ -327,7 +351,45 @@ extension SubjectTest {
                 .sort(\.openedAt, .descending)
                 .filter(\.openedAt != nil)
                 .filter(\User.ActiveSubject.userID == user.requireID())
+                .all()
+                .map { tests in
+                    tests.first(where: { $0.isOpen })
+            }
+        }
+
+        public static func all(in subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest]> {
+
+            try User.DatabaseRepository
+                .isModerator(user: user, subjectID: subject.requireID(), on: conn)
+                .flatMap {
+
+                    try SubjectTest.query(on: conn)
+                        .filter(\.subjectID == subject.requireID())
+                        .sort(\.scheduledAt)
+                        .all()
+            }
+        }
+
+        public static func taskIDsFor(testID id: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Task.ID]> {
+
+            SubjectTest.Pivot.Task.query(on: conn)
+                .filter(\.testID == id)
+                .all()
+                .map { rows in
+                    return rows.map { $0.taskID }
+            }
+        }
+
+        public static func firstTaskID(testID: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?> {
+
+            try SubjectTest.Pivot.Task
+                .query(on: conn)
+                .filter(\.testID == testID)
+                .sort(\.createdAt, .ascending)
                 .first()
+                .map { test in
+                    test?.id
+            }
         }
     }
 }

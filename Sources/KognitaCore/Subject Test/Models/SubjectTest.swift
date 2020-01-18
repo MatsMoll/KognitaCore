@@ -71,6 +71,8 @@ public final class SubjectTest: KognitaPersistenceModel {
         self.openedAt = .now
         return self.save(on: conn)
     }
+
+    public var response: SubjectTest.OverviewResponse { SubjectTest.OverviewResponse(test: self) }
 }
 
 extension SubjectTest: Content {}
@@ -105,42 +107,46 @@ extension SubjectTest {
         public var hasEveryoneCompleted: Bool { amountOfEnteredUsers == amountOfCompletedUsers }
     }
 
+    public struct TestTask: Content {
+        public let testTaskID: SubjectTest.Pivot.Task.ID
+        public let isCurrent: Bool
+    }
+
     public struct MultipleChoiseTaskContent: Content {
 
         public struct Choise: Content {
-            let choise: String
-            let isCorrect: Bool
-            let isSelected: Bool
+            public let id: MultipleChoiseTaskChoise.ID
+            public let choise: String
+            public let isCorrect: Bool
+            public let isSelected: Bool
         }
 
-        public struct TestTask: Content {
-            let testTaskID: SubjectTest.Pivot.Task.ID
-            let isCurrent: Bool
-        }
-
+        public let test: SubjectTest
         public let task: Task
         public let isMultipleSelect: Bool
         public let choises: [Choise]
 
         public let testTasks: [TestTask]
 
-        init(task: Task, multipleChoiseTask: KognitaCore.MultipleChoiseTask, choises: [MultipleChoiseTaskChoise], selectedChoises: [MultipleChoiseTaskAnswer], testTasks: [SubjectTest.Pivot.Task]) {
+        init(test: SubjectTest, task: Task, multipleChoiseTask: KognitaCore.MultipleChoiseTask, choises: [MultipleChoiseTaskChoise], selectedChoises: [MultipleChoiseTaskAnswer], testTasks: [SubjectTest.Pivot.Task]) {
+            self.test = test
             self.task = task
             self.isMultipleSelect = multipleChoiseTask.isMultipleSelect
-            self.choises = choises.map { choise in
-                Choise(
+            self.choises = choises.compactMap { choise in
+                try? Choise(
+                    id: choise.requireID(),
                     choise: choise.choise,
                     isCorrect: choise.isCorrect,
                     isSelected: selectedChoises.contains(where: { $0.choiseID == choise.id })
                 )
             }
             self.testTasks = testTasks.compactMap { testTask in
-                guard let taskID = testTask.id else {
+                guard let testTaskID = testTask.id else {
                     return nil
                 }
                 return TestTask(
-                    testTaskID: taskID,
-                    isCurrent: taskID == task.id
+                    testTaskID: testTaskID,
+                    isCurrent: testTask.taskID == task.id
                 )
             }
         }
