@@ -22,6 +22,9 @@ public final class SubjectTest: KognitaPersistenceModel {
     /// The time the test is open for entering
     public var openedAt: Date?
 
+    /// The date the test ended
+    public var endedAt: Date?
+
     /// The date the test is suppose to be held at
     public var scheduledAt: Date
 
@@ -33,10 +36,12 @@ public final class SubjectTest: KognitaPersistenceModel {
 
 
     public var isOpen: Bool {
-        guard let openedAt = openedAt else {
+        guard
+            let openedAt = openedAt,
+            let endsAt = endedAt
+        else {
             return false
         }
-        let endsAt = openedAt.addingTimeInterval(abs(duration))
         return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
     }
 
@@ -68,7 +73,9 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 
     public func open(on conn: DatabaseConnectable) -> EventLoopFuture<SubjectTest> {
-        self.openedAt = .now
+        let openDate = Date.now
+        self.openedAt = openDate
+        self.endedAt = openDate.addingTimeInterval(duration)
         return self.save(on: conn)
     }
 
@@ -157,19 +164,21 @@ extension SubjectTest {
         public struct MultipleChoiseTaskResult: Content {
 
             public struct Choise: Content {
-                let choise: String
-                let numberOfSubmissions: Int
-                let percentage: Double
+                public let choise: String
+                public let numberOfSubmissions: Int
+                public let percentage: Double
+                public let isCorrect: Bool
             }
 
-            let taskID: Task.ID
-            let question: String
-            let choises: [Choise]
+            public let taskID: Task.ID
+            public let question: String
+            public let choises: [Choise]
         }
 
-        let title: String
-        let heldAt: Date
-        let taskResults: [MultipleChoiseTaskResult]
+        public let title: String
+        public let heldAt: Date
+        public let taskResults: [MultipleChoiseTaskResult]
+        public let averageScore: Double
     }
 }
 

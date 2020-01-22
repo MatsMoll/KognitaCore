@@ -74,6 +74,8 @@ public protocol SubjectTestRepositoring:
     static func taskIDsFor(testID id: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Task.ID]>
 
     static func firstTaskID(testID: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?>
+
+    static func end(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
 
 
@@ -288,7 +290,7 @@ extension SubjectTest {
         }
 
         public static func results(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
-            guard let heldAt = test.openedAt else {
+            guard test.endedAt != nil else {
                 throw Errors.testHasNotBeenHeldYet
             }
 
@@ -313,34 +315,62 @@ extension SubjectTest {
                                 .groupBy(\Task.id)
                                 .groupBy(\MultipleChoiseTaskChoise.id)
                                 .all(decoding: Task.self, MultipleChoiseTaskChoise.self, MultipleChoiseTaskAnswerCount.self)
-                                .map { tasks in
-                                    return Results(
-                                        title: test.title,
-                                        heldAt: heldAt,
-                                        taskResults: tasks.group(by: \.0.id)
-                                            .compactMap { _, info in
-
-                                                guard let task = info.first?.0 else {
-                                                    return nil
-                                                }
-                                                let totalCount = info.reduce(0) { $0 + $1.2.numberOfAnswers }
-
-                                                return try? Results.MultipleChoiseTaskResult(
-                                                    taskID: task.requireID(),
-                                                    question: task.question,
-                                                    choises: info.map { _, choise, count in
-
-                                                        Results.MultipleChoiseTaskResult.Choise(
-                                                            choise: choise.choise,
-                                                            numberOfSubmissions: count.numberOfAnswers,
-                                                            percentage: Double(count.numberOfAnswers) / Double(totalCount)
-                                                        )
-                                                    }
-                                                )
-                                        }
-                                    )
+                                .flatMap { tasks in
+                                    return try calculateResultStatistics(for: test, tasks: tasks, on: conn)
                             }
                     }
+            }
+        }
+
+        private static func calculateResultStatistics(for test: SubjectTest, tasks: [(Task, MultipleChoiseTaskChoise, MultipleChoiseTaskAnswerCount)], on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Results> {
+
+            guard let heldAt = test.endedAt else {
+                throw Errors.testHasNotBeenHeldYet
+            }
+
+            var numberOfCorrectAnswers: Double = 0
+
+            let taskResults: [SubjectTest.Results.MultipleChoiseTaskResult] = tasks.group(by: \.0.id)
+                .compactMap { _, info in
+
+                    guard let task = info.first?.0 else {
+                        return nil
+                    }
+                    var totalCount = info.reduce(0) { $0 + $1.2.numberOfAnswers }
+                    if totalCount == 0 { // In order to fix NaN values
+                        totalCount = 1
+                    }
+
+                    return try? Results.MultipleChoiseTaskResult(
+                        taskID: task.requireID(),
+                        question: task.question,
+                        choises: info.map { _, choise, count in
+
+                            if choise.isCorrect {
+                                numberOfCorrectAnswers += Double(count.numberOfAnswers)
+                            }
+
+                            return Results.MultipleChoiseTaskResult.Choise(
+                                choise: choise.choise,
+                                numberOfSubmissions: count.numberOfAnswers,
+                                percentage: Double(count.numberOfAnswers) / Double(totalCount),
+                                isCorrect: choise.isCorrect
+                            )
+                        }
+                    )
+            }
+
+            return try TestSession.query(on: conn)
+                .filter(\.testID == test.requireID())
+                .count()
+                .map { numberOfSessions in
+
+                    Results(
+                        title: test.title,
+                        heldAt: heldAt,
+                        taskResults: taskResults,
+                        averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions)
+                    )
             }
         }
 
@@ -382,13 +412,59 @@ extension SubjectTest {
 
         public static func firstTaskID(testID: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?> {
 
-            try SubjectTest.Pivot.Task
+            SubjectTest.Pivot.Task
                 .query(on: conn)
                 .filter(\.testID == testID)
                 .sort(\.createdAt, .ascending)
                 .first()
                 .map { test in
                     test?.id
+            }
+        }
+
+        public static func end(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+            guard
+                let endedAt = test.endedAt,
+                endedAt.timeIntervalSinceNow > 0
+            else {
+                throw Abort(.badRequest)
+            }
+            
+            return try User.DatabaseRepository
+                .isModerator(user: user, subjectID: test.subjectID, on: conn)
+                .flatMap {
+                    test.endedAt = .now
+                    return test.save(on: conn)
+                        .flatMap { _ in
+                            try createResults(in: test, on: conn)
+                    }
+            }
+        }
+
+        static func createResults(in test: SubjectTest, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+            try TestSession.query(on: conn)
+                .join(\TaskSession.id, to: \TestSession.id)
+                .filter(\TestSession.testID == test.requireID())
+                .filter(\TestSession.submittedAt == nil)
+                .alsoDecode(TaskSession.self)
+                .all()
+                .flatMap { sessions in
+
+                    try sessions.map { testSession, taskSession in
+                        try TestSession.DatabaseRepository.createResult(
+                            for: TaskSession.TestParameter(
+                                session: taskSession,
+                                testSession: testSession
+                            ),
+                            on: conn
+                        )
+                        .catchMap { _ in
+                            // Ignoring errors in this case
+                        }
+                    }
+                    .flatten(on: conn)
             }
         }
     }

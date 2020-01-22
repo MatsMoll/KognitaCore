@@ -8,7 +8,7 @@ public protocol TestSessionRepresentable {
     var submittedAt: Date? { get }
 
     func requireID() throws -> Int
-    func submit(on conn: DatabaseConnectable) -> EventLoopFuture<TestSessionRepresentable>
+    func submit(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable>
 }
 
 public protocol TestSessionRepositoring {
@@ -284,7 +284,11 @@ extension TestSession {
                 throw Abort(.forbidden)
             }
 
-            return test.submit(on: conn)
+            return try createResult(for: test, on: conn)
+        }
+
+        static func createResult(for session: TestSessionRepresentable, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+            return try session.submit(on: conn)
                 .flatMap { _ in
                     conn.databaseConnection(to: .psql)
                         .flatMap { psqlConn in
@@ -295,7 +299,7 @@ extension TestSession {
                                 .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
                                 .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
                                 .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
-                                .where(\TaskSessionAnswer.sessionID == test.requireID())
+                                .where(\TaskSessionAnswer.sessionID == session.requireID())
                                 .all(decoding: MultipleChoiseTaskChoise.self)
                                 .flatMap { choises in
                                     choises.group(by: \.taskId)
@@ -315,7 +319,7 @@ extension TestSession {
                             .flatMap { results in
                                 try results.map { result in
                                     try TaskResult.DatabaseRepository
-                                        .createResult(from: result, by: user, with: test.requireID(), on: psqlConn)
+                                        .createResult(from: result, userID: session.userID, with: session.requireID(), on: psqlConn)
                                 }
                                 .flatten(on: psqlConn)
                             }

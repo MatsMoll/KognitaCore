@@ -566,7 +566,7 @@ extension PracticeSession.DatabaseRepository {
     ) throws -> EventLoopFuture<TaskResult> {
 
         return try TaskResult.DatabaseRepository
-            .createResult(from: submitResult, by: user, with: session.requireID(), on: conn)
+            .createResult(from: submitResult, userID: user.requireID(), with: session.requireID(), on: conn)
             .flatMap { result in
 
                 try PracticeSession.DatabaseRepository
