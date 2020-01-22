@@ -83,7 +83,7 @@ extension SubjectTest {
 
         public enum Errors: Error {
             case testIsClosed
-            case alreadyEntered
+            case alreadyEntered(sessionID: TaskSession.ID)
             case incorrectPassword
             case testHasNotBeenHeldYet
         }
@@ -169,8 +169,8 @@ extension SubjectTest {
                 .first()
                 .flatMap { session in
 
-                    guard session == nil else {
-                        throw Errors.alreadyEntered
+                    if let session = session {
+                        throw try Errors.alreadyEntered(sessionID: session.requireID())
                     }
                     return try TaskSession(userID: user.requireID())
                         .create(on: conn)

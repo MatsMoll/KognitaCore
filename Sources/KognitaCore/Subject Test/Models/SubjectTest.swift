@@ -72,7 +72,7 @@ public final class SubjectTest: KognitaPersistenceModel {
         return self.save(on: conn)
     }
 
-    public var response: SubjectTest.OverviewResponse { SubjectTest.OverviewResponse(test: self) }
+    public func response(with subject: Subject) -> SubjectTest.OverviewResponse { SubjectTest.OverviewResponse(test: self, subjectName: subject.name) }
 }
 
 extension SubjectTest: Content {}

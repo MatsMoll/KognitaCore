@@ -21,7 +21,6 @@ class TopicTests: VaporTestCase {
         let topicData = try Topic.Create.Data(
             subjectId: subject.requireID(),
             name: "Test",
-            description: "Some description",
             chapter: 1
         )
 
@@ -34,7 +33,6 @@ class TopicTests: VaporTestCase {
 
         XCTAssertEqual(topic.name, topicData.name)
         XCTAssertEqual(topic.subjectId, topicData.subjectId)
-        XCTAssertEqual(topic.description, topicData.description)
         XCTAssertEqual(topic.chapter, topicData.chapter)
         XCTAssertEqual(topic.name, topicData.name)
         XCTAssertEqual(subtopics.count, 1)

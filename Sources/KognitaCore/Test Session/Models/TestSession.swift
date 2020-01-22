@@ -101,6 +101,10 @@ extension TestSession {
                 return score / maximumScore
             }
 
+            public var readableScoreProsentage: Double {
+                scoreProsentage * 100
+            }
+
             init(name: String, taskResults: [Task]) {
                 self.name = name
                 self.taskResults = taskResults

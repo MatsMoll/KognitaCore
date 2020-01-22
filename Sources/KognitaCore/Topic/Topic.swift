@@ -79,9 +79,6 @@ extension Topic {
             /// The name of the topic
             public let name: String
 
-            /// A description of the topic
-            public let description: String
-
             /// The chapther number in a subject
             public let chapter: Int
         }

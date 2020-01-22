@@ -5,6 +5,7 @@ extension SubjectTest {
     public struct OverviewResponse: Content {
 
         public let id: SubjectTest.ID
+        public let subjectName: String
         public let title: String
         public let createdAt: Date
         public let duration: TimeInterval
@@ -20,13 +21,14 @@ extension SubjectTest {
             return openedAt.addingTimeInterval(duration)
         }
 
-        init(test: SubjectTest) {
+        init(test: SubjectTest, subjectName: String) {
             self.id = test.id ?? 0
             self.title = test.title
             self.createdAt = test.createdAt ?? .now
             self.scheduledAt = test.scheduledAt
             self.duration = test.duration
             self.openedAt = test.openedAt
+            self.subjectName = subjectName
         }
     }
 
@@ -71,7 +73,7 @@ extension SubjectTest {
 
         public init(subject: Subject, tests: [SubjectTest]) {
             self.subject = subject
-            self.tests = tests.map { $0.response }
+            self.tests = tests.map { $0.response(with: subject) }
         }
     }
 }
