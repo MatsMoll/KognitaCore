@@ -76,6 +76,8 @@ public protocol SubjectTestRepositoring:
     static func firstTaskID(testID: SubjectTest.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?>
 
     static func end(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    static func scoreHistogram(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.ScoreHistogram>
 }
 
 
@@ -480,6 +482,68 @@ extension SubjectTest {
                     }
                     .flatten(on: conn)
             }
+        }
+
+        struct TestCountQueryResult: Codable {
+            let taskCount: Int
+        }
+
+        struct HistogramQueryResult: Codable {
+            let score: Double
+            let sessionID: User.ID
+        }
+
+        public static func scoreHistogram(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.ScoreHistogram> {
+
+            try User.DatabaseRepository
+                .isModerator(user: user, subjectID: test.subjectID, on: conn)
+                .flatMap { _ in
+
+                    conn.databaseConnection(to: .psql)
+                        .flatMap { conn in
+
+                            try conn.select()
+                                .column(.count(\SubjectTest.Pivot.Task.id), as: "taskCount")
+                                .from(SubjectTest.Pivot.Task.self)
+                                .where(\SubjectTest.Pivot.Task.testID == test.requireID())
+                                .first(decoding: TestCountQueryResult.self)
+                                .unwrap(or: Abort(.badRequest))
+                                .flatMap { count in
+
+                                    try conn.select()
+                                        .column(\TaskResult.resultScore,    as: "score")
+                                        .column(\TestSession.id,            as: "sessionID")
+                                        .from(TestSession.self)
+                                        .join(\TestSession.id, to: \TaskResult.sessionID)
+                                        .where(\TestSession.testID == test.requireID())
+                                        .all(decoding: HistogramQueryResult.self)
+                                        .map { results in
+                                            calculateHistogram(from: results, maxScore: count.taskCount)
+                                    }
+                            }
+                    }
+            }
+        }
+
+        static func calculateHistogram(from results: [HistogramQueryResult], maxScore: Int) -> SubjectTest.ScoreHistogram {
+
+            let sessionResults = results.group(by: \.sessionID)
+                .mapValues { results in
+                    Int(results.reduce(into: 0.0) { $0 += $1.score }.rounded())
+            }
+            let numberOfSessions = sessionResults.count
+            var histogram = (0...maxScore).reduce(into: [Int: Int]()) { $0[$1] = 0 }
+            sessionResults.values.forEach { score in
+                histogram[score] = (histogram[score] ?? 0) + 1
+            }
+            let scores = histogram.map { score, amount in
+                SubjectTest.ScoreHistogram.Score(
+                    score: score,
+                    amount: amount,
+                    percentage: Double(amount) / Double(numberOfSessions)
+                )
+            }
+            return SubjectTest.ScoreHistogram(scores: scores)
         }
     }
 }

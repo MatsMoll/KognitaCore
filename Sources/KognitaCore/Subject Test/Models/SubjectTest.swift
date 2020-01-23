@@ -73,7 +73,7 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 
     public func open(on conn: DatabaseConnectable) -> EventLoopFuture<SubjectTest> {
-        let openDate = Date.now
+        let openDate = Date()
         self.openedAt = openDate
         self.endedAt = openDate.addingTimeInterval(duration)
         return self.save(on: conn)

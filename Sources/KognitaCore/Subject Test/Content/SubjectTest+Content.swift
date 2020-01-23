@@ -20,7 +20,7 @@ extension SubjectTest {
             else {
                 return false
             }
-            return openedAt.timeIntervalSinceNow > 0 && endsAt.timeIntervalSinceNow < 0
+            return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
         }
 
         init(test: SubjectTest, subjectName: String) {

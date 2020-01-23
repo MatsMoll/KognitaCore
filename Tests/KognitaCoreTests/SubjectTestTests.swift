@@ -182,6 +182,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks(numberOfTasks: 3)
 
+            XCTAssertTrue(test.isOpen)
+
             let userOne = try User.create(isAdmin: false, on: conn)
             let userTwo = try User.create(isAdmin: false, on: conn)
 
@@ -348,6 +350,41 @@ class SubjectTestTests: VaporTestCase {
     }
 
 
+    func testTestResultHistogram() throws {
+        do {
+            let test = try setupTestWithTasks()
+
+            let admin = try User.create(on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondSubmittion            = try submittionAt(index: 2, for: test)
+            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+
+            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+
+            let histogram = try SubjectTest.DatabaseRepository.scoreHistogram(for: test, user: admin, on: conn).wait()
+
+            XCTAssertEqual(histogram.scores.count, 4)
+
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.amount, 1)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.amount, 0)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.amount, 1)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.amount, 0)
+
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.percentage, 0.5)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.percentage, 0)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.percentage, 0.5)
+            XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.percentage, 0)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
         let sessionEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
 
@@ -462,7 +499,8 @@ class SubjectTestTests: VaporTestCase {
         ("testCompletionStatus",                testCompletionStatus),
         ("testRetrivingTaskContent",            testRetrivingTaskContent),
         ("testResultStatistics",                testResultStatistics),
-        ("testResultStatisticsTaskReuseBug",    testResultStatisticsTaskReuseBug)
+        ("testResultStatisticsTaskReuseBug",    testResultStatisticsTaskReuseBug),
+        ("testTestResultHistogram",             testTestResultHistogram)
     ]
 }
 
