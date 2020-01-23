@@ -286,6 +286,7 @@ extension SubjectTest {
         }
 
         struct MultipleChoiseTaskAnswerCount: Codable {
+            let choiseID: MultipleChoiseTaskChoise.ID
             let numberOfAnswers: Int
         }
 
@@ -302,33 +303,44 @@ extension SubjectTest {
                         .flatMap { conn in
 
                             try conn.select()
-                                .all(table: Task.self)
-                                .all(table: MultipleChoiseTaskChoise.self)
+                                .column(\MultipleChoiseTaskAnswer.choiseID)
                                 .column(.count(\MultipleChoiseTaskAnswer.id), as: "numberOfAnswers")
-                                .from(SubjectTest.Pivot.Task.self)
-                                .join(\SubjectTest.Pivot.Task.taskID,   to: \Task.id)
-                                .join(\Task.id,                         to: \MultipleChoiseTaskChoise.taskId)
-                                .join(\MultipleChoiseTaskChoise.id,     to: \MultipleChoiseTaskAnswer.choiseID, method: .left)
-                                .join(\MultipleChoiseTaskAnswer.id,     to: \TaskSessionAnswer.taskAnswerID,    method: .left)
-                                .join(\TaskSessionAnswer.sessionID,     to: \TestSession.id,                    method: .left)
-                                .where(\SubjectTest.Pivot.Task.testID == test.requireID())
-                                .groupBy(\Task.id)
-                                .groupBy(\MultipleChoiseTaskChoise.id)
-                                .all(decoding: Task.self, MultipleChoiseTaskChoise.self, MultipleChoiseTaskAnswerCount.self)
-                                .flatMap { tasks in
-                                    return try calculateResultStatistics(for: test, tasks: tasks, on: conn)
+                                .from(TestSession.self)
+                                .join(\TestSession.id, to: \TaskSessionAnswer.sessionID)
+                                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
+                                .groupBy(\MultipleChoiseTaskAnswer.choiseID)
+                                .where(\TestSession.testID == test.requireID())
+                                .all(decoding: MultipleChoiseTaskAnswerCount.self)
+                                .flatMap { choiseCount in
+
+                                    try conn.select()
+                                        .all(table: Task.self)
+                                        .all(table: MultipleChoiseTaskChoise.self)
+                                        .from(SubjectTest.Pivot.Task.self)
+                                        .join(\SubjectTest.Pivot.Task.taskID,   to: \Task.id)
+                                        .join(\Task.id, to: \MultipleChoiseTaskChoise.taskId)
+                                        .where(\SubjectTest.Pivot.Task.testID == test.requireID())
+                                        .all(decoding: Task.self, MultipleChoiseTaskChoise.self)
+                                        .flatMap { tasks in
+
+                                            return try calculateResultStatistics(for: test, tasks: tasks, choiseCount: choiseCount, on: conn)
+                                    }
                             }
                     }
             }
         }
 
-        private static func calculateResultStatistics(for test: SubjectTest, tasks: [(Task, MultipleChoiseTaskChoise, MultipleChoiseTaskAnswerCount)], on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Results> {
+        private static func calculateResultStatistics(for test: SubjectTest, tasks: [(Task, MultipleChoiseTaskChoise)], choiseCount: [MultipleChoiseTaskAnswerCount], on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Results> {
 
-            guard let heldAt = test.endedAt else {
+            guard let heldAt = test.openedAt else {
                 throw Errors.testHasNotBeenHeldYet
             }
 
             var numberOfCorrectAnswers: Double = 0
+
+            let grupedChoiseCount = choiseCount.reduce(into: [MultipleChoiseTaskChoise.ID : Int]()) { dict, choiseCount in
+                dict[choiseCount.choiseID] = choiseCount.numberOfAnswers
+            }
 
             let taskResults: [SubjectTest.Results.MultipleChoiseTaskResult] = tasks.group(by: \.0.id)
                 .compactMap { _, info in
@@ -336,7 +348,8 @@ extension SubjectTest {
                     guard let task = info.first?.0 else {
                         return nil
                     }
-                    var totalCount = info.reduce(0) { $0 + $1.2.numberOfAnswers }
+
+                    var totalCount = info.reduce(0) { $0 + ((try? grupedChoiseCount[$1.1.requireID()]) ?? 0) }
                     if totalCount == 0 { // In order to fix NaN values
                         totalCount = 1
                     }
@@ -344,16 +357,17 @@ extension SubjectTest {
                     return try? Results.MultipleChoiseTaskResult(
                         taskID: task.requireID(),
                         question: task.question,
-                        choises: info.map { _, choise, count in
+                        choises: info.map { _, choise in
 
+                            let choiseCount = (try? grupedChoiseCount[choise.requireID()]) ?? 0
                             if choise.isCorrect {
-                                numberOfCorrectAnswers += Double(count.numberOfAnswers)
+                                numberOfCorrectAnswers += Double(choiseCount)
                             }
 
                             return Results.MultipleChoiseTaskResult.Choise(
                                 choise: choise.choise,
-                                numberOfSubmissions: count.numberOfAnswers,
-                                percentage: Double(count.numberOfAnswers) / Double(totalCount),
+                                numberOfSubmissions: choiseCount,
+                                percentage: Double(choiseCount) / Double(totalCount),
                                 isCorrect: choise.isCorrect
                             )
                         }

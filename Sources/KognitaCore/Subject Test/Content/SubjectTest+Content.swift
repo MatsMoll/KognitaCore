@@ -9,16 +9,18 @@ extension SubjectTest {
         public let title: String
         public let createdAt: Date
         public let duration: TimeInterval
+        public let endsAt: Date?
         public let scheduledAt: Date
         public let openedAt: Date?
 
-        public var isOpen: Bool { openedAt != nil }
-
-        public var endsAt: Date? {
-            guard let openedAt = openedAt else {
-                return nil
+        public var isOpen: Bool {
+            guard
+                let openedAt = openedAt,
+                let endsAt = endsAt
+            else {
+                return false
             }
-            return openedAt.addingTimeInterval(duration)
+            return openedAt.timeIntervalSinceNow > 0 && endsAt.timeIntervalSinceNow < 0
         }
 
         init(test: SubjectTest, subjectName: String) {
@@ -29,6 +31,7 @@ extension SubjectTest {
             self.duration = test.duration
             self.openedAt = test.openedAt
             self.subjectName = subjectName
+            self.endsAt = test.endedAt
         }
     }
 

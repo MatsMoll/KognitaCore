@@ -253,11 +253,11 @@ class TestSessionTests: VaporTestCase {
 
             XCTAssertEqual(overviewOne.test.id, test.id)
             XCTAssertEqual(overviewOne.tasks.count, 3)
-            XCTAssertEqual(overviewOne.tasks.filter({ $0.isAnswerd }).count, 3)
+            XCTAssertEqual(overviewOne.tasks.filter({ $0.isAnswered }).count, 3)
 
             XCTAssertEqual(overviewTwo.test.id, test.id)
             XCTAssertEqual(overviewTwo.tasks.count, 3)
-            XCTAssertEqual(overviewTwo.tasks.filter({ $0.isAnswerd }).count, 2)
+            XCTAssertEqual(overviewTwo.tasks.filter({ $0.isAnswered }).count, 2)
         }
     }
 

@@ -248,34 +248,19 @@ class SubjectTestTests: VaporTestCase {
             let userOne = try User.create(isAdmin: false, on: conn)
             let userTwo = try User.create(isAdmin: false, on: conn)
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
-
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
-
             let firstSubmittion             = try submittionAt(index: 1, for: test)
             let secondSubmittion            = try submittionAt(index: 2, for: test)
             let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
             let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
-
-            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: secondSubmittionIncorrect, for: sessionTwo, by: userTwo, on: conn).wait()
-
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
-
-            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
-
-            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
-
             let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
             let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
             let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+
+            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect, thirdSubmittion])
+
+            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
 
             XCTAssertEqual(result.title, test.title)
             XCTAssertEqual(result.heldAt, test.openedAt)
@@ -305,6 +290,75 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testResultStatisticsTaskReuseBug() {
+        do {
+            let test = try setupTestWithTasks()
+
+            let teacher = try User.create(on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondSubmittion            = try submittionAt(index: 2, for: test)
+            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+
+            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+
+            let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
+
+            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+
+            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
+
+            try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+            try submitTestWithAnswers(secondTest, for: userTwo, with: [firstSubmittion, secondSubmittion])
+
+            let secondResult = try SubjectTest.DatabaseRepository.results(for: secondTest, user: teacher, on: conn).wait()
+
+            XCTAssertEqual(secondResult.title, secondTest.title)
+            XCTAssertEqual(secondResult.heldAt, secondTest.openedAt)
+
+            let firstTaskResult = try XCTUnwrap(secondResult.taskResults.first(where: { $0.taskID == firstTaskID }))
+            XCTAssertEqual(firstTaskResult.choises.count, 3)
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
+            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
+
+            let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
+            XCTAssertEqual(secondTaskResult.choises.count, 3)
+            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
+            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
+
+            let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
+            XCTAssertEqual(thirdTaskResult.choises.count, 3)
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 1 }))
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
+            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
+
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+
+    func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
+        let sessionEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
+
+        let session = try sessionEntry.representable(on: conn).wait()
+
+        try submittions.forEach {
+            try TestSession.DatabaseRepository.submit(content: $0, for: session, by: user, on: conn).wait()
+        }
+
+        try TestSession.DatabaseRepository.submit(test: session, by: user, on: conn).wait()
+    }
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
@@ -341,6 +395,26 @@ class SubjectTestTests: VaporTestCase {
             choises: choises,
             taskIndex: 1
         )
+    }
+
+    func setupTestWithTasks(with taskIDs: [MultipleChoiseTask.ID], subjectID: Subject.ID, scheduledAt: Date = .now, duration: TimeInterval = .minutes(10)) throws -> SubjectTest {
+        let user = try User.create(on: conn)
+
+        let data = SubjectTest.Create.Data(
+            tasks:          taskIDs,
+            subjectID:      subjectID,
+            duration:       duration,
+            scheduledAt:    scheduledAt,
+            password:       "password",
+            title:          "Testing"
+        )
+
+        if scheduledAt.timeIntervalSinceNow < 0 {
+            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            return try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+        } else {
+            return try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+        }
     }
 
     func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
@@ -387,7 +461,8 @@ class SubjectTestTests: VaporTestCase {
         ("testEnteringMultipleTimes",           testEnteringMultipleTimes),
         ("testCompletionStatus",                testCompletionStatus),
         ("testRetrivingTaskContent",            testRetrivingTaskContent),
-        ("testResultStatistics",                testResultStatistics)
+        ("testResultStatistics",                testResultStatistics),
+        ("testResultStatisticsTaskReuseBug",    testResultStatisticsTaskReuseBug)
     ]
 }
 
