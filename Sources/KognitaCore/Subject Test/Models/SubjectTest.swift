@@ -179,6 +179,8 @@ extension SubjectTest {
         public let heldAt: Date
         public let taskResults: [MultipleChoiseTaskResult]
         public let averageScore: Double
+        public let subjectID: Subject.ID
+        public let subjectName: String
     }
 }
 

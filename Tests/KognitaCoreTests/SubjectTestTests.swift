@@ -368,6 +368,10 @@ class SubjectTestTests: VaporTestCase {
 
             let histogram = try SubjectTest.DatabaseRepository.scoreHistogram(for: test, user: admin, on: conn).wait()
 
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.scoreHistogram(for: test, user: userOne, on: conn).wait()
+            )
+
             XCTAssertEqual(histogram.scores.count, 4)
 
             XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.amount, 1)

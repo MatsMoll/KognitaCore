@@ -72,11 +72,30 @@ extension SubjectTest {
 
     public struct ListReponse: Content {
         public let subject: Subject
-        public let tests: [SubjectTest.OverviewResponse]
+
+        public let finnishedTests: [SubjectTest.OverviewResponse]
+        public let unopenedTests: [SubjectTest.OverviewResponse]
+        public var ongoingTests: [SubjectTest.OverviewResponse]
 
         public init(subject: Subject, tests: [SubjectTest]) {
             self.subject = subject
-            self.tests = tests.map { $0.response(with: subject) }
+
+            var ongoingTests = [SubjectTest.OverviewResponse]()
+            var unopendTests = [SubjectTest.OverviewResponse]()
+            var finnishedTests = [SubjectTest.OverviewResponse]()
+
+            tests.forEach { test in
+                if test.endedAt == nil {
+                    unopendTests.append(test.response(with: subject))
+                } else if test.isOpen {
+                    ongoingTests.append(test.response(with: subject))
+                } else {
+                    finnishedTests.append(test.response(with: subject))
+                }
+            }
+            self.ongoingTests = ongoingTests
+            self.unopenedTests = unopendTests
+            self.finnishedTests = finnishedTests
         }
     }
 }

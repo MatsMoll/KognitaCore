@@ -379,14 +379,21 @@ extension SubjectTest {
             return try TestSession.query(on: conn)
                 .filter(\.testID == test.requireID())
                 .count()
-                .map { numberOfSessions in
+                .flatMap { numberOfSessions in
 
-                    Results(
-                        title: test.title,
-                        heldAt: heldAt,
-                        taskResults: taskResults,
-                        averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions)
-                    )
+                    Subject.find(test.subjectID, on: conn)
+                        .unwrap(or: Abort(.internalServerError))
+                        .map { subject in
+
+                            Results(
+                                title: test.title,
+                                heldAt: heldAt,
+                                taskResults: taskResults,
+                                averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions),
+                                subjectID: test.subjectID,
+                                subjectName: subject.name
+                            )
+                    }
             }
         }
 
@@ -411,7 +418,7 @@ extension SubjectTest {
 
                     try SubjectTest.query(on: conn)
                         .filter(\.subjectID == subject.requireID())
-                        .sort(\.scheduledAt)
+                        .sort(\.scheduledAt, .descending)
                         .all()
             }
         }
@@ -536,12 +543,13 @@ extension SubjectTest {
             sessionResults.values.forEach { score in
                 histogram[score] = (histogram[score] ?? 0) + 1
             }
-            let scores = histogram.map { score, amount in
-                SubjectTest.ScoreHistogram.Score(
-                    score: score,
-                    amount: amount,
-                    percentage: Double(amount) / Double(numberOfSessions)
-                )
+            let scores = histogram.sorted(by: { $0.key < $1.key })
+                .map { score, amount in
+                    SubjectTest.ScoreHistogram.Score(
+                        score: score,
+                        amount: amount,
+                        percentage: Double(amount) / Double(numberOfSessions)
+                    )
             }
             return SubjectTest.ScoreHistogram(scores: scores)
         }
