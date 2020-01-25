@@ -16,12 +16,6 @@ public protocol DeleteModelRepository {
 
 extension DeleteModelRepository where Model: PostgreSQLModel {
     public static func delete(model: Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-        guard let user = user else {
-            throw Abort(.unauthorized)
-        }
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
         return model.delete(on: conn)
     }
 }

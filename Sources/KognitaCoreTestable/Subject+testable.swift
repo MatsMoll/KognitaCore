@@ -30,4 +30,12 @@ extension Subject {
             .save(on: conn)
             .wait()
     }
+
+    public func makeActive(for user: User, canPractice: Bool, on conn: DatabaseConnectable) throws {
+        try Subject.DatabaseRepository.mark(active: self, canPractice: canPractice, for: user, on: conn).wait()
+    }
+
+    public func grantModeratorPrivilege(for userID: User.ID, by moderator: User, on conn: DatabaseConnectable) throws {
+        try Subject.DatabaseRepository.grantModeratorPrivilege(for: userID, in: self.requireID(), by: moderator, on: conn).wait()
+    }
 }

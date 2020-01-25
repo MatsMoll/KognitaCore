@@ -8,7 +8,7 @@ public protocol TestSessionRepresentable {
     var submittedAt: Date? { get }
 
     func requireID() throws -> Int
-    func submit(on conn: DatabaseConnectable) -> EventLoopFuture<TestSessionRepresentable>
+    func submit(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable>
 }
 
 public protocol TestSessionRepositoring {
@@ -34,11 +34,79 @@ public protocol TestSessionRepositoring {
     ///   - conn: The database connection
     /// - Returns: The results from a session
     static func results(in test: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.Results>
+
+    /// Returns an overview over a test session
+    /// - Parameters:
+    ///   - test: The session to get a overview over
+    ///   - user: The user requesting the overview
+    ///   - conn: The database connection
+    static func overview(in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.Overview>
 }
 
 
 extension TestSession {
     public class DatabaseRepository: TestSessionRepositoring {
+
+        struct OverviewQuery: Codable {
+            let question: String
+            let testTaskID: SubjectTest.Pivot.Task.ID
+            let taskID: Task.ID
+        }
+
+        struct TaskAnswerTaskIDQuery: Codable {
+            let taskID: Task.ID
+        }
+
+        public static func overview(in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.Overview> {
+            guard session.userID == user.id else {
+                throw Abort(.forbidden)
+            }
+
+            return conn.databaseConnection(to: .psql)
+                .flatMap { conn in
+
+                    return conn.select()
+                        .all(table: SubjectTest.self)
+                        .column(\Task.id,                       as: "taskID")
+                        .column(\Task.question,                 as: "question")
+                        .column(\SubjectTest.Pivot.Task.id,     as: "testTaskID")
+                        .from(SubjectTest.Pivot.Task.self)
+                        .join(\SubjectTest.Pivot.Task.taskID,       to: \Task.id)
+                        .join(\SubjectTest.Pivot.Task.testID,       to: \SubjectTest.id)
+                        .where(\SubjectTest.id == session.testID)
+                        .all(decoding: OverviewQuery.self, SubjectTest.self)
+                        .flatMap { tasks in
+
+                            try conn.select()
+                                .column(\MultipleChoiseTaskChoise.taskId,       as: "taskID")
+                                .from(TestSession.self)
+                                .join(\TestSession.id,                      to: \TaskSessionAnswer.sessionID)
+                                .join(\TaskSessionAnswer.taskAnswerID,      to: \MultipleChoiseTaskAnswer.id)
+                                .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
+                                .where(\TestSession.id == session.requireID())
+                                .all(decoding: TaskAnswerTaskIDQuery.self)
+                                .map { taskIDs in
+
+                                    guard let test = tasks.first?.1 else {
+                                        throw Abort(.internalServerError)
+                                    }
+
+                                    return try TestSession.Overview(
+                                        sessionID: session.requireID(),
+                                        test: test,
+                                        tasks: tasks.map { task in
+                                            return TestSession.Overview.Task(
+                                                testTaskID: task.0.testTaskID,
+                                                question: task.0.question,
+                                                isAnswered: taskIDs.contains(where: { $0.taskID == task.0.taskID })
+                                            )
+                                        }
+                                    )
+                            }
+                    }
+            }
+        }
+
 
         public static func submit(content: FlashCardTask.Submit, for session: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard user.id == session.userID else {
@@ -216,7 +284,11 @@ extension TestSession {
                 throw Abort(.forbidden)
             }
 
-            return test.submit(on: conn)
+            return try createResult(for: test, on: conn)
+        }
+
+        static func createResult(for session: TestSessionRepresentable, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+            return try session.submit(on: conn)
                 .flatMap { _ in
                     conn.databaseConnection(to: .psql)
                         .flatMap { psqlConn in
@@ -227,7 +299,7 @@ extension TestSession {
                                 .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
                                 .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
                                 .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
-                                .where(\TaskSessionAnswer.sessionID == test.requireID())
+                                .where(\TaskSessionAnswer.sessionID == session.requireID())
                                 .all(decoding: MultipleChoiseTaskChoise.self)
                                 .flatMap { choises in
                                     choises.group(by: \.taskId)
@@ -247,7 +319,7 @@ extension TestSession {
                             .flatMap { results in
                                 try results.map { result in
                                     try TaskResult.DatabaseRepository
-                                        .createResult(from: result, by: user, with: test.requireID(), on: psqlConn)
+                                        .createResult(from: result, userID: session.userID, with: session.requireID(), on: psqlConn)
                                 }
                                 .flatten(on: psqlConn)
                             }

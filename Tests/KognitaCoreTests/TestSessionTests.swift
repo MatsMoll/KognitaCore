@@ -218,6 +218,50 @@ class TestSessionTests: VaporTestCase {
     }
 
 
+    func testOverview() throws {
+        do {
+            let test = try setupTestWithTasks()
+
+            let userOne = try User.create(on: conn)
+            let userTwo = try User.create(on: conn)
+            let userThree = try User.create(on: conn)
+
+            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+
+            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+
+            let firstSubmittion     = try submittionAt(index: 1, for: test)
+            let secondSubmittion    = try submittionAt(index: 2, for: test)
+            let thirdSubmittion     = try submittionAt(index: 3, for: test)
+
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+
+            let overviewOne = try TestSession.DatabaseRepository.overview(in: sessionOne, for: userOne, on: conn).wait()
+            let overviewTwo = try TestSession.DatabaseRepository.overview(in: sessionTwo, for: userTwo, on: conn).wait()
+
+            XCTAssertThrowsError(
+                try TestSession.DatabaseRepository.overview(in: sessionTwo, for: userThree, on: conn).wait()
+            )
+
+            XCTAssertEqual(overviewOne.test.id, test.id)
+            XCTAssertEqual(overviewOne.tasks.count, 3)
+            XCTAssertEqual(overviewOne.tasks.filter({ $0.isAnswered }).count, 3)
+
+            XCTAssertEqual(overviewTwo.test.id, test.id)
+            XCTAssertEqual(overviewTwo.tasks.count, 3)
+            XCTAssertEqual(overviewTwo.tasks.filter({ $0.isAnswered }).count, 2)
+        }
+    }
+
+
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
@@ -249,7 +293,8 @@ class TestSessionTests: VaporTestCase {
     }
 
     func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
-        let subtopic = try Subtopic.create(on: conn)
+        let topic = try Topic.create(on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
         let taskIds = try (0..<numberOfTasks).map { _ in
             try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
                 .requireID()
@@ -262,6 +307,7 @@ class TestSessionTests: VaporTestCase {
 
         let data = SubjectTest.Create.Data(
             tasks:          taskIds,
+            subjectID:      topic.subjectId,
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",
@@ -284,6 +330,7 @@ class TestSessionTests: VaporTestCase {
         ("testUpdateAnswerInSession",                       testUpdateAnswerInSession),
         ("testSubmittingAndUpdatingAnswerMultipleUsers",    testSubmittingAndUpdatingAnswerMultipleUsers),
         ("testSubmittingTestSession",                       testSubmittingTestSession),
-        ("testResultsAfterSubmittion",                      testResultsAfterSubmittion)
+        ("testResultsAfterSubmittion",                      testResultsAfterSubmittion),
+        ("testOverview",                                    testOverview)
     ]
 }

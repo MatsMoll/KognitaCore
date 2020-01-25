@@ -22,12 +22,13 @@ public class DatabaseMigrations {
 
         migrations.add(migration: Task.ExamSemester.self,           database: .psql)
         migrations.add(migration: Subject.ColorClass.self,          database: .psql)
-        migrations.add(migration: User.Role.self,                   database: .psql)
 
         migrations.add(model: User.self,                            database: .psql)
-        migrations.add(model: UserToken.self,                       database: .psql)
+        migrations.add(model: User.Login.Token.self,                       database: .psql)
         migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
         migrations.add(model: Subject.self,                         database: .psql)
+        migrations.add(model: User.ModeratorPrivilege.self,         database: .psql)
+        migrations.add(model: User.ActiveSubject.self,              database: .psql)
         migrations.add(model: Topic.self,                           database: .psql)
         migrations.add(model: Subtopic.self,                        database: .psql)
         migrations.add(model: Task.self,                            database: .psql)

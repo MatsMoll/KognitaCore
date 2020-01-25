@@ -44,6 +44,7 @@ extension TaskSession {
         let session: TaskSession
         let practiceSession: PracticeSession
 
+        public var id: Int?                     { session.id }
         public var userID: User.ID              { session.userID }
         public var createdAt: Date?             { session.createdAt }
         public var endedAt: Date?               { practiceSession.endedAt }

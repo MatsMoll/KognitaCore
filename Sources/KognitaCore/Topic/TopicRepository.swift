@@ -35,7 +35,36 @@ struct TopicTaskCount: Codable {
     let taskCount: Int
 }
 
+public struct CompetenceData {
+    public let userScore: Double
+    public let maxScore: Double
+
+    public var percentage: Double {
+        guard maxScore > 0 else {
+            return 0
+        }
+        return ((userScore / maxScore) * 10000).rounded() / 100
+    }
+
+    public init(userScore: Double, maxScore: Double) {
+        self.userScore = userScore
+        self.maxScore = maxScore
+    }
+}
+
 extension Topic {
+
+    public struct UserOverview: Content {
+        public let id: Topic.ID
+        public let name: String
+        public let numberOfTasks: Int
+        public internal(set) var userScore: Double
+
+        public var competence: CompetenceData {
+            .init(userScore: userScore, maxScore: Double(numberOfTasks))
+        }
+    }
+
     public struct WithTaskCount: Content {
         public let topic: Topic
         public let taskCount: Int
@@ -50,24 +79,28 @@ extension Topic.DatabaseRepository: TopicRepository {
     
     public static func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
         
-        guard let user = user,
-            user.isCreator else { throw Abort(.forbidden) }
+        guard let user = user else { throw Abort(.forbidden) }
 
-        return Subject.DatabaseRepository
-            .getSubjectWith(id: content.subjectId, on: conn)
-            .flatMap { subject in
-                try Topic(content: content, subject: subject, creator: user)
-                    .create(on: conn)
-                    .flatMap { topic in
-                        try Subtopic(
-                            content: Subtopic.Create.Data(
-                                name: "Generelt",
-                                topicId: topic.requireID(),
-                                chapter: 1
-                            )
-                        )
-                        .save(on: conn)
-                        .transform(to: topic)
+        return try User.DatabaseRepository
+            .isModerator(user: user, subjectID: content.subjectId, on: conn)
+            .flatMap {
+
+                Subject.DatabaseRepository
+                    .getSubjectWith(id: content.subjectId, on: conn)
+                    .flatMap { subject in
+                        try Topic(content: content, subject: subject, creator: user)
+                            .create(on: conn)
+                            .flatMap { topic in
+                                try Subtopic(
+                                    content: Subtopic.Create.Data(
+                                        name: "Generelt",
+                                        topicId: topic.requireID(),
+                                        chapter: 1
+                                    )
+                                )
+                                .save(on: conn)
+                                .transform(to: topic)
+                        }
                 }
         }
     }
@@ -128,6 +161,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 .join(\Subtopic.id, to: \Task.subtopicID)
                 .groupBy(\Topic.id)
                 .where(\Topic.subjectId == subject.requireID())
+                .where(\Task.isTestable == false)
                 .all(decoding: Topic.self, TopicTaskCount.self)
                 .map { topics in
                     topics.map { data in

@@ -11,16 +11,20 @@ import Vapor
 
 public protocol UserRepository:
     CreateModelRepository,
-    UpdateModelRepository,
     RetriveModelRepository
     where
     CreateData      == User.Create.Data,
     CreateResponse  == User.Response,
-    UpdateData      == User.Edit.Data,
-    UpdateResponse  == User.Response,
     Model           == User
 {
     static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?>
+
+    static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
 
 extension User {
@@ -49,9 +53,9 @@ extension User.DatabaseRepository: UserRepository {
         }
     }
 
-    static public func login(with user: User, conn: DatabaseConnectable) throws -> Future<UserToken> {
+    static public func login(with user: User, conn: DatabaseConnectable) throws -> Future<User.Login.Token> {
         // create new token for this user
-        let token = try UserToken.create(userID: user.requireID())
+        let token = try User.Login.Token.create(userID: user.requireID())
 
         // save and return token
         return token.save(on: conn)
@@ -79,9 +83,7 @@ extension User.DatabaseRepository: UserRepository {
         let newUser = User(
             username: content.username,
             email: content.email,
-            passwordHash: hash,
-            role: .user,
-            canPractice: true
+            passwordHash: hash
         )
 
         return User.query(on: conn)
@@ -97,19 +99,77 @@ extension User.DatabaseRepository: UserRepository {
         }
     }
 
-    public static func update(model: User, to data: User.Edit.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
-
-        guard try model.requireID() == user.requireID() else {
-            throw Abort(.forbidden)
-        }
-        try model.updateValues(with: data)
-        return model.save(on: conn)
-            .map { try $0.content() }
-    }
-
     public static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?> {
         User.query(on: conn)
             .filter(\.email == email)
             .first()
+    }
+
+    public static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard user.isAdmin == false else {
+            return conn.future()
+        }
+        return try User.ModeratorPrivilege
+            .query(on: conn)
+            .filter(\.subjectID == subjectID)
+            .filter(\User.ModeratorPrivilege.userID == user.requireID())
+            .first()
+            .unwrap(or: Abort(.forbidden))
+            .transform(to: ())
+    }
+
+    public static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard user.isAdmin == false else {
+            return conn.future()
+        }
+        return try Subtopic.query(on: conn)
+            .filter(\.id == subtopicID)
+            .filter(\User.ModeratorPrivilege.userID == user.requireID())
+            .join(\Topic.id, to: \Subtopic.topicId)
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .first()
+            .unwrap(or: Abort(.forbidden))
+            .transform(to: ())
+    }
+
+    public static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard user.isAdmin == false else {
+            return conn.future()
+        }
+        return try Task.query(on: conn)
+            .filter(\.id == taskID)
+            .filter(\User.ModeratorPrivilege.userID == user.requireID())
+            .join(\Subtopic.id, to: \Task.subtopicID)
+            .join(\Topic.id, to: \Subtopic.topicId)
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .first()
+            .unwrap(or: Abort(.forbidden))
+            .transform(to: ())
+    }
+
+    public static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard user.isAdmin == false else {
+            return conn.future()
+        }
+        return try Topic.query(on: conn)
+            .filter(\.id == topicID)
+            .filter(\User.ModeratorPrivilege.userID == user.requireID())
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .first()
+            .unwrap(or: Abort(.forbidden))
+            .transform(to: ())
+    }
+
+    public static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard user.isAdmin == false else {
+            return conn.future()
+        }
+        return try User.ActiveSubject.query(on: conn)
+            .filter(\.userID == user.requireID())
+            .filter(\.subjectID == subjectID)
+            .filter(\.canPractice == true)
+            .first()
+            .unwrap(or: Abort(.forbidden))
+            .transform(to: ())
     }
 }

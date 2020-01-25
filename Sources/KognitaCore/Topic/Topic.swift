@@ -23,9 +23,6 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
     /// The name of the topic
     public private(set) var name: String
 
-    /// A description of the topic
-    public private(set) var description: String
-
     /// The chapther number in a subject
     public private(set) var chapter: Int
     
@@ -33,9 +30,8 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
     public var updatedAt: Date?
     
     
-    public init(name: String, description: String, chapter: Int, subjectId: Subject.ID) throws {
+    public init(name: String, chapter: Int, subjectId: Subject.ID) throws {
         self.name           = name
-        self.description    = description
         self.chapter        = chapter
         self.subjectId      = subjectId
 
@@ -45,7 +41,6 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
     init(content: Create.Data, subject: Subject, creator: User) throws {
         subjectId   = try subject.requireID()
         name        = content.name
-        description = content.description
         chapter     = content.chapter
 
         try validateTopic()
@@ -55,14 +50,11 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
         guard try name.validateWith(regex: "[\\u0028-\\u003B\\u0041-\\u005A\\u0061-\\u007A\\u00B4-\\u00FF\\- ]*") else {
             throw Abort(.badRequest, reason: "Misformed name")
         }
-        description.makeHTMLSafe()
     }
 
     public func updateValues(with content: Create.Data) throws {
         name        = content.name
-        description = content.description
         chapter     = content.chapter
-
         try validateTopic()
     }
     
@@ -86,9 +78,6 @@ extension Topic {
 
             /// The name of the topic
             public let name: String
-
-            /// A description of the topic
-            public let description: String
 
             /// The chapther number in a subject
             public let chapter: Int
@@ -136,7 +125,7 @@ extension Subtopic {
 }
 
 extension Topic {
-    public static let unselected = try! Topic(name: "Velg ...", description: "", chapter: 0, subjectId: 0)
+    public static let unselected = try! Topic(name: "Velg ...", chapter: 0, subjectId: 0)
 }
 
 extension Topic.Response {
