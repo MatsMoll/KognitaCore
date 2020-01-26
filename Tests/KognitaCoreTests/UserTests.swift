@@ -7,6 +7,61 @@ import KognitaCoreTestable
 
 class UserTests: VaporTestCase {
 
+    func testEmailVerificationTokenOnCreate() throws {
+
+        let createRequest = User.Create.Data(
+            username: "Test",
+            email: "test@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTermsInput: "on" // The same ass checked
+        )
+
+        let user = try User.DatabaseRepository.create(from: createRequest, by: nil, on: conn).wait()
+        XCTAssertNoThrow(
+            try User.VerifyEmail.Token.query(on: conn).filter(\.userID == user.userId).first().unwrap(or: Abort(.internalServerError)).wait()
+        )
+    }
+
+    func testSendEmail() throws {
+        let createRequest = User.Create.Data(
+            username: "Test",
+            email: "test@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTermsInput: "on" // The same ass checked
+        )
+        let user = try User.DatabaseRepository.create(from: createRequest, by: nil, on: conn).wait()
+        let token = try User.VerifyEmail.Token.query(on: conn).filter(\.userID == user.userId).first().unwrap(or: Abort(.internalServerError)).wait()
+        let sender = try XCTUnwrap(try app.make(VerifyEmailSendable.self) as? SendVerifyEmailMock)
+        XCTAssertFalse(sender.hasBeenCalled)
+        _ = try token.sendEmail(with: app)
+        XCTAssertTrue(sender.hasBeenCalled)
+    }
+
+    func testNotNTNUEmailCreateError() throws {
+        let createRequestNTNU = User.Create.Data(
+            username: "Test",
+            email: "test@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTermsInput: "on" // The same ass checked
+        )
+        let createRequestInvalid = User.Create.Data(
+            username: "Test",
+            email: "test@test.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTermsInput: "on" // The same ass checked
+        )
+        XCTAssertNoThrow(
+            try User.DatabaseRepository.create(from: createRequestNTNU, by: nil, on: conn).wait()
+        )
+        XCTAssertThrowsError(
+            try User.DatabaseRepository.create(from: createRequestInvalid, by: nil, on: conn).wait()
+        )
+    }
+
     func testResetPassword() throws {
         let user = try User.create(on: conn)
         
@@ -80,6 +135,9 @@ class UserTests: VaporTestCase {
     }
     
     static let allTests = [
+        ("testEmailVerificationTokenOnCreate", testEmailVerificationTokenOnCreate),
+        ("testSendEmail", testSendEmail),
+        ("testNotNTNUEmailCreateError", testNotNTNUEmailCreateError),
         ("testResetPassword", testResetPassword),
         ("testResetPasswordPasswordMismatch", testResetPasswordPasswordMismatch),
         ("testResetPasswordExpiredToken", testResetPasswordExpiredToken)

@@ -24,8 +24,9 @@ public class DatabaseMigrations {
         migrations.add(migration: Subject.ColorClass.self,          database: .psql)
 
         migrations.add(model: User.self,                            database: .psql)
-        migrations.add(model: User.Login.Token.self,                       database: .psql)
+        migrations.add(model: User.Login.Token.self,                database: .psql)
         migrations.add(model: User.ResetPassword.Token.self,        database: .psql)
+        migrations.add(model: User.VerifyEmail.Token.self,          database: .psql)
         migrations.add(model: Subject.self,                         database: .psql)
         migrations.add(model: User.ModeratorPrivilege.self,         database: .psql)
         migrations.add(model: User.ActiveSubject.self,              database: .psql)
