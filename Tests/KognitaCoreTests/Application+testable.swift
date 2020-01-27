@@ -53,10 +53,9 @@ extension Application {
         var commandConfig = CommandConfig()
         commandConfig.useFluentCommands()
         services.register(commandConfig)
+        services.register(SendVerifyEmailMock(), as: VerifyEmailSendable.self)
 
-        let app = try Application(config: config, environment: env, services: services)
-
-        return app
+        return try Application(config: config, environment: env, services: services)
     }
     
     static func reset() throws {

@@ -30,6 +30,9 @@ public final class User: KognitaCRUDModel {
     /// The role of the User
     public private(set) var isAdmin: Bool
 
+    /// If the user has verified the user email
+    public var isEmailVerified: Bool
+
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
 
@@ -42,16 +45,18 @@ public final class User: KognitaCRUDModel {
 //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, username: String, email: String, passwordHash: String, isAdmin: Bool = false) {
+    init(id: Int? = nil, username: String, email: String, passwordHash: String, isAdmin: Bool = false, isEmailVerified: Bool = false) {
         self.id = id
         self.username = username
         self.email = email.lowercased()
         self.passwordHash = passwordHash
         self.isAdmin = isAdmin
+        self.isEmailVerified = isEmailVerified
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
         builder.unique(on: \.email)
+        builder.unique(on: \.username)
     }
     
     public func update(password: String) throws {
@@ -96,19 +101,14 @@ extension User {
 extension User {
     struct UnknownUserMigration: PostgreSQLMigration {
         static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            do {
-                let hash = try BCrypt.hash("soMe-unKnown-paSswOrd-@934")
-                return User(
-                    id: nil,
-                    username: "Unknown",
-                    email: "unknown@kognita.no",
-                    passwordHash: hash
-                )
-                    .create(on: conn)
-                    .transform(to: ())
-            } catch {
-                return conn.future()
-            }
+            return User(
+                id: nil,
+                username: "Unknown",
+                email: "unknown@kognita.no",
+                passwordHash: "$2b$12$w8PoPj1yhROCdkAc2JjUJefWX91RztazdWo.D5kQhSdY.eSrT3wD6"
+            )
+                .create(on: conn)
+                .transform(to: ())
         }
 
         static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

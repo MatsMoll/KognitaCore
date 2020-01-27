@@ -19,19 +19,34 @@ public protocol UserRepository:
 {
     static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?>
 
-    static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, subjectID: Subject.ID,      on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, subtopicID: Subtopic.ID,    on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, taskID: Task.ID,            on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, topicID: Topic.ID,          on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 
-    static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func canPractice(user: User, subjectID: Subject.ID,      on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token>
 }
 
 extension User {
     public final class DatabaseRepository {}
 }
 
+extension String {
+    var isValidEmail: Bool {
+        if let matchRange = self.range(of: "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}", options: [.regularExpression, .caseInsensitive]) {
+            if matchRange == startIndex..<endIndex {
+                return true
+            }
+        }
+        return false
+    }
+}
+
 extension User.DatabaseRepository: UserRepository {
+
 
     public enum Errors: LocalizedError {
         case passwordMismatch
@@ -40,6 +55,7 @@ extension User.DatabaseRepository: UserRepository {
         case unauthorized
         case existingUser(email: String)
         case invalidRecruterToken
+        case invalidEmail
 
         public var errorDescription: String? {
             switch self {
@@ -48,7 +64,8 @@ extension User.DatabaseRepository: UserRepository {
             case .unauthorized:                     return "Sjekk at epost og passord stemmer"
             case .existingUser(let email):          return "Det finnes allerede en bruker med epost: \(email)"
             case .invalidRecruterToken:             return "Ugyldig rekruterings kode"
-            case .misformed(let field, let reason): return "Ugylding formentert \(field), fordi det \(reason)"
+            case .misformed(let field, let reason): return "Ugyldig formentert \(field), fordi det \(reason)"
+            case .invalidEmail:                     return "Ugyldig epost. Må være en NTNU-addresse"
             }
         }
     }
@@ -69,12 +86,15 @@ extension User.DatabaseRepository: UserRepository {
         guard !content.username.isEmpty, !content.email.isEmpty, !content.password.isEmpty else {
             throw Errors.missingInput
         }
-        let lowercasedEmail = content.email.lowercased()
-        guard lowercasedEmail.allSatisfy({ !$0.isWhitespace }) else {
-            throw Errors.misformed(field: "email", reason: "innholder mellomrom eller lignende tegn")
-        }
         guard content.password == content.verifyPassword else {
             throw Errors.passwordMismatch
+        }
+        let lowercasedEmail = content.email.lowercased()
+        guard lowercasedEmail.isValidEmail else {
+            throw Errors.misformed(field: "email", reason: "innholder mellomrom eller lignende tegn")
+        }
+        guard lowercasedEmail.hasSuffix("ntnu.no") else {
+            throw Errors.invalidEmail
         }
 
         // hash user's password using BCrypt
@@ -95,6 +115,12 @@ extension User.DatabaseRepository: UserRepository {
                     throw Errors.existingUser(email: newUser.email)
                 }
                 return newUser.save(on: conn)
+                    .flatMap { user in
+
+                        try User.VerifyEmail.Token.create(userID: user.requireID())
+                            .save(on: conn)
+                            .transform(to: user)
+                }
                     .map { try $0.content() }
         }
     }
@@ -164,6 +190,9 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
+        guard user.isEmailVerified else {
+            throw Abort(.forbidden)
+        }
         return try User.ActiveSubject.query(on: conn)
             .filter(\.userID == user.requireID())
             .filter(\.subjectID == subjectID)
@@ -171,5 +200,31 @@ extension User.DatabaseRepository: UserRepository {
             .first()
             .unwrap(or: Abort(.forbidden))
             .transform(to: ())
+    }
+
+    public static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+        guard user.isEmailVerified == false else {
+            return conn.future()
+        }
+        return try User.VerifyEmail.Token
+            .query(on: conn)
+            .filter(\.token == token.token)
+            .filter(\.userID == user.requireID())
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { token in
+                user.isEmailVerified = true
+                return user.save(on: conn)
+                    .transform(to: ())
+        }
+    }
+
+    public static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token> {
+        User.VerifyEmail.Token
+            .query(on: conn)
+            .filter(\.userID == userID)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
     }
 }

@@ -56,7 +56,7 @@ class SubjectTests: VaporTestCase {
     func testModeratorPrivilege() throws {
         do {
             let user = try User.create(isAdmin: false, on: conn)
-            let admin = try User.create(on: conn)
+            let admin = try User.create(isAdmin: true, on: conn)
             let subject = try Subject.create(on: conn)
 
             XCTAssertThrowsError(
