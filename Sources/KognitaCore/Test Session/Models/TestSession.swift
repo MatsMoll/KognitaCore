@@ -50,7 +50,10 @@ extension TaskSession {
 
         public func requireID() throws -> Int   { try session.requireID() }
 
-        public func submit(on conn: DatabaseConnectable) -> EventLoopFuture<TestSessionRepresentable> {
+        public func submit(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable> {
+            guard submittedAt == nil else {
+                throw Abort(.badRequest)
+            }
             testSession.submittedAt = .now
             return testSession.save(on: conn)
                 .transform(to: self)
@@ -99,6 +102,10 @@ extension TestSession {
             public var scoreProsentage: Double {
                 guard maximumScore != 0 else { return 0 }
                 return score / maximumScore
+            }
+
+            public var readableScoreProsentage: Double {
+                scoreProsentage * 100
             }
 
             init(name: String, taskResults: [Task]) {

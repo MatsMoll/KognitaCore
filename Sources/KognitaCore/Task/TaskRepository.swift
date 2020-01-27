@@ -215,6 +215,15 @@ extension Task.Repository {
                 TaskType(content: taskContent)
         }
     }
+
+    public static func examTasks(subjectID: Subject.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[Task]> {
+        Task.query(on: conn)
+            .join(\Subtopic.id, to: \Task.subtopicID)
+            .join(\Topic.id, to: \Subtopic.topicId)
+            .filter(\.isTestable == true)
+            .filter(\Topic.subjectId == subjectID)
+            .all()
+    }
 }
 
 

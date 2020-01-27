@@ -24,8 +24,5 @@ extension User {
 
         /// The User's registration date
         public let registrationDate: Date
-
-        /// If the user is a creator
-        public let isCreator: Bool
     }
 }

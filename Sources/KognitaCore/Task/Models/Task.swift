@@ -70,7 +70,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         creatorID: User.ID,
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
-        isTestable: Bool = true
+        isTestable: Bool = false
     ) {
         self.subtopicID     = subtopicID
         self.description    = description

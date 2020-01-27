@@ -7,18 +7,10 @@ public protocol UserContent {
     var userId: Int { get }
     var username: String { get }
     var email: String { get }
-    var isCreator: Bool { get }
 }
 
 /// A registered user, capable of owning todo items.
-public final class User: KognitaCRUDModel, UserContent {
-
-    public enum Role: String, PostgreSQLEnum, PostgreSQLMigration {
-        case none
-        case user
-        case creator
-        case admin
-    }
+public final class User: KognitaCRUDModel {
 
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
@@ -36,10 +28,10 @@ public final class User: KognitaCRUDModel, UserContent {
     public private(set) var passwordHash: String
 
     /// The role of the User
-    public private(set) var role: Role
+    public private(set) var isAdmin: Bool
 
-    /// A bool determing if the User has access to the practice mode
-    public var canPractice: Bool
+    /// If the user has verified the user email
+    public var isEmailVerified: Bool
 
     /// Can be `nil` if the user has not been saved yet.
     public var createdAt: Date?
@@ -53,17 +45,18 @@ public final class User: KognitaCRUDModel, UserContent {
 //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
     /// Creates a new `User`.
-    init(id: Int? = nil, username: String, email: String, passwordHash: String, role: Role, canPractice: Bool) {
+    init(id: Int? = nil, username: String, email: String, passwordHash: String, isAdmin: Bool = false, isEmailVerified: Bool = false) {
         self.id = id
         self.username = username
         self.email = email.lowercased()
         self.passwordHash = passwordHash
-        self.role = role
-        self.canPractice = canPractice
+        self.isAdmin = isAdmin
+        self.isEmailVerified = isEmailVerified
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
         builder.unique(on: \.email)
+        builder.unique(on: \.username)
     }
     
     public func update(password: String) throws {
@@ -84,7 +77,7 @@ extension User: PasswordAuthenticatable {
 extension User: TokenAuthenticatable {
 
     /// See `TokenAuthenticatable`.
-    public typealias TokenType = UserToken
+    public typealias TokenType = User.Login.Token
 }
 
 extension User: SessionAuthenticatable { }
@@ -94,45 +87,28 @@ extension User: Parameter { }
 
 
 extension User {
-    /// A bool indicating if the user is a creator
-    public var isCreator: Bool { return role == .creator || role == .admin }
     
     public func content() throws -> User.Response {
-        return try User.Response(
+        try User.Response(
             userId:             requireID(),
             username:           username,
             email:              email,
-            registrationDate:   createdAt ?? Date(),
-            isCreator:          isCreator
+            registrationDate:   createdAt ?? Date()
         )
-    }
-}
-
-extension User : KognitaModelUpdatable {
-    
-    public func updateValues(with content: User.Edit.Data) throws {
-//        self.name = content.name
     }
 }
 
 extension User {
     struct UnknownUserMigration: PostgreSQLMigration {
         static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            do {
-                let hash = try BCrypt.hash("soMe-unKnown-paSswOrd-@934")
-                return User(
-                    id: nil,
-                    username: "Unknown",
-                    email: "unknown@kognita.no",
-                    passwordHash: hash,
-                    role: .user,
-                    canPractice: true
-                )
-                    .create(on: conn)
-                    .transform(to: ())
-            } catch {
-                return conn.future()
-            }
+            return User(
+                id: nil,
+                username: "Unknown",
+                email: "unknown@kognita.no",
+                passwordHash: "$2b$12$w8PoPj1yhROCdkAc2JjUJefWX91RztazdWo.D5kQhSdY.eSrT3wD6"
+            )
+                .create(on: conn)
+                .transform(to: ())
         }
 
         static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

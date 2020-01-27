@@ -15,11 +15,15 @@ extension Subtopic {
 extension Subtopic.DatabaseRepository {
 
     public static func create(from content: Subtopic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subtopic> {
-        guard let user = user,
-            user.isCreator else { throw Abort(.unauthorized) }
+        guard let user = user else { throw Abort(.unauthorized) }
 
-        return Subtopic(content: content)
-            .save(on: conn)
+        return try User.DatabaseRepository
+            .isModerator(user: user, topicID: content.topicId, on: conn)
+            .flatMap {
+
+                Subtopic(content: content)
+                    .save(on: conn)
+        }
     }
 
     public static func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> EventLoopFuture<[Subtopic]> {

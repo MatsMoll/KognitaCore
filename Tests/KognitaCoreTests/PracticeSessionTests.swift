@@ -38,6 +38,35 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertThrowsError(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
     }
 
+    func testUnverifiedEmailPractice() throws {
+
+        let user = try User.create(on: conn)
+        let unverifiedUser = try User.create(isAdmin: false, isEmailVerified: false, on: conn)
+
+        let subtopic = try Subtopic.create(on: conn)
+
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+
+        let createSession = try PracticeSession.Create.Data(
+            numberOfTaskGoal: 2,
+            subtopicsIDs: [subtopic.requireID()],
+            topicIDs: nil
+        )
+
+        XCTAssertNoThrow(
+            try PracticeSession.DatabaseRepository.create(from: createSession, by: user, on: conn).wait()
+        )
+        XCTAssertThrowsError(
+            try PracticeSession.DatabaseRepository.create(from: createSession, by: nil, on: conn).wait()
+        )
+        XCTAssertThrowsError(
+            try PracticeSession.DatabaseRepository.create(from: createSession, by: unverifiedUser, on: conn).wait()
+        )
+    }
+
     func testNumberOfCompletedTasksFlashCard() throws {
 
         let user = try User.create(on: conn)
@@ -145,7 +174,7 @@ final class PracticeSessionTests: VaporTestCase {
 
     func testPracticeSessionAssignmentWithoutPracticeCapability() throws {
 
-        let user = try User.create(canPractice: false, on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
 
         let subtopic = try Subtopic.create(on: conn)
 

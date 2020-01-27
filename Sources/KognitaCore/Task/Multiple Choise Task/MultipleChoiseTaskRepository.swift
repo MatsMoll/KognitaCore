@@ -33,41 +33,46 @@ extension MultipleChoiseTask.DatabaseRepository {
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<MultipleChoiseTask> {
 
-        guard let user = user, user.isCreator else {
-            throw Abort(.forbidden)
+        guard let user = user else {
+            throw Abort(.unauthorized)
         }
-        try content.validate()
-        return Subtopic.DatabaseRepository
-            .find(content.subtopicId, on: conn)
-            .unwrap(or: Task.Create.Errors.invalidTopic)
-            .flatMap { subtopic in
+        return try User.DatabaseRepository
+            .isModerator(user: user, subtopicID: content.subtopicId, on: conn)
+            .flatMap {
 
-                conn.transaction(on: .psql) { conn in
+                try content.validate()
+                return Subtopic.DatabaseRepository
+                    .find(content.subtopicId, on: conn)
+                    .unwrap(or: Task.Create.Errors.invalidTopic)
+                    .flatMap { subtopic in
 
-                    try Task.Repository
-                        .create(
-                            from: .init(
-                                content: content,
-                                subtopicID: subtopic.requireID(),
-                                solution: content.solution
-                            ),
-                            by: user,
-                            on: conn)
-                        .flatMap { task in
+                        conn.transaction(on: .psql) { conn in
 
-                            try MultipleChoiseTask(
-                                isMultipleSelect: content.isMultipleSelect,
-                                task: task)
-                                .create(on: conn)
+                            try Task.Repository
+                                .create(
+                                    from: .init(
+                                        content: content,
+                                        subtopicID: subtopic.requireID(),
+                                        solution: content.solution
+                                    ),
+                                    by: user,
+                                    on: conn)
+                                .flatMap { task in
 
-                        } .flatMap { (task) in
-                            try content.choises.map { choise in
-                                try MultipleChoiseTaskChoise(content: choise, task: task)
-                                    .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
-                                }
-                                .flatten(on: conn)
-                                .transform(to: task)
-                    }
+                                    try MultipleChoiseTask(
+                                        isMultipleSelect: content.isMultipleSelect,
+                                        task: task)
+                                        .create(on: conn)
+
+                                } .flatMap { (task) in
+                                    try content.choises.map { choise in
+                                        try MultipleChoiseTaskChoise(content: choise, task: task)
+                                            .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
+                                        }
+                                        .flatten(on: conn)
+                                        .transform(to: task)
+                            }
+                        }
                 }
         }
     }
@@ -79,27 +84,26 @@ extension MultipleChoiseTask.DatabaseRepository {
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<MultipleChoiseTask> {
 
-           guard user.isCreator else {
-               throw Abort(.forbidden)
-           }
-           guard let task = model.task else {
-               throw Abort(.internalServerError)
-           }
+        guard let task = model.task else {
+            throw Abort(.internalServerError)
+        }
+        return try User.DatabaseRepository.isModerator(user: user, taskID: model.requireID(), on: conn)
+            .flatMap {
+                try MultipleChoiseTask.DatabaseRepository
+                .create(from: data, by: user, on: conn)
+                .flatMap { newTask in
 
-           return try MultipleChoiseTask.DatabaseRepository
-               .create(from: data, by: user, on: conn)
-               .flatMap { newTask in
+                    task.get(on: conn)
+                        .flatMap { task in
 
-                   task.get(on: conn)
-                       .flatMap { task in
-
-                           task.deletedAt = Date() // Equilent to .delete(on: conn)
-                           task.editedTaskID = newTask.id
-                           return task
-                               .save(on: conn)
-                               .transform(to: newTask)
-                   }
-               }
+                            task.deletedAt = Date() // Equilent to .delete(on: conn)
+                            task.editedTaskID = newTask.id
+                            return task
+                                .save(on: conn)
+                                .transform(to: newTask)
+                    }
+                }
+        }
     }
 
     public static func delete(
@@ -107,18 +111,22 @@ extension MultipleChoiseTask.DatabaseRepository {
         by user: User?,
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<Void> {
-        guard let user = user, user.isCreator else {
-           throw Abort(.forbidden)
-       }
-       guard let task = model.task else {
-           throw Abort(.internalServerError)
-       }
-       return task.get(on: conn)
-           .flatMap { task in
-               return task
-                   .delete(on: conn)
-                   .transform(to: ())
-       }
+        guard let user = user else {
+            throw Abort(.unauthorized)
+        }
+        return try User.DatabaseRepository.isModerator(user: user, taskID: model.requireID(), on: conn)
+            .flatMap {
+
+                guard let task = model.task else {
+                    throw Abort(.internalServerError)
+                }
+                return task.get(on: conn)
+                    .flatMap { task in
+                        return task
+                            .delete(on: conn)
+                            .transform(to: ())
+                }
+        }
     }
 
     public static func importTask(

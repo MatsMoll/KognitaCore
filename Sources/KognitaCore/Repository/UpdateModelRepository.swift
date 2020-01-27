@@ -23,9 +23,6 @@ extension UpdateModelRepository
     UpdateResponse == Model
 {
     public static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse> {
-        guard user.isCreator else {
-            throw Abort(.forbidden)
-        }
         try model.updateValues(with: data)
         return model.save(on: conn)
     }

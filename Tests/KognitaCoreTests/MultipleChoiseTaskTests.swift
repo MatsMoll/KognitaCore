@@ -53,7 +53,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
     func testCreateWithoutPrivilage() throws {
         let subtopic = try Subtopic.create(on: conn)
-        let user = try User.create(role: .user, on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
 
         let content = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),

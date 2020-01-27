@@ -14,6 +14,7 @@ extension TaskResult {
 }
 
 public protocol PracticeSessionRepresentable: Codable {
+    var id: Int? { get }
     var userID: User.ID { get }
     var createdAt: Date? { get }
     var endedAt: Date? { get }
@@ -63,7 +64,7 @@ extension TaskResult.DatabaseRepository {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks: return "SELECT * FROM (\(Query.taskResults.rawQuery)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicID\" = ANY (\(Query.subtopics.rawQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
+            case .flowTasks: return "SELECT * FROM (\(Query.taskResults.rawQuery)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"isTestable\" = 'false' AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicID\" = ANY (\(Query.subtopics.rawQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
@@ -336,8 +337,8 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    static func createResult(from result: TaskSubmitResultRepresentable, by user: User, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult> {
-        return try TaskResult(result: result, userID: user.requireID(), sessionID: sessionID)
+    static func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskResult> {
+        return TaskResult(result: result, userID: userID, sessionID: sessionID)
             .save(on: conn)
     }
 
@@ -490,36 +491,10 @@ extension User {
 
         public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
         public var correctProsentage: Double {
-            return (correctScore * 1000 / maxScore).rounded() / 10
-        }
-    }
-}
-
-extension Subject {
-    public struct Details: Codable {
-        public let subject: Subject
-        public let topics: [Topic.WithTaskCount]
-        public let levels: [User.TopicLevel]
-        public let subjectLevel: User.SubjectLevel
-
-        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel]) {
-            self.subject = subject
-            self.topics = topics
-            self.levels = levels
-
-            var correctScore: Double = 0
-            var maxScore: Double = 0
-
-            for level in levels {
-                correctScore += level.correctScore
-                maxScore += level.maxScore
+            guard maxScore.isNormal else {
+                return 0
             }
-
-            self.subjectLevel = User.SubjectLevel(
-                subjectID: subject.id ?? 0,
-                correctScore: correctScore,
-                maxScore: maxScore
-            )
+            return (correctScore * 1000 / maxScore).rounded() / 10
         }
     }
 }
