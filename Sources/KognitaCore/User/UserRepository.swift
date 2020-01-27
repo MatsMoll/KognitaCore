@@ -27,6 +27,7 @@ public protocol UserRepository:
     static func canPractice(user: User, subjectID: Subject.ID,      on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 
     static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token>
 }
 
 extension User {
@@ -45,6 +46,7 @@ extension String {
 }
 
 extension User.DatabaseRepository: UserRepository {
+
 
     public enum Errors: LocalizedError {
         case passwordMismatch
@@ -216,5 +218,13 @@ extension User.DatabaseRepository: UserRepository {
                 return user.save(on: conn)
                     .transform(to: ())
         }
+    }
+
+    public static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token> {
+        User.VerifyEmail.Token
+            .query(on: conn)
+            .filter(\.userID == userID)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
     }
 }

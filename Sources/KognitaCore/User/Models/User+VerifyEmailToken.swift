@@ -1,28 +1,27 @@
-import Crypto
 import Vapor
 import FluentPostgreSQL
 
 
 public protocol VerifyEmailSendable {
-    func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) -> EventLoopFuture<Void>
+    func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) throws -> EventLoopFuture<Void>
 }
 
 
 extension User {
     public enum VerifyEmail {
-        final class Token: PostgreSQLModel {
+        public final class Token: PostgreSQLModel {
 
-            static var entity: String = "User.VerifyEmail.Token"
-            static var name: String = "User.VerifyEmail.Token"
+            public static var entity: String = "User.VerifyEmail.Token"
+            public static var name: String = "User.VerifyEmail.Token"
 
             /// UserToken's unique identifier.
-            var id: Int?
+            public var id: Int?
 
             /// Unique token string.
-            var token: String
+            public var token: String
 
             /// Reference to user that owns this token.
-            var userID: User.ID
+            public var userID: User.ID
 
             init(token: String, userID: User.ID) {
                 self.token = token
@@ -31,16 +30,16 @@ extension User {
 
             /// Creates a new `UserToken` for a given user.
             static func create(userID: User.ID) throws -> User.VerifyEmail.Token {
-                // generate a random 128-bit, base64-encoded string.
-                let string = try CryptoRandom().generateData(count: 16).base64EncodedString()
+                let string = UUID().uuidString
                 // init a new `User.VerifyEmail.Token` from that string.
                 return .init(token: string, userID: userID)
             }
         }
 
         public struct EmailContent {
-            let token: String
-            let userID: User.ID
+            public let token: String
+            public let userID: User.ID
+            public let email: String
         }
 
         public struct Request: Content {
@@ -52,13 +51,8 @@ extension User {
 
 extension User.VerifyEmail.Token {
 
-    func content() -> User.VerifyEmail.EmailContent {
-        .init(token: token, userID: userID)
-    }
-
-    func sendEmail(with container: Container) throws -> EventLoopFuture<Void> {
-        let sender = try container.make(VerifyEmailSendable.self)
-        return sender.sendEmail(with: self.content(), on: container)
+    public func content(with email: String) -> User.VerifyEmail.EmailContent {
+        .init(token: token, userID: userID, email: email)
     }
 }
 
