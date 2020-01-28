@@ -505,7 +505,8 @@ extension PracticeSession.DatabaseRepository {
             .join(\Subtopic.id, to: \Task.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .alsoDecode(Task.self)
-            .alsoDecode(Topic.self).all()
+            .alsoDecode(Topic.self)
+            .all()
             .map { tasks in
                 tasks.map { PSTaskResult(task: $0.0.1, topic: $0.1, result: $0.0.0) }
         }
