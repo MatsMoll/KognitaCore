@@ -11,16 +11,16 @@ import FluentPostgreSQL
 
 
 extension Subtopic {
-    public static func create(name: String = "Topic", chapter: Int = 1, topic: Topic? = nil, on conn: PostgreSQLConnection) throws -> Subtopic {
+    public static func create(name: String = "Topic", topic: Topic? = nil, on conn: PostgreSQLConnection) throws -> Subtopic {
 
         let usedTopic = try topic ?? Topic.create(on: conn)
 
-        return try Subtopic.create(name: name, chapter: chapter, topicId: usedTopic.requireID(), on: conn)
+        return try Subtopic.create(name: name, topicId: usedTopic.requireID(), on: conn)
     }
 
-    public static func create(name: String = "Topic", chapter: Int = 1, topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
+    public static func create(name: String = "Topic", topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
 
-        return try Subtopic(name: name, chapter: chapter, topicId: topicId)
+        return try Subtopic(name: name, topicId: topicId)
             .save(on: conn)
             .wait()
     }

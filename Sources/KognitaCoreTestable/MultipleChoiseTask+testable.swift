@@ -16,7 +16,7 @@ extension MultipleChoiseTask {
                        subtopic:               Subtopic?      = nil,
                        task:                Task?       = nil,
                        isMultipleSelect:    Bool        = true,
-                       choises:             [MultipleChoiseTaskChoise.Data] = MultipleChoiseTaskChoise.Data.standard,
+                       choises:             [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
         let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, on: conn)
@@ -28,7 +28,7 @@ extension MultipleChoiseTask {
     
     public static func create(taskId:              Task.ID,
                        isMultipleSelect:    Bool        = true,
-                       choises:             [MultipleChoiseTaskChoise.Data] = MultipleChoiseTaskChoise.Data.standard,
+                       choises:             [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
                        on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
         
         return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
@@ -45,8 +45,8 @@ extension MultipleChoiseTask {
     }
 }
 
-extension MultipleChoiseTaskChoise.Data {
-    public static let standard: [MultipleChoiseTaskChoise.Data] = [
+extension MultipleChoiseTaskChoise.Create.Data {
+    public static let standard: [MultipleChoiseTaskChoise.Create.Data] = [
         .init(choise: "not", isCorrect: false),
         .init(choise: "yes", isCorrect: true),
         .init(choise: "not again", isCorrect: false)

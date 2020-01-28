@@ -18,8 +18,8 @@ class SubjectTests: VaporTestCase {
         do {
             let subject     = try Subject.create(on: conn)
             let topic       = try Topic.create(subject: subject, on: conn)
-            let subtopicOne = try Subtopic.create(chapter: 1, topic: topic, on: conn)
-            let subtopicTwo = try Subtopic.create(chapter: 2, topic: topic, on: conn)
+            let subtopicOne = try Subtopic.create(topic: topic, on: conn)
+            let subtopicTwo = try Subtopic.create(topic: topic, on: conn)
 
             _ = try MultipleChoiseTask.create(subtopic: subtopicOne, on: conn)
             _ = try MultipleChoiseTask.create(subtopic: subtopicOne, on: conn)
