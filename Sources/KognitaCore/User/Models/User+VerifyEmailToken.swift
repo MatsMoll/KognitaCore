@@ -1,6 +1,6 @@
 import Vapor
 import FluentPostgreSQL
-
+import Crypto
 
 public protocol VerifyEmailSendable {
     func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) throws -> EventLoopFuture<Void>
@@ -30,7 +30,7 @@ extension User {
 
             /// Creates a new `UserToken` for a given user.
             static func create(userID: User.ID) throws -> User.VerifyEmail.Token {
-                let string = UUID().uuidString
+                let string = try CryptoRandom().generateData(count: 16).base64URLEncodedString(options: .init())
                 // init a new `User.VerifyEmail.Token` from that string.
                 return .init(token: string, userID: userID)
             }

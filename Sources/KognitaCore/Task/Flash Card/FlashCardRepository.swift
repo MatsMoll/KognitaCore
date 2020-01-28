@@ -25,6 +25,8 @@ public protocol FlashCardTaskRepository:
         in subtopic: Subtopic,
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<Void>
+
+    static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
 }
 
 
@@ -199,6 +201,41 @@ extension FlashCardTask.DatabaseRepository {
                 )
                 .create(on: conn)
                 .transform(to: answer)
+        }
+    }
+
+    public static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<FlashCardTask.ModifyContent> {
+
+        Task.query(on: conn)
+            .join(\FlashCardTask.id, to: \Task.id)
+            .join(\TaskSolution.taskID, to: \Task.id)
+            .filter(\Task.id == taskID)
+            .alsoDecode(TaskSolution.self)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
+            .flatMap { taskInfo in
+
+                Subject.query(on: conn)
+                    .join(\Topic.subjectId, to: \Subject.id)
+                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .filter(\Subtopic.id == taskInfo.0.subtopicID)
+                    .first()
+                    .unwrap(or: Abort(.internalServerError))
+                    .flatMap { subject in
+
+                        try Topic.DatabaseRepository.getTopicResponses(in: subject, conn: conn)
+                            .map { topics in
+
+                                FlashCardTask.ModifyContent(
+                                    task: Task.ModifyContent(
+                                        task: taskInfo.0,
+                                        solution: taskInfo.1
+                                    ),
+                                    subject: Subject.Overview(subject: subject),
+                                    topics: topics
+                                )
+                        }
+                }
         }
     }
 }

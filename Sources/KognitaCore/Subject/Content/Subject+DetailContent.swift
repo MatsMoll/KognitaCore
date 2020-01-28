@@ -40,7 +40,7 @@ extension Subject {
                 correctScore: correctScore,
                 maxScore: maxScore
             )
-            self.topics = topicLevels.map { $0.value }
+            self.topics = topics.compactMap { topicLevels[$0.topic.id ?? 0] }
             self.isActive = isActive
             self.canPractice = canPractice
         }

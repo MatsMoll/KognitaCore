@@ -16,33 +16,27 @@ public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
 
     public var topicId: Topic.ID
 
-    public var chapter: Int
-
     public var createdAt: Date?
 
     public var updatedAt: Date?
 
 
-    init(name: String, chapter: Int, topicId: Topic.ID) {
+    init(name: String, topicId: Topic.ID) {
         self.name = name
-        self.chapter = chapter
         self.topicId = topicId
     }
 
     init(content: Create.Data) {
         self.name = content.name
-        self.chapter = content.chapter
         self.topicId = content.topicId
     }
 
     public func updateValues(with content: Create.Data) {
         self.name = content.name
-        self.chapter = content.chapter
         self.topicId = content.topicId
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<Subtopic>) {
-        builder.unique(on: \.chapter, \.topicId)
         builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
     }
 }
@@ -60,12 +54,25 @@ extension Subtopic {
             public let name: String
 
             public var topicId: Topic.ID
-
-            public var chapter: Int
         }
         
         public typealias Response = Subtopic
     }
 
     public typealias Edit = Create
+}
+
+extension Subtopic {
+    public struct Overview: Content {
+        
+        public let id: Int
+        public let name: String
+        public let topicID: Topic.ID
+
+        init(subtopic: Subtopic) {
+            self.id = subtopic.id ?? 0
+            self.name = subtopic.name
+            self.topicID = subtopic.topicId
+        }
+    }
 }
