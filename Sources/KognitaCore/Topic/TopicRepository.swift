@@ -150,27 +150,29 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public static func getTopicsWithTaskCount(in subject: Subject, conn: DatabaseConnectable) throws -> EventLoopFuture<[Topic.WithTaskCount]> {
-       conn.databaseConnection(to: .psql)
-        .flatMap { psqlConn in
-            try psqlConn.select()
-                .all(table: Topic.self)
-                .from(Topic.self)
-                .column(.count(\Task.id), as: "taskCount")
-                .join(\Topic.id , to: \Subtopic.topicId)
-                .join(\Subtopic.id, to: \Task.subtopicID)
-                .groupBy(\Topic.id)
-                .where(\Topic.subjectId == subject.requireID())
-                .where(\Task.isTestable == false)
-                .all(decoding: Topic.self, TopicTaskCount.self)
-                .map { topics in
-                    topics.map { data in
-                        Topic.WithTaskCount(
-                            topic: data.0,
-                            taskCount: data.1.taskCount
-                        )
-                    }
+
+        conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+                try psqlConn.select()
+                    .all(table: Topic.self)
+                    .from(Topic.self)
+                    .column(.count(\Task.id), as: "taskCount")
+                    .join(\Topic.id , to: \Subtopic.topicId)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
+                    .groupBy(\Topic.id)
+                    .where(\Topic.subjectId == subject.requireID())
+                    .where(\Task.isTestable == false)
+                    .all(decoding: Topic.self, TopicTaskCount.self)
+                    .map { topics in
+                        topics.map { data in
+                            Topic.WithTaskCount(
+                                topic: data.0,
+                                taskCount: data.1.taskCount
+                            )
+                        }
+                        .sorted(by: { $0.topic.chapter < $1.topic.chapter })
             }
-       }
+        }
    }
 
     public static func getTopicResponses(in subject: Subject, conn: DatabaseConnectable) throws -> EventLoopFuture<[Topic.Response]> {
