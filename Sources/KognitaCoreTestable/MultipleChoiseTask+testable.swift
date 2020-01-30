@@ -23,6 +23,7 @@ extension MultipleChoiseTask {
         
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
+                          choises: choises,
                           on: conn)
     }
     
