@@ -349,6 +349,48 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
+    func testResultStatisticsTaskWithMultipleCorrectAnswers() {
+        do {
+            let choises: [MultipleChoiseTaskChoise.Create.Data] = [
+                .init(choise: "first", isCorrect: false),
+                .init(choise: "correct", isCorrect: true),
+                .init(choise: "yeah", isCorrect: true),
+            ]
+
+            let test = try setupTestWithTasks(choises: choises)
+
+            let teacher = try User.create(on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondSubmittion            = try submittionAt(index: 2, for: test)
+            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+
+            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+
+            let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
+
+            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+            try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittion, thirdSubmittion])
+
+            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
+            let secondResult = try SubjectTest.DatabaseRepository.results(for: secondTest, user: teacher, on: conn).wait()
+
+            XCTAssertEqual(result.averageScore, 1/3)
+            XCTAssertEqual(secondResult.averageScore, 1)
+
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+            )
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
 
     func testTestResultHistogram() throws {
         do {
@@ -458,11 +500,12 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
-    func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
+    func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3, choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard) throws -> SubjectTest {
         let topic = try Topic.create(on: conn)
         let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let isMultipleSelect = choises.filter({ $0.isCorrect }).count > 1
         let taskIds = try (0..<numberOfTasks).map { _ in
-            try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            try MultipleChoiseTask.create(subtopic: subtopic, isMultipleSelect: isMultipleSelect, choises: choises, on: conn)
                 .requireID()
         }
         _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
