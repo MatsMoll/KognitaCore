@@ -57,8 +57,8 @@ extension TaskSession {
             guard let id = Int(parameter) else {
                 throw Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`.")
             }
-            return container.requestCachedConnection(to: .psql)
-                .flatMap { conn in
+            return try container.connectionPool(to: .psql)
+                .withConnection { conn in
                     
                     TaskSession.query(on: conn)
                         .join(\PracticeSession.id, to: \TaskSession.id)
