@@ -83,7 +83,7 @@ extension User: TokenAuthenticatable {
 extension User: SessionAuthenticatable { }
 
 /// Allows `User` to be used as a dynamic parameter in route definitions.
-extension User: Parameter { }
+extension User: ModelParameterRepresentable { }
 
 
 extension User {

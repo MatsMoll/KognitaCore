@@ -53,5 +53,5 @@ extension MultipleChoiseTaskChoise: Migration {
     }
 }
 
-extension MultipleChoiseTaskChoise: Parameter { }
+extension MultipleChoiseTaskChoise: ModelParameterRepresentable { }
 extension MultipleChoiseTaskChoise: Content { }

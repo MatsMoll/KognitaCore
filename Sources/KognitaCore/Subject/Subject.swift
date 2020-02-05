@@ -117,4 +117,4 @@ extension Subject {
 }
 
 extension Subject: Content { }
-extension Subject: Parameter { }
+extension Subject: ModelParameterRepresentable { }

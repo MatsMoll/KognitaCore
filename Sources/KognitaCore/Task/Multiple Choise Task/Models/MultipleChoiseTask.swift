@@ -111,6 +111,6 @@ extension MultipleChoiseTask {
     }
 }
 
-extension MultipleChoiseTask: Parameter { }
+extension MultipleChoiseTask: ModelParameterRepresentable { }
 extension MultipleChoiseTask: Content { }
 

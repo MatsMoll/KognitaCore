@@ -95,4 +95,4 @@ extension User.Login.Token: Migration {
 extension User.Login.Token: Content { }
 
 /// Allows `UserToken` to be used as a dynamic parameter in route definitions.
-extension User.Login.Token: Parameter { }
+extension User.Login.Token: ModelParameterRepresentable { }

@@ -38,7 +38,7 @@ extension TestSession: Content {}
 
 extension TaskSession {
 
-    public struct TestParameter: Parameter, Codable, TestSessionRepresentable {
+    public struct TestParameter: ModelParameterRepresentable, Codable, TestSessionRepresentable {
 
         let session: TaskSession
         let testSession: TestSession
@@ -61,22 +61,24 @@ extension TaskSession {
 
 
         public typealias ResolvedParameter = EventLoopFuture<TestParameter>
+        public typealias ParameterModel = TestParameter
 
         public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<TaskSession.TestParameter> {
+            throw Abort(.notImplemented)
+        }
+
+        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.TestParameter.ParameterModel> {
             guard let id = Int(parameter) else {
-                throw Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`.")
+                return conn.future(error: Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`."))
             }
-            return try container.connectionPool(to: .psql)
-                .withConnection { conn in
-                    TaskSession.query(on: conn)
-                        .join(\TestSession.id, to: \TaskSession.id)
-                        .filter(\TaskSession.id == id)
-                        .alsoDecode(TestSession.self)
-                        .first()
-                        .unwrap(or: Abort(.internalServerError))
-                        .map {
-                            TestParameter(session: $0.0, testSession: $0.1)
-                    }
+            return TaskSession.query(on: conn)
+                .join(\TestSession.id, to: \TaskSession.id)
+                .filter(\TaskSession.id == id)
+                .alsoDecode(TestSession.self)
+                .first()
+                .unwrap(or: Abort(.internalServerError))
+                .map {
+                    return TestParameter(session: $0.0, testSession: $0.1)
             }
         }
     }

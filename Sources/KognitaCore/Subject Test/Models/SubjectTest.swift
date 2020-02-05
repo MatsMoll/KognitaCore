@@ -83,7 +83,7 @@ public final class SubjectTest: KognitaPersistenceModel {
 }
 
 extension SubjectTest: Content {}
-extension SubjectTest: Parameter {}
+extension SubjectTest: ModelParameterRepresentable {}
 
 extension SubjectTest {
     public enum Create {
