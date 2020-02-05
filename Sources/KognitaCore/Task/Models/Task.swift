@@ -187,7 +187,7 @@ extension Task {
 }
 
 extension Task: Content { }
-extension Task: Parameter { }
+extension Task: ModelParameterRepresentable { }
 
 
 extension Task {

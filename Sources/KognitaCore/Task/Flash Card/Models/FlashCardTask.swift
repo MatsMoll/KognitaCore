@@ -33,7 +33,7 @@ public final class FlashCardTask: KognitaCRUDModel {
 }
 
 extension FlashCardTask: Content { }
-extension FlashCardTask: Parameter { }
+extension FlashCardTask: ModelParameterRepresentable { }
 
 extension FlashCardTask {
     var task: Parent<FlashCardTask, Task>? {

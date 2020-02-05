@@ -42,7 +42,7 @@ public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
 }
 
 extension Subtopic: Content { }
-extension Subtopic: Parameter { }
+extension Subtopic: ModelParameterRepresentable { }
 
 
 extension Subtopic {

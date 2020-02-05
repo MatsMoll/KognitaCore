@@ -131,4 +131,4 @@ extension Topic {
 }
 
 extension Topic: Content { }
-extension Topic: Parameter { }
+extension Topic: ModelParameterRepresentable { }
