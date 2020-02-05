@@ -352,6 +352,7 @@ extension SubjectTest {
                     }
 
                     var totalCount = info.reduce(0) { $0 + ((try? grupedChoiseCount[$1.1.requireID()]) ?? 0) }
+                    let numberOfCorrectChoises = info.reduce(into: 0.0) { $0 += ($1.1.isCorrect ? 1 : 0) }
                     if totalCount == 0 { // In order to fix NaN values
                         totalCount = 1
                     }
@@ -363,7 +364,7 @@ extension SubjectTest {
 
                             let choiseCount = (try? grupedChoiseCount[choise.requireID()]) ?? 0
                             if choise.isCorrect {
-                                numberOfCorrectAnswers += Double(choiseCount)
+                                numberOfCorrectAnswers += (Double(choiseCount) * 1 / numberOfCorrectChoises)
                             }
 
                             return Results.MultipleChoiseTaskResult.Choise(

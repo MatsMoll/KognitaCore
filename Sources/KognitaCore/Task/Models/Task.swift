@@ -32,7 +32,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
     /// The topic.id for the topic this task relates to
     public var subtopicID: Subtopic.ID
 
-    /// Some html that contains extra information about the task if needed
+    /// Some markdown that contains extra information about the task if needed
     public var description: String?
 
     /// The question needed to answer the task
@@ -187,7 +187,7 @@ extension Task {
 }
 
 extension Task: Content { }
-extension Task: Parameter { }
+extension Task: ModelParameterRepresentable { }
 
 
 extension Task {

@@ -39,7 +39,8 @@ extension TaskSession {
 
 
 extension TaskSession {
-    public struct PracticeParameter: Parameter, Content, PracticeSessionRepresentable {
+    public struct PracticeParameter: ModelParameterRepresentable, Content, PracticeSessionRepresentable {
+
 
         let session: TaskSession
         let practiceSession: PracticeSession
@@ -51,25 +52,25 @@ extension TaskSession {
         public var numberOfTaskGoal: Int        { practiceSession.numberOfTaskGoal }
         public func requireID() throws -> Int   { try session.requireID() }
 
+        public typealias ParameterModel = PracticeParameter
         public typealias ResolvedParameter = EventLoopFuture<PracticeParameter>
 
-        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<TaskSession.PracticeParameter> {
+        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.PracticeParameter.ParameterModel> {
             guard let id = Int(parameter) else {
-                throw Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`.")
+                return conn.future(error: Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`."))
             }
-            return container.requestCachedConnection(to: .psql)
-                .flatMap { conn in
-                    
-                    TaskSession.query(on: conn)
-                        .join(\PracticeSession.id, to: \TaskSession.id)
-                        .filter(\TaskSession.id == id)
-                        .alsoDecode(PracticeSession.self)
-                        .first()
-                        .unwrap(or: Abort(.internalServerError))
-                        .map {
-                            PracticeParameter(session: $0.0, practiceSession: $0.1)
-                    }
+            return TaskSession.query(on: conn)
+                .join(\PracticeSession.id, to: \TaskSession.id)
+                .filter(\TaskSession.id == id)
+                .alsoDecode(PracticeSession.self)
+                .first()
+                .unwrap(or: Abort(.internalServerError))
+                .map {
+                    PracticeParameter(session: $0.0, practiceSession: $0.1)
             }
+        }
+        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<TaskSession.PracticeParameter> {
+            throw Abort(.notImplemented)
         }
 
         public func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {

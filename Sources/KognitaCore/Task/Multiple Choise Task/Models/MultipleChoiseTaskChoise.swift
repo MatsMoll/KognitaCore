@@ -27,7 +27,7 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
         self.taskId = taskId
     }
 
-    public init(content: MultipleChoiseTaskChoise.Data, task: MultipleChoiseTask) throws {
+    public init(content: MultipleChoiseTaskChoise.Create.Data, task: MultipleChoiseTask) throws {
         self.taskId = try task.requireID()
         self.choise = content.choise
         self.isCorrect = content.isCorrect
@@ -53,5 +53,5 @@ extension MultipleChoiseTaskChoise: Migration {
     }
 }
 
-extension MultipleChoiseTaskChoise: Parameter { }
+extension MultipleChoiseTaskChoise: ModelParameterRepresentable { }
 extension MultipleChoiseTaskChoise: Content { }

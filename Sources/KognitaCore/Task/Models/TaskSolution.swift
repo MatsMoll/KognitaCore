@@ -52,34 +52,6 @@ public final class TaskSolution: KognitaPersistenceModel {
             }
         }
     }
-    
-
-    func response(on conn: DatabaseConnectable) -> EventLoopFuture<Response> {
-        fatalError()
-//            var response = Response(createdAt: createdAt, solution: solution, creatorName: nil, approvedBy: nil)
-//            let approvedByID = approvedBy
-//            if presentUser {
-//                return User.Repository.find(creatorID, or: Abort(.internalServerError), on: conn)
-//                    .flatMap { creator in
-//                        response.creatorName = creator.name
-//                        if let approvedByID = approvedByID {
-//                            return User.Repository.find(approvedByID, or: Abort(.internalServerError), on: conn).map { user in
-//                                response.approvedBy = user.name
-//                                return response
-//                            }
-//                        } else {
-//                            return conn.future(response)
-//                        }
-//                }
-//            } else if let approvedByID = approvedByID {
-//                return User.Repository.find(approvedByID, or: Abort(.internalServerError), on: conn).map { user in
-//                    response.approvedBy = user.name
-//                    return response
-//                }
-//            } else {
-//                return conn.future(response)
-//            }
-    }
 }
 
 extension TaskSolution {

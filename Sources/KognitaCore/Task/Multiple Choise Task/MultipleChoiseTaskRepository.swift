@@ -5,6 +5,7 @@
 //  Created by Mats Mollestad on 11/04/2019.
 //
 
+import FluentSQL
 import FluentPostgreSQL
 import Vapor
 
@@ -18,7 +19,9 @@ public protocol MultipleChoiseTaskRepository:
     CreateResponse  == MultipleChoiseTask.Create.Response,
     UpdateData      == MultipleChoiseTask.Edit.Data,
     UpdateResponse  == MultipleChoiseTask.Edit.Response
-{}
+{
+    static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask.ModifyContent>
+}
 
 extension MultipleChoiseTask {
     public final class DatabaseRepository: MultipleChoiseTaskRepository {}
@@ -311,6 +314,59 @@ extension MultipleChoiseTask.DatabaseRepository {
             .filter(\.taskId == taskID)
             .filter(\.isCorrect == true)
             .all()
+    }
+
+    public static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask.ModifyContent> {
+
+        return conn.databaseConnection(to: .psql)
+            .flatMap { conn in
+
+                conn.select()
+                    .all(table: Task.self)
+                    .all(table: MultipleChoiseTask.self)
+                    .all(table: TaskSolution.self)
+                    .from(Task.self)
+                    .join(\Task.id, to: \MultipleChoiseTask.id)
+                    .join(\Task.id, to: \TaskSolution.taskID)
+                    .where(\Task.id, .equal, taskID)
+                    .first(decoding: Task.self, MultipleChoiseTask.self, TaskSolution.self)
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { taskContent in
+
+                        MultipleChoiseTaskChoise.query(on: conn)
+                            .filter(\MultipleChoiseTaskChoise.taskId, .equal, taskID)
+                            .all()
+                            .flatMap { choises in
+
+                                Subject.query(on: conn)
+                                    .join(\Topic.subjectId, to: \Subject.id)
+                                    .join(\Subtopic.topicId, to: \Topic.id)
+                                    .filter(\Subtopic.id, .equal, taskContent.0.subtopicID)
+                                    .first()
+                                    .unwrap(or: Abort(.internalServerError))
+                                    .flatMap { subject in
+
+                                        try Topic.DatabaseRepository
+                                            .getTopicResponses(in: subject, conn: conn)
+                                            .map { topics in
+
+                                                MultipleChoiseTask.ModifyContent(
+                                                    task: Task.ModifyContent(
+                                                        task: taskContent.0,
+                                                        solution: taskContent.2
+                                                    ),
+                                                    subject: .init(subject: subject),
+                                                    topics: topics,
+                                                    multiple: taskContent.1,
+                                                    choises: choises.map { .init(choise: $0) }
+                                                )
+                                        }
+
+                                }
+                        }
+                }
+        }
+
     }
 }
 

@@ -11,8 +11,22 @@ import Vapor
 public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
     
     public struct Response : Content {
-        public let topic: Topic
-        public let subtopics: [Subtopic]
+        public let topic: Topic.Overview
+        public let subtopics: [Subtopic.Overview]
+    }
+
+    public struct Overview: Content {
+        public let id: Int
+        public let subjectID: Subject.ID
+        public let name: String
+        public let chapter: Int
+
+        init(topic: Topic) {
+            self.id = topic.id ?? 0
+            self.subjectID = topic.subjectId
+            self.name = topic.name
+            self.chapter = topic.chapter
+        }
     }
     
     public var id: Int?
@@ -117,17 +131,4 @@ extension Topic {
 }
 
 extension Topic: Content { }
-extension Topic: Parameter { }
-
-
-extension Subtopic {
-    public static let unselected = Subtopic(name: "", chapter: 0, topicId: 0)
-}
-
-extension Topic {
-    public static let unselected = try! Topic(name: "Velg ...", chapter: 0, subjectId: 0)
-}
-
-extension Topic.Response {
-    public static let unselected: Topic.Response = Topic.Response(topic: .unselected, subtopics: [.unselected])
-}
+extension Topic: ModelParameterRepresentable { }

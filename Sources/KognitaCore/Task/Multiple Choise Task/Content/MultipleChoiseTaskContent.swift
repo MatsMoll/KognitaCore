@@ -52,7 +52,7 @@ extension MultipleChoiseTask {
 
             public let isTestable: Bool
 
-            public let choises: [MultipleChoiseTaskChoise.Data]
+            public let choises: [MultipleChoiseTaskChoise.Create.Data]
 
             public func validate() throws {
                 try (self as TaskCreationContentable).validate()
@@ -75,10 +75,28 @@ extension MultipleChoiseTask {
 }
 
 extension MultipleChoiseTaskChoise {
+
+    public enum Create {
+        public struct Data: Content {
+
+            public let choise: String
+
+            public let isCorrect: Bool
+        }
+    }
+
     public struct Data: Content {
+
+        public let id: MultipleChoiseTaskChoise.ID
 
         public let choise: String
 
         public let isCorrect: Bool
+
+        init(choise: MultipleChoiseTaskChoise) {
+            self.id = choise.id ?? 0
+            self.choise = choise.choise
+            self.isCorrect = choise.isCorrect
+        }
     }
 }
