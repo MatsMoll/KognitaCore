@@ -14,9 +14,12 @@ extension PostgreSQLModel where Self: Parameter {
         guard let id = Int(parameter) else {
             throw Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`.")
         }
-        return container.requestCachedConnection(to: .psql).flatMap { (connection) in
-            return Self.find(id, on: connection)
-                .unwrap(or: Abort(.internalServerError))
-            }
+
+        return try container.connectionPool(to: .psql)
+            .withConnection { conn in
+
+                Self.find(id, on: conn)
+                    .unwrap(or: Abort(.internalServerError))
+        }
     }
 }
