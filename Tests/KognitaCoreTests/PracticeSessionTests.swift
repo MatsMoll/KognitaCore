@@ -304,7 +304,7 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try MultipleChoiseTask.create(on: conn)
         let createdSesssion = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-        let parameterSession = try TaskSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", on: app).wait()
+        let parameterSession = try TaskSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", conn: conn).wait()
 
         XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.practiceSession.id)
         XCTAssertEqual(createdSesssion.practiceSession.createdAt,   parameterSession.practiceSession.createdAt)
