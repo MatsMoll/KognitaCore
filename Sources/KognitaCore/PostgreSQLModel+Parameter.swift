@@ -34,7 +34,6 @@ extension ParametersContainer {
         guard let parameter = self.rawValues(for: T.self).first else {
             return conn.future(error: Abort(.badRequest))
         }
-        _ = try? self.next(T.self)
         return T.resolveParameter(parameter, conn: conn)
     }
 

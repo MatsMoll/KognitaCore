@@ -184,6 +184,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
                                 )
                             )
                             .filter(\.subtopicID ~~ subtopics.map { try $0.requireID() })
+                            .filter(\.isTestable == false)
                             .all()
                             .map { uncompletedTasks in
                                 
