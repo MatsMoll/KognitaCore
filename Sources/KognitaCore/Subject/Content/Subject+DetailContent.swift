@@ -6,6 +6,7 @@ extension Subject {
         public let subject: Subject
         public let topics: [Topic.UserOverview]
         public let subjectLevel: User.SubjectLevel
+        public let numberOfTasks: Int
         public let isActive: Bool
         public let canPractice: Bool
 
@@ -13,12 +14,14 @@ extension Subject {
             self.subject = subject
 
             var topicLevels = [Topic.ID: Topic.UserOverview]()
+            var numberOfTasks = 0
             for topic in topics {
+                numberOfTasks += topic.taskCount
                 topicLevels[topic.topic.id ?? 0] = .init(
                     id: topic.topic.id ?? 0,
                     name: topic.topic.name,
                     numberOfTasks: topic.taskCount,
-                    userScore: 0
+                    userLevel: levels.first(where: { $0.topicID == topic.topic.id }) ?? User.TopicLevel(topicID: 0, correctScore: 0, maxScore: 1)
                 )
             }
 
@@ -28,21 +31,17 @@ extension Subject {
             for level in levels {
                 correctScore += level.correctScore
                 maxScore += level.maxScore
-
-                if var overview = topicLevels[level.topicID] {
-                    overview.userScore += level.correctScore
-                    topicLevels[level.topicID] = overview
-                }
             }
 
             self.subjectLevel = User.SubjectLevel(
                 subjectID: subject.id ?? 0,
                 correctScore: correctScore,
-                maxScore: maxScore
+                maxScore: max(maxScore, Double(numberOfTasks))
             )
             self.topics = topics.compactMap { topicLevels[$0.topic.id ?? 0] }
             self.isActive = isActive
             self.canPractice = canPractice
+            self.numberOfTasks = numberOfTasks
         }
     }
 }

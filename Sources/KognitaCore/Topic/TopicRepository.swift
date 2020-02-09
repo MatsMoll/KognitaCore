@@ -58,10 +58,10 @@ extension Topic {
         public let id: Topic.ID
         public let name: String
         public let numberOfTasks: Int
-        public internal(set) var userScore: Double
+        public let userLevel: User.TopicLevel
 
         public var competence: CompetenceData {
-            .init(userScore: userScore, maxScore: Double(numberOfTasks))
+            .init(userScore: userLevel.correctScore, maxScore: userLevel.maxScore)
         }
     }
 
