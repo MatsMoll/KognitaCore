@@ -17,6 +17,7 @@ extension Task {
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,
+                       isTestable:      Bool            = false,
                        on conn:         PostgreSQLConnection) throws -> Task {
 
         let usedCreator = try creator ?? User.create(on: conn)
@@ -28,6 +29,7 @@ extension Task {
                           question: question,
                           explenation: explenation,
                           createSolution: createSolution,
+                          isTestable: isTestable,
                           on: conn)
     }
     
@@ -37,12 +39,14 @@ extension Task {
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,
+                       isTestable:      Bool            = false,
                        on conn:         PostgreSQLConnection) throws -> Task {
         
         return try Task(subtopicID:     subtopicId,
                         description:    description,
                         question:       question,
-                        creatorID:      creatorId)
+                        creatorID:      creatorId,
+                        isTestable:     isTestable)
             
             .save(on: conn)
             .flatMap { task in

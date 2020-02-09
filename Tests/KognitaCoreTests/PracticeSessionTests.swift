@@ -172,6 +172,62 @@ final class PracticeSessionTests: VaporTestCase {
         }
     }
 
+    func testPracticeSessionAssignmentWithTestTasks() throws {
+        do {
+            let user = try User.create(on: conn)
+
+            let subtopic = try Subtopic.create(on: conn)
+
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            let taskThree = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            let testTask = try Task.create(subtopic: subtopic, isTestable: true, on: conn)
+
+            _ = try MultipleChoiseTask.DatabaseRepository.delete(model: taskThree, by: user, on: conn).wait()
+
+            let create = try PracticeSession.Create.Data(
+                numberOfTaskGoal: 2,
+                subtopicsIDs: [
+                    subtopic.requireID()
+                ],
+                topicIDs: nil
+            )
+
+            let session = try PracticeSession.DatabaseRepository.create(from: create, by: user, on: conn).wait()
+            let representable = try session.representable(on: conn).wait()
+
+            let firstTask = try session.currentTask(on: conn).wait()
+
+            XCTAssertNotNil(firstTask.multipleChoise)
+            XCTAssert(try firstTask.task.requireID() != testTask.requireID())
+
+            let submit = MultipleChoiseTask.Submit(
+                timeUsed: 20,
+                choises: [],
+                taskIndex: 1
+            )
+            _ = try PracticeSession.DatabaseRepository.submit(submit, in: representable, by: user, on: conn).wait()
+
+            let secondTask = try session.currentTask(on: conn).wait()
+
+            XCTAssertNotNil(secondTask.multipleChoise)
+            XCTAssert(try secondTask.task.requireID() != testTask.requireID())
+
+            let secondSubmit = MultipleChoiseTask.Submit(
+                timeUsed: 20,
+                choises: [],
+                taskIndex: 2
+            )
+            _ = try PracticeSession.DatabaseRepository.submit(secondSubmit, in: representable, by: user, on: conn).wait()
+            let thiredTask = try session.currentTask(on: conn).wait()
+
+            XCTAssert(try thiredTask.task.requireID() != testTask.requireID())
+
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
     func testPracticeSessionAssignmentWithoutPracticeCapability() throws {
 
         let user = try User.create(isAdmin: false, on: conn)
@@ -318,6 +374,7 @@ final class PracticeSessionTests: VaporTestCase {
         ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple),
         ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
         ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),
-        ("testAsignTaskWithTaskResult", testAsignTaskWithTaskResult)
+        ("testAsignTaskWithTaskResult", testAsignTaskWithTaskResult),
+        ("testPracticeSessionAssignmentWithTestTasks", testPracticeSessionAssignmentWithTestTasks)
     ]
 }
