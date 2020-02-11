@@ -190,9 +190,6 @@ extension SubjectTest {
         }
 
         public static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
-            guard test.openedAt == nil else {
-                throw Abort(.badRequest)
-            }
             return try User.DatabaseRepository
                 .isModerator(user: user, subjectID: test.subjectID, on: conn)
                 .flatMap {
