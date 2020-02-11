@@ -38,5 +38,13 @@ extension TaskSessionAnswer {
                 .filter(\MultipleChoiseTaskChoise.taskId == taskID)
                 .all()
         }
+
+        public static func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<FlashCardAnswer?> {
+            FlashCardAnswer.query(on: conn)
+                .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id)
+                .filter(\TaskSessionAnswer.sessionID == sessionID)
+                .filter(\FlashCardAnswer.taskID == taskID)
+                .first()
+        }
     }
 }
