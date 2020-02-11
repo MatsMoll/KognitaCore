@@ -325,8 +325,8 @@ extension PracticeSession.DatabaseRepository {
 
         return try get(MultipleChoiseTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
-            MultipleChoiseTask.DatabaseRepository
-                .create(answer: submit, on: conn)
+            try MultipleChoiseTask.DatabaseRepository
+                .create(answer: submit, sessionID: session.requireID(), on: conn)
                 .flatMap { _ in
 
                     try MultipleChoiseTask.DatabaseRepository

@@ -151,20 +151,32 @@ final class PracticeSessionTests: VaporTestCase {
             XCTAssertNotNil(firstTask.multipleChoise)
             XCTAssert(try firstTask.task.requireID() == taskOne.requireID() || firstTask.task.requireID() == taskTwo.requireID())
 
+            let firstChoises = try choisesAt(index: 1, for: representable).filter({ $0.isCorrect })
             let submit = MultipleChoiseTask.Submit(
                 timeUsed: 20,
-                choises: [],
+                choises: firstChoises.compactMap { $0.id },
                 taskIndex: 1
             )
             _ = try PracticeSession.DatabaseRepository.submit(submit, in: representable, by: user, on: conn).wait()
+            XCTAssertEqual(try MultipleChoiseTaskAnswer.query(on: conn).count().wait(), 1)
+            XCTAssertEqual(try TaskSessionAnswer.query(on: conn).count().wait(), 1)
 
             let secondTask = try session.currentTask(on: conn).wait()
 
             XCTAssertNotNil(secondTask.multipleChoise)
             try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
 
+            let secondChoises = try choisesAt(index: 2, for: representable).first!
+            let secondSubmit = try MultipleChoiseTask.Submit(
+                timeUsed: 20,
+                choises: [secondChoises.requireID()],
+                taskIndex: 2
+            )
+            _ = try PracticeSession.DatabaseRepository.submit(secondSubmit, in: representable, by: user, on: conn).wait()
             _ = try PracticeSession.DatabaseRepository.end(representable, for: user, on: conn).wait()
 
+            XCTAssertEqual(try MultipleChoiseTaskAnswer.query(on: conn).count().wait(), 2)
+            XCTAssertEqual(try TaskSessionAnswer.query(on: conn).count().wait(), 2)
             XCTAssertNotNil(representable.endedAt)
 
         } catch {
@@ -365,6 +377,17 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.practiceSession.id)
         XCTAssertEqual(createdSesssion.practiceSession.createdAt,   parameterSession.practiceSession.createdAt)
         XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.session.id)
+    }
+
+
+    func choisesAt(index: Int, for session: PracticeSessionRepresentable) throws -> [MultipleChoiseTaskChoise] {
+        try PracticeSession.Pivot.Task.query(on: conn)
+            .filter(\PracticeSession.Pivot.Task.sessionID, .equal, session.requireID())
+            .filter(\.index, .equal, index)
+            .join(\MultipleChoiseTaskChoise.taskId, to: \PracticeSession.Pivot.Task.taskID)
+            .decode(MultipleChoiseTaskChoise.self)
+            .all()
+            .wait()
     }
 
     static let allTests = [
