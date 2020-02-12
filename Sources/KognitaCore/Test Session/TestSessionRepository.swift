@@ -163,15 +163,9 @@ extension TestSession {
                             return update(answer: content, for: session, by: user, on: conn)
                                 .catchFlatMap { _ in
 
-                                    return MultipleChoiseTask.DatabaseRepository
-                                        .create(answer: content, on: conn)
-                                        .flatMap { answers in
-
-                                            try answers.map { answer in
-                                                try save(answer: answer, to: session.requireID(), on: conn)
-                                            }
-                                            .flatten(on: conn)
-                                    }
+                                    return try MultipleChoiseTask.DatabaseRepository
+                                        .create(answer: content, sessionID: session.requireID(), on: conn)
+                                        .transform(to: ())
                             }
                     }
             }
@@ -198,16 +192,14 @@ extension TestSession {
                                 throw Abort(.badRequest)
                             }
                             let choisesIDs = answers.map { $0.0.choiseID }
-                            return content.choises
+                            return try content.choises
                                 .changes(from: choisesIDs)
                                 .compactMap { change in
                                     switch change {
                                     case .insert(let choiseID):
-                                        return MultipleChoiseTask.DatabaseRepository
-                                            .createAnswer(choiseID: choiseID, on: conn)
-                                            .flatMap { answer in
-                                                try save(answer: answer, to: session.requireID(), on: conn)
-                                        }
+                                        return try MultipleChoiseTask.DatabaseRepository
+                                            .createAnswer(choiseID: choiseID, sessionID: session.requireID(), on: conn)
+                                            .transform(to: ())
                                     case .remove(let choiseID):
                                         return answers.first(where: { $0.0.choiseID == choiseID })?.1
                                             .delete(on: conn)
