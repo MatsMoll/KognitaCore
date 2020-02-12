@@ -9,8 +9,9 @@ extension Subject {
         public let numberOfTasks: Int
         public let isActive: Bool
         public let canPractice: Bool
+        public let isModerator: Bool
 
-        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel], isActive: Bool, canPractice: Bool) {
+        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel], isActive: Bool, canPractice: Bool, isModerator: Bool) {
             self.subject = subject
 
             var topicLevels = [Topic.ID: Topic.UserOverview]()
@@ -42,6 +43,7 @@ extension Subject {
             self.isActive = isActive
             self.canPractice = canPractice
             self.numberOfTasks = numberOfTasks
+            self.isModerator = isModerator
         }
     }
 }
