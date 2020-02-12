@@ -6,12 +6,13 @@ extension Subject {
         public let subject: Subject
         public let topics: [Topic.UserOverview]
         public let subjectLevel: User.SubjectLevel
+        public let openTest: SubjectTest.OverviewResponse?
         public let numberOfTasks: Int
         public let isActive: Bool
         public let canPractice: Bool
         public let isModerator: Bool
 
-        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel], isActive: Bool, canPractice: Bool, isModerator: Bool) {
+        public init(subject: Subject, topics: [Topic.WithTaskCount], levels: [User.TopicLevel], isActive: Bool, canPractice: Bool, isModerator: Bool, openTest: SubjectTest.OverviewResponse?) {
             self.subject = subject
 
             var topicLevels = [Topic.ID: Topic.UserOverview]()
@@ -44,6 +45,7 @@ extension Subject {
             self.canPractice = canPractice
             self.numberOfTasks = numberOfTasks
             self.isModerator = isModerator
+            self.openTest = openTest
         }
     }
 }

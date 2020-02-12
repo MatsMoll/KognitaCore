@@ -78,6 +78,8 @@ public protocol SubjectTestRepositoring:
     static func end(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 
     static func scoreHistogram(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.ScoreHistogram>
+
+    static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?>
 }
 
 
@@ -402,6 +404,20 @@ extension SubjectTest {
                 .sort(\.openedAt, .descending)
                 .filter(\.openedAt != nil)
                 .filter(\User.ActiveSubject.userID == user.requireID())
+                .all()
+                .map { tests in
+                    tests.first(where: { $0.isOpen })
+            }
+        }
+
+        public static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?> {
+
+            try SubjectTest.query(on: conn)
+                .join(\User.ActiveSubject.subjectID, to: \SubjectTest.subjectID)
+                .sort(\.openedAt, .descending)
+                .filter(\.openedAt != nil)
+                .filter(\User.ActiveSubject.userID == user.requireID())
+                .filter(\SubjectTest.subjectID == subject.requireID())
                 .all()
                 .map { tests in
                     tests.first(where: { $0.isOpen })
