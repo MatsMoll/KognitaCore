@@ -92,6 +92,7 @@ extension SubjectTest {
             case alreadyEntered(sessionID: TaskSession.ID)
             case incorrectPassword
             case testHasNotBeenHeldYet
+            case alreadyEnded
         }
 
         public static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
@@ -499,7 +500,7 @@ extension SubjectTest {
                 let endedAt = test.endedAt,
                 endedAt.timeIntervalSinceNow > 0
             else {
-                throw Abort(.badRequest)
+                throw Errors.alreadyEnded
             }
             
             return try User.DatabaseRepository
