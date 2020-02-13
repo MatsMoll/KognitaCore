@@ -14,4 +14,13 @@ extension TestSession {
             public let isAnswered: Bool
         }
     }
+
+    public struct HighOverview: Content {
+
+        public let id: TaskSession.ID
+        public let createdAt: Date
+        public let subjectName: String
+        public let subjectID: Subject.ID
+        public let testTitle: String
+    }
 }
