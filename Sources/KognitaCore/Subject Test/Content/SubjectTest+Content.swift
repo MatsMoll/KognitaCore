@@ -6,12 +6,15 @@ extension SubjectTest {
 
         public let id: SubjectTest.ID
         public let subjectName: String
+        public let subjectID: Subject.ID
         public let title: String
         public let createdAt: Date
         public let duration: TimeInterval
         public let endsAt: Date?
         public let scheduledAt: Date
         public let openedAt: Date?
+        public let hasSubmitted: Bool
+        public let testSessionID: TestSession.ID?
 
         public var isOpen: Bool {
             guard
@@ -23,7 +26,7 @@ extension SubjectTest {
             return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
         }
 
-        init(test: SubjectTest, subjectName: String) {
+        init(test: SubjectTest, subjectName: String, subjectID: Subject.ID, hasSubmitted: Bool, testSessionID: TestSession.ID?) {
             self.id = test.id ?? 0
             self.title = test.title
             self.createdAt = test.createdAt ?? .now
@@ -31,7 +34,10 @@ extension SubjectTest {
             self.duration = test.duration
             self.openedAt = test.openedAt
             self.subjectName = subjectName
+            self.subjectID = subjectID
             self.endsAt = test.endedAt
+            self.hasSubmitted = hasSubmitted
+            self.testSessionID = testSessionID
         }
     }
 
@@ -85,12 +91,16 @@ extension SubjectTest {
             var finnishedTests = [SubjectTest.OverviewResponse]()
 
             tests.forEach { test in
-                if test.endedAt == nil {
-                    unopendTests.append(test.response(with: subject))
-                } else if test.isOpen {
-                    ongoingTests.append(test.response(with: subject))
-                } else {
-                    finnishedTests.append(test.response(with: subject))
+                do {
+                    if test.endedAt == nil {
+                        try unopendTests.append(test.response(with: subject))
+                    } else if test.isOpen {
+                        try ongoingTests.append(test.response(with: subject))
+                    } else {
+                        try finnishedTests.append(test.response(with: subject))
+                    }
+                } catch {
+                    print("SubjectTest.ListResponse Error: ", error.localizedDescription)
                 }
             }
             self.ongoingTests = ongoingTests
