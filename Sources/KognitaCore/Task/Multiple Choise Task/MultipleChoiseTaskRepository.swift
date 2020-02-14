@@ -290,22 +290,28 @@ extension MultipleChoiseTask.DatabaseRepository {
 
     public static func create(
         answer submit: MultipleChoiseTask.Submit,
+        sessionID: TaskSession.ID,
         on conn: DatabaseConnectable
     ) -> EventLoopFuture<[TaskAnswer]> {
         
         submit.choises.map { choise in
-            createAnswer(choiseID: choise, on: conn)
+            createAnswer(choiseID: choise, sessionID: sessionID, on: conn)
         }
         .flatten(on: conn)
     }
 
-    public static func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskAnswer> {
+    public static func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, sessionID: TaskSession.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskAnswer> {
         TaskAnswer()
             .save(on: conn)
             .flatMap { answer in
                 try MultipleChoiseTaskAnswer(answerID: answer.requireID(), choiseID: choiseID)
                     .create(on: conn)
                     .transform(to: answer)
+        }
+        .flatMap { answer in
+            try TaskSessionAnswer(sessionID: sessionID, taskAnswerID: answer.requireID())
+                .save(on: conn)
+                .transform(to: answer)
         }
     }
 

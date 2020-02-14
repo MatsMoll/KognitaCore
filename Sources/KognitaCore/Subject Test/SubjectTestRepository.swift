@@ -58,7 +58,7 @@ public protocol SubjectTestRepositoring:
     /// Returns the tests that a user can enter in
     /// - Parameter user: The user to find the tests for
     /// - Parameter conn: The database connection
-    static func currentlyOpenTest(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?>
+    static func currentlyOpenTest(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.OverviewResponse?>
 
     /// Returns a list of all the different tests in a subject
     /// - Parameter subject: The subject the tests is for
@@ -79,7 +79,7 @@ public protocol SubjectTestRepositoring:
 
     static func scoreHistogram(for test: SubjectTest, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.ScoreHistogram>
 
-    static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?>
+    static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.OverviewResponse?>
 }
 
 
@@ -92,6 +92,7 @@ extension SubjectTest {
             case alreadyEntered(sessionID: TaskSession.ID)
             case incorrectPassword
             case testHasNotBeenHeldYet
+            case alreadyEnded
         }
 
         public static func create(from content: SubjectTest.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest> {
@@ -397,30 +398,64 @@ extension SubjectTest {
             }
         }
 
-        public static func currentlyOpenTest(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?> {
+        public static func currentlyOpenTest(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.OverviewResponse?> {
 
-            try SubjectTest.query(on: conn)
-                .join(\User.ActiveSubject.subjectID, to: \SubjectTest.subjectID)
-                .sort(\.openedAt, .descending)
-                .filter(\.openedAt != nil)
-                .filter(\User.ActiveSubject.userID == user.requireID())
-                .all()
-                .map { tests in
-                    tests.first(where: { $0.isOpen })
+            return conn.databaseConnection(to: .psql)
+                .flatMap { conn in
+
+                    try conn.select()
+                        .all(table: SubjectTest.self)
+                        .all(table: TestSession.self)
+                        .all(table: Subject.self)
+                        .from(SubjectTest.self)
+                        .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.subjectID,   to: \Subject.id)
+                        .join(\SubjectTest.id,          to: \TestSession.testID, method: .left)
+                        .where(\SubjectTest.openedAt != nil)
+                        .where(\User.ActiveSubject.userID == user.requireID())
+                        .all(decoding: SubjectTest.self, Subject.self, TestSession?.self)
+                        .map { tests in
+                            tests.first { $0.0.isOpen }
+                                .map { test, subject, session in
+                                    SubjectTest.OverviewResponse(
+                                        test: test,
+                                        subjectName: subject.name,
+                                        subjectID: subject.id ?? 0,
+                                        hasSubmitted: session?.hasSubmitted ?? false,
+                                        testSessionID: session?.id
+                                    )
+                            }
+                    }
             }
         }
 
-        public static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest?> {
+        public static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.OverviewResponse?> {
 
-            try SubjectTest.query(on: conn)
-                .join(\User.ActiveSubject.subjectID, to: \SubjectTest.subjectID)
-                .sort(\.openedAt, .descending)
-                .filter(\.openedAt != nil)
-                .filter(\User.ActiveSubject.userID == user.requireID())
-                .filter(\SubjectTest.subjectID == subject.requireID())
-                .all()
-                .map { tests in
-                    tests.first(where: { $0.isOpen })
+            return conn.databaseConnection(to: .psql)
+                .flatMap { conn in
+
+                    try conn.select()
+                        .all(table: SubjectTest.self)
+                        .all(table: TestSession.self)
+                        .from(SubjectTest.self)
+                        .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.id,          to: \TestSession.testID, method: .left)
+                        .where(\SubjectTest.openedAt != nil)
+                        .where(\SubjectTest.subjectID == subject.requireID())
+                        .where(\User.ActiveSubject.userID == user.requireID())
+                        .all(decoding: SubjectTest.self, TestSession?.self)
+                        .map { tests in
+                            tests.first { $0.0.isOpen }
+                                .map { test, session in
+                                    SubjectTest.OverviewResponse(
+                                        test: test,
+                                        subjectName: subject.name,
+                                        subjectID: subject.id ?? 0,
+                                        hasSubmitted: session?.hasSubmitted ?? false,
+                                        testSessionID: session?.id
+                                    )
+                            }
+                    }
             }
         }
 
@@ -465,7 +500,7 @@ extension SubjectTest {
                 let endedAt = test.endedAt,
                 endedAt.timeIntervalSinceNow > 0
             else {
-                throw Abort(.badRequest)
+                throw Errors.alreadyEnded
             }
             
             return try User.DatabaseRepository
@@ -569,4 +604,3 @@ extension SubjectTest {
         }
     }
 }
-
