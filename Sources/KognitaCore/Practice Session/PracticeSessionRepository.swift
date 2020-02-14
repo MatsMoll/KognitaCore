@@ -15,7 +15,9 @@ public protocol PracticeSessionRepository:
     where
     CreateData == PracticeSession.Create.Data,
     CreateResponse == PracticeSession.Create.Response
-{}
+{
+    static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
+}
 
 
 extension PracticeSession {
@@ -556,6 +558,31 @@ extension PracticeSession.DatabaseRepository {
                         )
                     }
                 )
+        }
+    }
+
+    public static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[PracticeSession.HighOverview]> {
+
+        conn.databaseConnection(to: .psql)
+            .flatMap { conn in
+
+                try conn.select()
+                    .column(\Subject.name,              as: "subjectName")
+                    .column(\Subject.id,                as: "subjectID")
+                    .column(\PracticeSession.id,        as: "id")
+                    .column(\PracticeSession.createdAt, as: "createdAt")
+                    .from(PracticeSession.self)
+                    .join(\PracticeSession.id,      to: \TaskSession.id)
+                    .join(\PracticeSession.id,      to: \PracticeSession.Pivot.Subtopic.sessionID)
+                    .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.id)
+                    .join(\Subtopic.topicId,        to: \Topic.id)
+                    .join(\Topic.subjectId,         to: \Subject.id)
+                    .where(\PracticeSession.endedAt != nil)
+                    .where(\TaskSession.userID == user.requireID())
+                    .orderBy(\PracticeSession.createdAt, .descending)
+                    .groupBy(\PracticeSession.id)
+                    .groupBy(\Subject.id)
+                    .all(decoding: PracticeSession.HighOverview.self)
         }
     }
 

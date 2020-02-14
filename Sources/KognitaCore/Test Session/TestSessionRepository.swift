@@ -41,6 +41,8 @@ public protocol TestSessionRepositoring {
     ///   - user: The user requesting the overview
     ///   - conn: The database connection
     static func overview(in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.Overview>
+
+    static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TestSession.HighOverview]>
 }
 
 
@@ -381,6 +383,27 @@ extension TestSession {
                                 }
                             )
                     }
+            }
+        }
+
+        public static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TestSession.HighOverview]> {
+
+            conn.databaseConnection(to: .psql)
+                .flatMap { conn in
+
+                    return try conn.select()
+                        .column(\Subject.name,          as: "subjectName")
+                        .column(\Subject.id,            as: "subjectID")
+                        .column(\TestSession.id,        as: "id")
+                        .column(\TestSession.createdAt, as: "createdAt")
+                        .column(\SubjectTest.title,     as: "testTitle")
+                        .from(TestSession.self)
+                        .join(\TestSession.id,          to: \TaskSession.id)
+                        .join(\TestSession.testID,      to: \SubjectTest.id)
+                        .join(\SubjectTest.subjectID,   to: \Subject.id)
+                        .where(\TestSession.submittedAt != nil)
+                        .where(\TaskSession.userID == user.requireID())
+                        .all(decoding: TestSession.HighOverview.self)
             }
         }
     }
