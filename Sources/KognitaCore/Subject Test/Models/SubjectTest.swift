@@ -180,6 +180,7 @@ extension SubjectTest {
 
             public let taskID: Task.ID
             public let question: String
+            public let description: String?
             public let choises: [Choise]
         }
 
