@@ -34,6 +34,9 @@ public final class SubjectTest: KognitaPersistenceModel {
     /// A title describing the test
     public var title: String
 
+    /// A bool represening if is in team based learning mode
+    public var isTeamBasedLearning: Bool
+
 
     public var isOpen: Bool {
         guard
@@ -46,21 +49,23 @@ public final class SubjectTest: KognitaPersistenceModel {
     }
 
 
-    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID) {
-        self.scheduledAt    = scheduledAt
-        self.duration       = duration
-        self.password       = password
-        self.title          = title
-        self.subjectID      = subjectID
+    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID, isTeamBasedLearning: Bool) {
+        self.scheduledAt            = scheduledAt
+        self.duration               = duration
+        self.password               = password
+        self.title                  = title
+        self.subjectID              = subjectID
+        self.isTeamBasedLearning    = isTeamBasedLearning
     }
 
     convenience init(data: SubjectTest.Create.Data) {
         self.init(
-            scheduledAt:    data.scheduledAt,
-            duration:       data.duration,
-            password:       data.password,
-            title:          data.title,
-            subjectID:      data.subjectID
+            scheduledAt:            data.scheduledAt,
+            duration:               data.duration,
+            password:               data.password,
+            title:                  data.title,
+            subjectID:              data.subjectID,
+            isTeamBasedLearning:    data.isTeamBasedLearning
         )
     }
 
@@ -69,6 +74,7 @@ public final class SubjectTest: KognitaPersistenceModel {
         self.duration       = data.duration
         self.password       = data.password
         self.title          = data.title
+        self.isTeamBasedLearning = data.isTeamBasedLearning
         return self
     }
 
@@ -92,106 +98,6 @@ public final class SubjectTest: KognitaPersistenceModel {
 
 extension SubjectTest: Content {}
 extension SubjectTest: ModelParameterRepresentable {}
-
-extension SubjectTest {
-    public enum Create {
-        public struct Data: Content {
-            let tasks: [Task.ID]
-            let subjectID: Subject.ID
-            let duration: TimeInterval
-            let scheduledAt: Date
-            let password: String
-            let title: String
-        }
-
-        public typealias Response = SubjectTest
-    }
-
-    public typealias Update = Create
-
-    public enum Enter {
-        public struct Request: Decodable {
-            let password: String
-        }
-    }
-
-    public struct CompletionStatus: Content {
-        public internal(set) var amountOfCompletedUsers: Int
-        public internal(set) var amountOfEnteredUsers: Int
-
-        public var hasEveryoneCompleted: Bool { amountOfEnteredUsers == amountOfCompletedUsers }
-    }
-
-    public struct TestTask: Content {
-        public let testTaskID: SubjectTest.Pivot.Task.ID
-        public let isCurrent: Bool
-    }
-
-    public struct MultipleChoiseTaskContent: Content {
-
-        public struct Choise: Content {
-            public let id: MultipleChoiseTaskChoise.ID
-            public let choise: String
-            public let isCorrect: Bool
-            public let isSelected: Bool
-        }
-
-        public let test: SubjectTest
-        public let task: Task
-        public let isMultipleSelect: Bool
-        public let choises: [Choise]
-
-        public let testTasks: [TestTask]
-
-        init(test: SubjectTest, task: Task, multipleChoiseTask: KognitaCore.MultipleChoiseTask, choises: [MultipleChoiseTaskChoise], selectedChoises: [MultipleChoiseTaskAnswer], testTasks: [SubjectTest.Pivot.Task]) {
-            self.test = test
-            self.task = task
-            self.isMultipleSelect = multipleChoiseTask.isMultipleSelect
-            self.choises = choises.compactMap { choise in
-                try? Choise(
-                    id: choise.requireID(),
-                    choise: choise.choise,
-                    isCorrect: choise.isCorrect,
-                    isSelected: selectedChoises.contains(where: { $0.choiseID == choise.id })
-                )
-            }
-            self.testTasks = testTasks.compactMap { testTask in
-                guard let testTaskID = testTask.id else {
-                    return nil
-                }
-                return TestTask(
-                    testTaskID: testTaskID,
-                    isCurrent: testTask.taskID == task.id
-                )
-            }
-        }
-    }
-
-    public struct Results: Content {
-
-        public struct MultipleChoiseTaskResult: Content {
-
-            public struct Choise: Content {
-                public let choise: String
-                public let numberOfSubmissions: Int
-                public let percentage: Double
-                public let isCorrect: Bool
-            }
-
-            public let taskID: Task.ID
-            public let question: String
-            public let description: String?
-            public let choises: [Choise]
-        }
-
-        public let title: String
-        public let heldAt: Date
-        public let taskResults: [MultipleChoiseTaskResult]
-        public let averageScore: Double
-        public let subjectID: Subject.ID
-        public let subjectName: String
-    }
-}
 
 extension Date {
     public static var now: Date { Date() }

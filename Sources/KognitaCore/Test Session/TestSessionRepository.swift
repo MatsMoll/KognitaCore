@@ -362,7 +362,7 @@ extension TestSession {
                             return Results(
                                 testTitle: test.title,
                                 executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
-                                shouldPresentDetails: false,
+                                shouldPresentDetails: test.isTeamBasedLearning == false,
                                 topicResults: tasks.group(by: \.1.id) // Grouping by topic id
                                     .compactMap { (_, topicTasks) in
 

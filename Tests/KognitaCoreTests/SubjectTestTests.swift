@@ -39,7 +39,8 @@ class SubjectTestTests: VaporTestCase {
             duration: .minutes(10),
             scheduledAt: .now,
             password: "password",
-            title: "Testing"
+            title: "Testing",
+            isTeamBasedLearning: false
         )
         XCTAssertThrowsError(
             _ = try SubjectTest.DatabaseRepository.create(from: data, by: nil, on: conn).wait()
@@ -54,7 +55,8 @@ class SubjectTestTests: VaporTestCase {
             duration: .minutes(10),
             scheduledAt: .now,
             password: "password",
-            title: "Testing"
+            title: "Testing",
+            isTeamBasedLearning: false
         )
         XCTAssertThrowsError(
             _ = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
@@ -489,7 +491,8 @@ class SubjectTestTests: VaporTestCase {
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",
-            title:          "Testing"
+            title:          "Testing",
+            isTeamBasedLearning: false
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {
@@ -520,7 +523,8 @@ class SubjectTestTests: VaporTestCase {
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",
-            title:          "Testing"
+            title:          "Testing",
+            isTeamBasedLearning: false
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {
