@@ -360,6 +360,7 @@ extension SubjectTest {
                     return try? Results.MultipleChoiseTaskResult(
                         taskID: task.requireID(),
                         question: task.question,
+                        description: task.description,
                         choises: info.map { _, choise in
 
                             let choiseCount = (try? grupedChoiseCount[choise.requireID()]) ?? 0
