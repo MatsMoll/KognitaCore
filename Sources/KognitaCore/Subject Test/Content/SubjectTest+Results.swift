@@ -25,5 +25,6 @@ extension SubjectTest {
         public let averageScore: Double
         public let subjectID: Subject.ID
         public let subjectName: String
+        public let userResults: [UserResult]
     }
 }

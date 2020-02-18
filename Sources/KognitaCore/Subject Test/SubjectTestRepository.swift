@@ -324,15 +324,26 @@ extension SubjectTest {
                                         .where(\SubjectTest.Pivot.Task.testID == test.requireID())
                                         .all(decoding: Task.self, MultipleChoiseTaskChoise.self)
                                         .flatMap { tasks in
-
-                                            return try calculateResultStatistics(for: test, tasks: tasks, choiseCount: choiseCount, on: conn)
+                                            try calculateResultStatistics(
+                                                for: test,
+                                                tasks: tasks,
+                                                choiseCount: choiseCount,
+                                                user: user,
+                                                on: conn
+                                            )
                                     }
                             }
                     }
             }
         }
 
-        private static func calculateResultStatistics(for test: SubjectTest, tasks: [(Task, MultipleChoiseTaskChoise)], choiseCount: [MultipleChoiseTaskAnswerCount], on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.Results> {
+        private static func calculateResultStatistics(
+            for test: SubjectTest,
+            tasks: [(Task, MultipleChoiseTaskChoise)],
+            choiseCount: [MultipleChoiseTaskAnswerCount],
+            user: User,
+            on conn: DatabaseConnectable
+        ) throws -> EventLoopFuture<SubjectTest.Results> {
 
             guard let heldAt = test.openedAt else {
                 throw Errors.testHasNotBeenHeldYet
@@ -378,23 +389,28 @@ extension SubjectTest {
                     )
             }
 
-            return try TestSession.query(on: conn)
-                .filter(\.testID == test.requireID())
-                .count()
-                .flatMap { numberOfSessions in
+            return try detailedUserResults(for: test, maxScore: Double(taskResults.count), user: user, on: conn)
+                .flatMap { userResults in
 
-                    Subject.find(test.subjectID, on: conn)
-                        .unwrap(or: Abort(.internalServerError))
-                        .map { subject in
+                    try TestSession.query(on: conn)
+                        .filter(\.testID == test.requireID())
+                        .count()
+                        .flatMap { numberOfSessions in
 
-                            Results(
-                                title: test.title,
-                                heldAt: heldAt,
-                                taskResults: taskResults,
-                                averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions),
-                                subjectID: test.subjectID,
-                                subjectName: subject.name
-                            )
+                            Subject.find(test.subjectID, on: conn)
+                                .unwrap(or: Abort(.internalServerError))
+                                .map { subject in
+
+                                    Results(
+                                        title: test.title,
+                                        heldAt: heldAt,
+                                        taskResults: taskResults,
+                                        averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions),
+                                        subjectID: test.subjectID,
+                                        subjectName: subject.name,
+                                        userResults: userResults
+                                    )
+                            }
                     }
             }
         }
@@ -602,6 +618,55 @@ extension SubjectTest {
                     )
             }
             return SubjectTest.ScoreHistogram(scores: scores)
+        }
+
+        private struct UserResultQueryResult: Codable {
+            let userEmail: String
+            let userID: User.ID
+            let score: Double
+        }
+
+        public static func detailedUserResults(for test: SubjectTest, maxScore: Double, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[UserResult]> {
+
+            guard maxScore != 0 else {
+                throw Abort(.badRequest)
+            }
+
+            return try User.DatabaseRepository
+                .isModerator(user: user, subjectID: test.subjectID, on: conn)
+                .flatMap {
+
+                    conn.databaseConnection(to: .psql)
+                        .flatMap { conn in
+
+                            try conn.select()
+                                .column(\User.email,                as: "userEmail")
+                                .column(\User.id,                   as: "userID")
+                                .column(\TaskResult.resultScore,    as: "score")
+                                .from(TaskResult.self)
+                                .join(\TaskResult.sessionID, to: \TaskSession.id)
+                                .join(\TaskSession.userID, to: \User.id)
+                                .join(\TaskSession.id, to: \TestSession.id)
+                                .where(\TestSession.testID == test.requireID())
+                                .all(decoding: UserResultQueryResult.self)
+                                .map { users in
+
+                                    users.group(by: \.userID)
+                                        .compactMap { (_, scores) in
+
+                                            guard let userEmail = scores.first?.userEmail else {
+                                                return nil
+                                            }
+                                            let score = scores.reduce(0.0) { $0 + $1.score }
+                                            return UserResult(
+                                                userEmail: userEmail,
+                                                score: score,
+                                                percentage: score / maxScore
+                                            )
+                                    }
+                            }
+                    }
+            }
         }
     }
 }
