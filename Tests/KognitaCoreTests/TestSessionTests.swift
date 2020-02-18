@@ -311,7 +311,8 @@ class TestSessionTests: VaporTestCase {
             duration:       duration,
             scheduledAt:    scheduledAt,
             password:       "password",
-            title:          "Testing"
+            title:          "Testing",
+            isTeamBasedLearning: false
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {

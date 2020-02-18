@@ -52,6 +52,7 @@ extension SubjectTest {
         public let openedAt: Date?
         public let taskIDs: [Task.ID]
         public let password: String
+        public let isTeamBasedLearning: Bool
 
         public var isOpen: Bool { openedAt != nil }
 
@@ -72,6 +73,7 @@ extension SubjectTest {
             self.openedAt = test.openedAt
             self.taskIDs = taskIDs
             self.password = test.password
+            self.isTeamBasedLearning = test.isTeamBasedLearning
         }
     }
 
