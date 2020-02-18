@@ -433,6 +433,43 @@ class SubjectTestTests: VaporTestCase {
     }
 
 
+    func testUserResults() {
+        do {
+            let test = try setupTestWithTasks()
+
+            let admin = try User.create(on: conn)
+            let userOne = try User.create(isAdmin: false, on: conn)
+            let userTwo = try User.create(isAdmin: false, on: conn)
+
+            let firstSubmittion             = try submittionAt(index: 1, for: test)
+            let secondSubmittion            = try submittionAt(index: 2, for: test)
+            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+
+            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+
+            let results = try SubjectTest.DatabaseRepository.detailedUserResults(for: test, maxScore: 3, user: admin, on: conn).wait()
+
+            XCTAssertThrowsError(
+                try SubjectTest.DatabaseRepository.detailedUserResults(for: test, maxScore: 3, user: userOne, on: conn).wait()
+            )
+
+            XCTAssertEqual(results.count, 2)
+
+            let userOneResult = try XCTUnwrap(results.first(where: { $0.userEmail == userOne.email }))
+            let userTwoResult = try XCTUnwrap(results.first(where: { $0.userEmail == userTwo.email }))
+
+            XCTAssertEqual(userOneResult.score, 3)
+            XCTAssertEqual(userTwoResult.score, 1)
+            XCTAssertEqual(userOneResult.percentage, 1)
+            XCTAssertEqual(userTwoResult.percentage, 1/3)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
         let sessionEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
 
@@ -551,7 +588,8 @@ class SubjectTestTests: VaporTestCase {
         ("testRetrivingTaskContent",            testRetrivingTaskContent),
         ("testResultStatistics",                testResultStatistics),
         ("testResultStatisticsTaskReuseBug",    testResultStatisticsTaskReuseBug),
-        ("testTestResultHistogram",             testTestResultHistogram)
+        ("testTestResultHistogram",             testTestResultHistogram),
+        ("testUserResults",                     testUserResults)
     ]
 }
 
