@@ -6,6 +6,7 @@ public protocol TestSessionRepresentable {
     var userID: User.ID { get }
     var testID: SubjectTest.ID { get }
     var submittedAt: Date? { get }
+    var expectedScore: Int? { get }
 
     func requireID() throws -> Int
     func submit(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable>
@@ -323,16 +324,16 @@ extension TestSession {
         }
 
 
-        public static func results(in test: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+        public static func results(in testSession: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
 
-            guard try test.userID == user.requireID() else {
+            guard try testSession.userID == user.requireID() else {
                 throw Abort(.forbidden)
             }
 
             return try TestSession.query(on: conn)
                 .join(\SubjectTest.id, to: \TestSession.testID)
                 .join(\TaskResult.sessionID, to: \TestSession.id)
-                .filter(\TestSession.id == test.requireID())
+                .filter(\TestSession.id == testSession.requireID())
                 .decode(SubjectTest.self)
                 .alsoDecode(TaskResult.self)
                 .all()
@@ -359,28 +360,31 @@ extension TestSession {
                                 taskResults[result.1.taskID] = result.1.resultScore
                             }
 
+                            let topicResults: [Results.Topic] = tasks.group(by: \.1.id) // Grouping by topic id
+                                .compactMap { (_, topicTasks) in
+
+                                    guard let topic = topicTasks.first?.1 else {
+                                        return nil
+                                    }
+
+                                    return Results.Topic(
+                                        name: topic.name,
+                                        taskResults: topicTasks.map { task in
+                                            // Calculating the score for a given task and defaulting to 0 in score
+                                            Results.Task(
+                                                question: task.0.question,
+                                                score: taskResults[task.0.id ?? 0] ?? 0
+                                            )
+                                        }
+                                    )
+                            }
+
                             return Results(
                                 testTitle: test.title,
                                 executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
                                 shouldPresentDetails: test.isTeamBasedLearning == false,
-                                topicResults: tasks.group(by: \.1.id) // Grouping by topic id
-                                    .compactMap { (_, topicTasks) in
-
-                                        guard let topic = topicTasks.first?.1 else {
-                                            return nil
-                                        }
-
-                                        return Results.Topic(
-                                            name: topic.name,
-                                            taskResults: topicTasks.map { task in
-                                                // Calculating the score for a given task and defaulting to 0 in score
-                                                Results.Task(
-                                                    question: task.0.question,
-                                                    score: taskResults[task.0.id ?? 0] ?? 0
-                                                )
-                                            }
-                                        )
-                                }
+                                topicResults: topicResults,
+                                expectedScore: testSession.expectedScore
                             )
                     }
             }

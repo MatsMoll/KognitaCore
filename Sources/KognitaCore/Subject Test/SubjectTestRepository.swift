@@ -185,7 +185,8 @@ extension SubjectTest {
 
                             try TestSession(
                                 sessionID: session.requireID(),
-                                testID: test.requireID()
+                                testID: test.requireID(),
+                                expectedScore: request.expectedScore
                             )
                             .create(on: conn)
                     }
