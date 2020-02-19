@@ -36,7 +36,7 @@ extension Task.Repository {
     
     public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
-        guard let user = user else { throw Abort(.forbidden) }
+        guard let user = user else { throw Abort(.unauthorized) }
         
         return try Task(
             content: content.content,
@@ -54,7 +54,17 @@ extension Task.Repository {
                     creatorID: user.requireID()
                 )
                 .save(on: conn)
-                .transform(to: task)
+                .flatMap { solution in
+
+                    try User.DatabaseRepository
+                        .isModerator(user: user, subtopicID: content.subtopicID, on: conn)
+                        .flatMap {
+                            solution.isApproved = true
+                            return solution.save(on: conn)
+                                .transform(to: task)
+                    }
+                    .catchMap { _ in task }
+                }
         }
     }
 

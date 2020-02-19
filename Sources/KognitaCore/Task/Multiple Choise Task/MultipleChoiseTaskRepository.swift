@@ -39,43 +39,40 @@ extension MultipleChoiseTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        return try User.DatabaseRepository
-            .isModerator(user: user, subtopicID: content.subtopicId, on: conn)
-            .flatMap {
+        try content.validate()
+        return Subtopic.DatabaseRepository
+            .find(content.subtopicId, on: conn)
+            .unwrap(or: Task.Create.Errors.invalidTopic)
+            .flatMap { subtopic in
 
-                try content.validate()
-                return Subtopic.DatabaseRepository
-                    .find(content.subtopicId, on: conn)
-                    .unwrap(or: Task.Create.Errors.invalidTopic)
-                    .flatMap { subtopic in
+                conn.transaction(on: .psql) { conn in
 
-                        conn.transaction(on: .psql) { conn in
+                    try Task.Repository
+                        .create(
+                            from: .init(
+                                content: content,
+                                subtopicID: subtopic.requireID(),
+                                solution: content.solution
+                            ),
+                            by: user,
+                            on: conn
+                    )
+                        .flatMap { task in
 
-                            try Task.Repository
-                                .create(
-                                    from: .init(
-                                        content: content,
-                                        subtopicID: subtopic.requireID(),
-                                        solution: content.solution
-                                    ),
-                                    by: user,
-                                    on: conn)
-                                .flatMap { task in
-
-                                    try MultipleChoiseTask(
-                                        isMultipleSelect: content.isMultipleSelect,
-                                        task: task)
-                                        .create(on: conn)
-
-                                } .flatMap { (task) in
-                                    try content.choises.map { choise in
-                                        try MultipleChoiseTaskChoise(content: choise, task: task)
-                                            .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
-                                        }
-                                        .flatten(on: conn)
-                                        .transform(to: task)
-                            }
+                            try MultipleChoiseTask(
+                                isMultipleSelect: content.isMultipleSelect,
+                                task: task
+                            )
+                                .create(on: conn)
                         }
+                    .flatMap { (task) in
+                            try content.choises.map { choise in
+                                try MultipleChoiseTaskChoise(content: choise, task: task)
+                                    .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
+                                }
+                                .flatten(on: conn)
+                                .transform(to: task)
+                    }
                 }
         }
     }
