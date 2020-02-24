@@ -5,6 +5,8 @@ extension Task {
 
         public let id: Int
 
+        public let creatorID: User.ID?
+
         /// The topic.id for the topic this task relates to
         public let subtopicID: Subtopic.ID
 
@@ -44,6 +46,7 @@ extension Task {
             self.editedTaskID = task.editedTaskID
             self.solution = solution.solution
             self.deletedAt = task.deletedAt
+            self.creatorID = task.creatorID
         }
     }
 }
