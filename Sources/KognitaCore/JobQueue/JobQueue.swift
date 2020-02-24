@@ -2,10 +2,8 @@ import Vapor
 import Foundation
 import FluentPostgreSQL
 
-public typealias Job = (Container, DatabaseConnectable) -> Future<Void>
-
 public protocol JobQueueable: Service {
-    func scheduleFutureJob(after delay: TimeAmount, job: @escaping Job)
+    func scheduleFutureJob(after delay: TimeAmount, job: @escaping (Container, DatabaseConnectable) throws -> EventLoopFuture<Void>)
 }
 
 final class ProductionJobQueue: JobQueueable {
@@ -18,11 +16,11 @@ final class ProductionJobQueue: JobQueueable {
     }
 
 
-    func scheduleFutureJob(after delay: TimeAmount, job: @escaping Job) {
+    func scheduleFutureJob(after delay: TimeAmount, job: @escaping (Container, DatabaseConnectable) throws -> EventLoopFuture<Void>) {
         eventLoop.scheduleTask(in: delay) {
             self.container.requestCachedConnection(to: .psql)
                 .flatMap { conn in
-                    job(self.container, conn)
+                    try job(self.container, conn)
             }
         }
     }
