@@ -43,10 +43,8 @@ extension Application {
         }
 
         try services.register(FluentPostgreSQLProvider())
-        services.register(
-            DatabaseMigrations.migrationConfig(enviroment: env)
-        )
 
+        KognitaCore.config(enviroment: env, in: &services)
         setupDatabase(for: env, in: &services)
 
         // Register the commands (used to reset the database)
