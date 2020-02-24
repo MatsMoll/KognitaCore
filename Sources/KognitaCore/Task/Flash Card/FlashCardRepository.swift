@@ -42,36 +42,30 @@ extension FlashCardTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        return try User.DatabaseRepository
-            .isModerator(user: user, subtopicID: content.subtopicId, on: conn)
-            .flatMap {
+        try content.validate()
+        return Subtopic.DatabaseRepository
+            .find(content.subtopicId, on: conn)
+            .unwrap(or: Task.Create.Errors.invalidTopic)
+            .flatMap { subtopic in
 
-                try content.validate()
+                conn.transaction(on: .psql) { conn in
 
-                return Subtopic.DatabaseRepository
-                    .find(content.subtopicId, on: conn)
-                    .unwrap(or: Task.Create.Errors.invalidTopic)
-                    .flatMap { subtopic in
+                    try Task.Repository
+                        .create(
+                            from: .init(
+                                content: content,
+                                subtopicID: subtopic.requireID(),
+                                solution: content.solution
+                            ),
+                            by: user,
+                            on: conn
+                    )
+                        .flatMap { task in
 
-                        conn.transaction(on: .psql) { conn in
-
-                            try Task.Repository
-                                .create(
-                                    from: .init(
-                                        content: content,
-                                        subtopicID: subtopic.requireID(),
-                                        solution: content.solution
-                                    ),
-                                    by: user,
-                                    on: conn
-                            )
-                                .flatMap { task in
-
-                                    try FlashCardTask(task: task)
-                                        .create(on: conn)
-                                        .transform(to: task)
-                            }
-                        }
+                            try FlashCardTask(task: task)
+                                .create(on: conn)
+                                .transform(to: task)
+                    }
                 }
         }
     }

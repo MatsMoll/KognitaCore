@@ -60,6 +60,7 @@ extension Task.Repository {
                         .isModerator(user: user, subtopicID: content.subtopicID, on: conn)
                         .flatMap {
                             solution.isApproved = true
+                            try solution.approvedBy = user.requireID()
                             return solution.save(on: conn)
                                 .transform(to: task)
                     }
