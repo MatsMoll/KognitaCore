@@ -31,26 +31,38 @@ class TaskTests: VaporTestCase {
     }
 
     func testSolutions() throws {
+        do {
+            let task = try Task.create(createSolution: false, on: conn)
+            let user = try User.create(on: conn)
+            let secondUser = try User.create(isAdmin: false, on: conn)
+            let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
+            let secondSolution = try TaskSolution.create(task: task, on: conn)
+            _ = try TaskSolution.create(on: conn)
 
-        let task = try Task.create(createSolution: false, on: conn)
-        let user = try User.create(on: conn)
-        let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
-        let secondSolution = try TaskSolution.create(task: task, on: conn)
-        _ = try TaskSolution.create(on: conn)
+            secondSolution.isApproved = true
+            secondSolution.approvedBy = try user.requireID()
+            _ = try secondSolution.save(on: conn).wait()
 
-        secondSolution.isApproved = true
-        secondSolution.approvedBy = try user.requireID()
-        _ = try secondSolution.save(on: conn).wait()
+            try TaskSolution.Repository.vote(for: firstSolution.requireID(), by: user, on: conn).wait()
+            try TaskSolution.Repository.vote(for: firstSolution.requireID(), by: secondUser, on: conn).wait()
 
-        let solutions = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
-        
-        XCTAssertEqual(solutions.count, 2)
-        XCTAssertNotNil(solutions.first(where: { $0.solution == firstSolution.solution }))
-        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.creatorUsername)
-        XCTAssertNil(solutions.first(where: { $0.solution == firstSolution.solution })?.approvedBy)
-        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution }))
-        XCTAssertEqual(solutions.first(where: { $0.solution == secondSolution.solution })?.approvedBy, user.username)
-        XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorUsername)
+            let solutions = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
+
+            XCTAssertEqual(solutions.count, 2)
+
+            let firstResponse = try XCTUnwrap(solutions.first(where: { $0.solution == firstSolution.solution }))
+            XCTAssertNil(firstResponse.creatorUsername)
+            XCTAssertNil(firstResponse.approvedBy)
+            XCTAssertEqual(firstResponse.numberOfVotes, 2)
+
+            let secondResponse = try XCTUnwrap(solutions.first(where: { $0.solution == secondSolution.solution }))
+            XCTAssertEqual(secondResponse.approvedBy, user.username)
+            XCTAssertNotNil(secondResponse.creatorUsername)
+            XCTAssertEqual(secondResponse.numberOfVotes, 0)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
     }
 
     static var allTests = [
