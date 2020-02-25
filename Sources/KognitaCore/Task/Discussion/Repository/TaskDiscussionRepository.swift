@@ -27,7 +27,10 @@ extension TaskDiscussion {
 
         public static func respond(with response: TaskDiscussion.Pivot.Response.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
 
-            return try TaskDiscussion.DatabaseRepository.respond(with: response, by: user, on: conn)
+            return try TaskDiscussion.Pivot.Response(data: response, userID: user.requireID())
+                .create(on: conn)
+                .transform(to: ())
+
         }
     }
 }
