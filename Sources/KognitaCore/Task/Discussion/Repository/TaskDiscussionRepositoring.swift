@@ -11,4 +11,8 @@ public protocol TaskDiscussionRepositoring:
     UpdateResponse  == TaskDiscussion.Create.Response
 {
     static func respond(with response: TaskDiscussion.Pivot.Response.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    static func getDiscussions(in taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]>
+
+
 }
