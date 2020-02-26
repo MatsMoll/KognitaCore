@@ -8,7 +8,7 @@ public protocol TaskDiscussionRepositoring:
     CreateData      == TaskDiscussion.Create.Data,
     CreateResponse  == TaskDiscussion.Create.Response,
     UpdateData      == TaskDiscussion.Update.Data,
-    UpdateResponse  == TaskDiscussion.Create.Response
+    UpdateResponse  == TaskDiscussion.Update.Response
 {
     static func respond(with response: TaskDiscussion.Pivot.Response.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 

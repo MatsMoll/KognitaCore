@@ -47,3 +47,5 @@ public final class TaskDiscussion : KognitaCRUDModel {
         }
     }
 }
+
+extension TaskDiscussion: ModelParameterRepresentable {}

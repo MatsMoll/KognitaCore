@@ -61,7 +61,7 @@ extension TaskDiscussion {
                 .transform(to: .init())
         }
 
-        public static func update(model: TaskDiscussion, to data: TaskDiscussion.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Create.Response> {
+        public static func update(model: TaskDiscussion, to data: TaskDiscussion.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Update.Response> {
 
             guard user.id == model.userID else {
                 throw Abort(.forbidden)
