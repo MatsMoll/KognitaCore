@@ -22,7 +22,7 @@ extension Sequence {
         return result
     }
 
-    public func count<T>(_ path: KeyPath<Element, T>) -> [T : Int] where T : Hashable {
+    public func count<T>(equal path: KeyPath<Element, T>) -> [T : Int] where T : Hashable {
         var counts = [T : Int]()
         for object in self {
             let value = object[keyPath: path]

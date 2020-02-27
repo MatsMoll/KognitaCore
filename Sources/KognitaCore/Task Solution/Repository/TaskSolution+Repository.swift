@@ -3,8 +3,7 @@ import FluentPostgreSQL
 
 extension TaskSolution {
 
-    public final class Repository: RetriveAllModelsRepository {
-
+    public final class DatabaseRepository: TaskSolutionRepositoring {
 
         struct Query {
             struct SolutionID: Codable {
@@ -23,9 +22,6 @@ extension TaskSolution {
             static let taskSolutionForTaskID = #"SELECT "sol"."id", "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."username" AS "creatorUsername", "approved"."username" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
         }
 
-        public typealias Model = TaskSolution
-        public typealias ResponseModel = TaskSolution
-
         public static func create(from content: TaskSolution.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Create.Response> {
 
             guard let user = user else { throw Abort(.unauthorized) }
@@ -37,6 +33,7 @@ extension TaskSolution {
 
         public static func solutions(for taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
             return conn.databaseConnection(to: .psql).flatMap { psqlConn in
+
                 psqlConn
                     .raw(Query.taskSolutionForTaskID)
                     .bind(taskID)
@@ -51,7 +48,7 @@ extension TaskSolution {
                             .all(decoding: Query.SolutionID.self)
                             .map { (votes: [Query.SolutionID]) in
 
-                                let counts = votes.count(\.solutionID)
+                                let counts = votes.count(equal: \.solutionID)
 
                                 return solutions.map { solution in
                                     if solution.presentUser == false {
@@ -67,7 +64,7 @@ extension TaskSolution {
             }
         }
 
-        public static func vote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public static func upvote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             try TaskSolution.Pivot.Vote(userID: user.requireID(), solutionID: solutionID)
                 .create(on: conn)
                 .transform(to: ())
@@ -83,6 +80,30 @@ extension TaskSolution {
                     vote.delete(on: conn)
             }
         }
-    }
 
+        public static func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Update.Response> {
+            if try model.creatorID == user.requireID() {
+                model.update(with: data)
+                return model.save(on: conn).transform(to: .init())
+            } else {
+                return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
+                    model.update(with: data)
+                    return model.save(on: conn).transform(to: .init())
+                }
+            }
+        }
+
+        public static func delete(model: TaskSolution, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+            guard let user = user else {
+                throw Abort(.unauthorized)
+            }
+            if try model.creatorID == user.requireID() {
+                return model.delete(on: conn)
+            } else {
+                return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
+                    model.delete(on: conn)
+                }
+            }
+        }
+    }
 }

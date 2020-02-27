@@ -52,4 +52,13 @@ public final class TaskSolution: KognitaPersistenceModel {
             }
         }
     }
+
+    public func update(with data: TaskSolution.Update.Data) {
+        if let solution = data.solution {
+            self.solution = solution
+        }
+        if let presentUser = data.presentUser {
+            self.presentUser = presentUser
+        }
+    }
 }
