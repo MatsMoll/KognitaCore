@@ -88,6 +88,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 Subject.DatabaseRepository
                     .getSubjectWith(id: content.subjectId, on: conn)
                     .flatMap { subject in
+                        
                         try Topic(content: content, subject: subject, creator: user)
                             .create(on: conn)
                             .flatMap { topic in
