@@ -94,6 +94,7 @@ extension TestSession {
         }
 
         public struct Topic: Content {
+            public let id: KognitaCore.Topic.ID
             public let name: String
             public let taskResults: [Task]
 
@@ -109,7 +110,8 @@ extension TestSession {
                 scoreProsentage * 100
             }
 
-            init(name: String, taskResults: [Task]) {
+            init(id: KognitaCore.Topic.ID, name: String, taskResults: [Task]) {
+                self.id = id
                 self.name = name
                 self.taskResults = taskResults
 
@@ -122,6 +124,8 @@ extension TestSession {
         public let executedAt: Date
         public let shouldPresentDetails: Bool
         public let topicResults: [Topic]
+        public let subjectID: Subject.ID
+        public let canPractice: Bool
 
         public let score: Double
         public let maximumScore: Double
@@ -131,10 +135,12 @@ extension TestSession {
             return score / maximumScore
         }
 
-        init(testTitle: String, executedAt: Date, shouldPresentDetails: Bool, topicResults: [Topic]) {
+        init(testTitle: String, executedAt: Date, shouldPresentDetails: Bool, subjectID: Subject.ID, canPractice: Bool, topicResults: [Topic]) {
             self.testTitle = testTitle
             self.executedAt = executedAt
             self.shouldPresentDetails = shouldPresentDetails
+            self.subjectID = subjectID
+            self.canPractice = canPractice
             self.topicResults = topicResults
             self.score = topicResults.reduce(0) { $0 + $1.score }
             self.maximumScore = topicResults.reduce(0) { $0 + $1.maximumScore }
