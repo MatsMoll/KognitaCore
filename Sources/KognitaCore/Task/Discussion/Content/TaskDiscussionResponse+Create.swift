@@ -10,7 +10,7 @@ extension TaskDiscussion.Pivot.Response {
         }
 
         public struct Response: Content {
-            
+            public init() {}
         }
     }
 }

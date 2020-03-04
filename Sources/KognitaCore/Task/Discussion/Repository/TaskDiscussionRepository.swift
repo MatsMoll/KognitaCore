@@ -10,43 +10,17 @@ extension TaskDiscussion {
                 .join(\User.id, to: \TaskDiscussion.userID)
                 .alsoDecode(User.self)
                 .all()
-                .flatMap { discussions in
+                .map { discussions in
 
-                    TaskDiscussion.Pivot.Response.query(on: conn)
-                        .join(\TaskDiscussion.id, to: \TaskDiscussion.Pivot.Response.discussionID)
-                        .filter(\TaskDiscussion.taskID == taskID)
-                        .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
-                        .alsoDecode(User.self)
-                        .all()
-                        .map { responses in
+                    return discussions.map { (discussion, user) in
 
-                            structureDetailsResponse(discussions: discussions, responses: responses)
-                    }
-            }
-        }
-
-        private static func structureDetailsResponse(discussions: [(TaskDiscussion, User)], responses: [(TaskDiscussion.Pivot.Response, User)]) -> [TaskDiscussion.Details] {
-
-            let groupedResponses = responses
-                .group(by: \.0.discussionID)
-                .mapValues { responses in
-                    responses.map { (response, user) in
-                        TaskDiscussion.Pivot.Response.Details(
-                            response: response.response,
-                            createdAt: response.createdAt,
+                        TaskDiscussion.Details(
+                            id: discussion.id ?? 0,
+                            description: discussion.description,
+                            createdAt: discussion.createdAt,
                             username: user.username
                         )
                     }
-            }
-
-            return discussions.map { (discussion, user) in
-
-                TaskDiscussion.Details(
-                    description: discussion.description,
-                    createdAt: discussion.createdAt,
-                    username: user.username,
-                    responses: groupedResponses[discussion.id ?? 0] ?? []
-                )
             }
         }
 
@@ -76,6 +50,24 @@ extension TaskDiscussion {
             return try TaskDiscussion.Pivot.Response(data: response, userID: user.requireID())
                 .create(on: conn)
                 .transform(to: ())
+        }
+
+        public static func responses(to discussionID: TaskDiscussion.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Pivot.Response.Details]> {
+
+            TaskDiscussion.Pivot.Response.query(on: conn)
+                .filter(\TaskDiscussion.Pivot.Response.discussionID == discussionID)
+                .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
+                .alsoDecode(User.self)
+                .all()
+                .map { responses in
+                    responses.map { response, user in
+                        TaskDiscussion.Pivot.Response.Details(
+                            response: response.response,
+                            createdAt: response.createdAt,
+                            username: user.username
+                        )
+                    }
+            }
         }
     }
 }
