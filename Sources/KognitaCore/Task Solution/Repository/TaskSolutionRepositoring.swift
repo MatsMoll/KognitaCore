@@ -12,7 +12,7 @@ public protocol TaskSolutionRepositoring:
     UpdateData      == TaskSolution.Update.Data,
     UpdateResponse  == TaskSolution.Update.Response
 {
-    static func solutions(for taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]>
+    static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]>
 
     /// Upvote a solution
     static func upvote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>

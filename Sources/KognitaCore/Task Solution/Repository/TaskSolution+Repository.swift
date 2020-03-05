@@ -8,6 +8,7 @@ extension TaskSolution {
         struct Query {
             struct SolutionID: Codable {
                 let solutionID: TaskSolution.ID
+                let userID: User.ID
             }
 
             final class Response: Codable {
@@ -31,7 +32,8 @@ extension TaskSolution {
                 .transform(to: .init())
         }
 
-        public static func solutions(for taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
+        public static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
+
             return conn.databaseConnection(to: .psql).flatMap { psqlConn in
 
                 psqlConn
@@ -42,6 +44,7 @@ extension TaskSolution {
 
                         psqlConn.select()
                             .column(\TaskSolution.Pivot.Vote.solutionID)
+                            .column(\TaskSolution.Pivot.Vote.userID)
                             .from(TaskSolution.Pivot.Vote.self)
                             .join(\TaskSolution.Pivot.Vote.solutionID, to: \TaskSolution.id)
                             .where(\TaskSolution.taskID == taskID)
@@ -56,7 +59,8 @@ extension TaskSolution {
                                     }
                                     return TaskSolution.Response(
                                         queryResponse: solution,
-                                        numberOfVotes: counts[solution.id] ?? 0
+                                        numberOfVotes: counts[solution.id] ?? 0,
+                                        userHasVoted: votes.contains(where: { vote in vote.userID == user.id && vote.solutionID == solution.id })
                                     )
                                 }
                         }
