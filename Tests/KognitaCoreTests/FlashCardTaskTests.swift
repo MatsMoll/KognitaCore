@@ -31,8 +31,8 @@ class FlashCardTaskTests: VaporTestCase {
                 .create(from: taskData, by: user, on: conn)
                 .wait()
 
-            let solution = try TaskSolution.Repository
-                .solutions(for: flashCardTask.requireID(), on: conn)
+            let solution = try TaskSolution.DatabaseRepository
+                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)
@@ -64,8 +64,8 @@ class FlashCardTaskTests: VaporTestCase {
                 .create(from: taskData, by: user, on: conn)
                 .wait()
 
-            let solution = try TaskSolution.Repository
-                .solutions(for: flashCardTask.requireID(), on: conn)
+            let solution = try TaskSolution.DatabaseRepository
+                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)

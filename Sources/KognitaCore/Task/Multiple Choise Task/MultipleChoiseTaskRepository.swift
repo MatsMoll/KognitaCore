@@ -114,14 +114,21 @@ extension MultipleChoiseTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        return try User.DatabaseRepository.isModerator(user: user, taskID: model.requireID(), on: conn)
-            .flatMap {
+        return try User.DatabaseRepository
+            .isModerator(user: user, taskID: model.requireID(), on: conn)
+            .map { true }
+            .catchMap { _ in false }
+            .flatMap { isModerator in
 
                 guard let task = model.task else {
                     throw Abort(.internalServerError)
                 }
                 return task.get(on: conn)
                     .flatMap { task in
+
+                        guard isModerator || task.creatorID == user.id else {
+                            throw Abort(.forbidden)
+                        }
                         return task
                             .delete(on: conn)
                             .transform(to: ())

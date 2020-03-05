@@ -176,7 +176,7 @@ extension Task.Repository {
             dbQuery = dbQuery.filter(\Topic.id ~~ query.topics)
         }
         if let question = query.taskQuestion, question.isEmpty == false {
-            dbQuery = dbQuery.filter(\Task.question, .like, "%\(question)%")
+            dbQuery = dbQuery.filter(\Task.question, .ilike, "%\(question)%")
         }
         return dbQuery
             .all()

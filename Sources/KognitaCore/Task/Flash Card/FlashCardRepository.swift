@@ -93,8 +93,8 @@ extension FlashCardTask.DatabaseRepository {
                 }
         }
     }
-    
-    public static func delete(_ flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+    public static func delete(model flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
 
         guard let user = user else {
             throw Abort(.unauthorized)
@@ -102,13 +102,19 @@ extension FlashCardTask.DatabaseRepository {
 
         return try User.DatabaseRepository
             .isModerator(user: user, taskID: flashCard.requireID(), on: conn)
-            .flatMap {
+            .map { true }
+            .catchMap { _ in false }
+            .flatMap { isModerator in
 
                 guard let task = flashCard.task else {
                     throw Abort(.internalServerError)
                 }
                 return task.get(on: conn)
                     .flatMap { task in
+                        
+                        guard isModerator || task.creatorID == user.id else {
+                            throw Abort(.forbidden)
+                        }
                         return task.delete(on: conn)
                 }
         }

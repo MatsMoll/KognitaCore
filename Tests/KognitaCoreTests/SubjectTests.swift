@@ -47,7 +47,7 @@ class SubjectTests: VaporTestCase {
             _ = try Subject.DatabaseRepository.importContent(subjectExport, on: conn).wait()
 
             XCTAssertEqual(try Task.Repository.all(on: conn).wait().count, 10)
-            XCTAssertEqual(try TaskSolution.Repository.all(on: conn).wait().count, 10)
+            XCTAssertEqual(try TaskSolution.query(on: conn).all().wait().count, 10)
         } catch {
             XCTFail(error.localizedDescription)
         }

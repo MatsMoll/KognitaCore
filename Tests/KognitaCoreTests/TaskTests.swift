@@ -43,10 +43,10 @@ class TaskTests: VaporTestCase {
             secondSolution.approvedBy = try user.requireID()
             _ = try secondSolution.save(on: conn).wait()
 
-            try TaskSolution.Repository.vote(for: firstSolution.requireID(), by: user, on: conn).wait()
-            try TaskSolution.Repository.vote(for: firstSolution.requireID(), by: secondUser, on: conn).wait()
+            try TaskSolution.DatabaseRepository.upvote(for: firstSolution.requireID(), by: user, on: conn).wait()
+            try TaskSolution.DatabaseRepository.upvote(for: firstSolution.requireID(), by: secondUser, on: conn).wait()
 
-            let solutions = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
+            let solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
 
             XCTAssertEqual(solutions.count, 2)
 

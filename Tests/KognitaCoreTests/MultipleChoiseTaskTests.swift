@@ -39,8 +39,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             .content(on: conn)
             .wait()
 
-        let solution = try TaskSolution.Repository
-            .solutions(for: multiple.requireID(), on: conn)
+        let solution = try TaskSolution.DatabaseRepository
+            .solutions(for: multiple.requireID(), for: user, on: conn)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
@@ -78,8 +78,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             .content(on: conn)
             .wait()
 
-        let solution = try TaskSolution.Repository
-            .solutions(for: multiple.requireID(), on: conn)
+        let solution = try TaskSolution.DatabaseRepository
+            .solutions(for: multiple.requireID(), for: user, on: conn)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)

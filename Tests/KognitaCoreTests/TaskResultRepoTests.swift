@@ -57,12 +57,16 @@ class TaskResultRepoTests: VaporTestCase {
 
     func testFlowZoneTasks() throws {
         let user = try User.create(on: conn)
+        let secondUser = try User.create(on: conn)
         let subject = try Subject.create(name: "test", on: conn)
         let topic = try Topic.create(subject: subject, on: conn)
         let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let otherSubtopic = try Subtopic.create(topic: topic, on: conn)
         let taskOne = try Task.create(subtopic: subtopic, on: conn)
         let taskTwo = try Task.create(subtopic: subtopic, on: conn)
+        let otherTask = try Task.create(subtopic: otherSubtopic, on: conn)
 
+        let otherSession = try PracticeSession.create(in: [subtopic.requireID()], for: secondUser, on: conn)
         let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
         let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
@@ -70,17 +74,23 @@ class TaskResultRepoTests: VaporTestCase {
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
-        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6,  on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+
+        _ = try TaskResult.create(task: taskTwo, sessionID: otherSession.requireID(), user: secondUser, score: 0.2,  on: conn)
 
         let taskTypeOne = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        
         XCTAssertNotNil(taskTypeOne)
-        XCTAssertEqual(taskTypeOne?.taskID, taskTwo.id)
+        XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
-        _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5,    on: conn)
+
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
+        _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+
         let taskTypeTwo = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
 
         XCTAssertNotNil(taskTypeTwo)
-        XCTAssertEqual(taskTypeTwo?.taskID, taskOne.id)
+        XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
     }
 
     func testSubjectProgress() throws {
