@@ -350,7 +350,7 @@ extension TestSession {
                         .decode(Task.self)
                         .alsoDecode(Topic.self)
                         .all()
-                        .map { tasks in
+                        .flatMap { tasks in
 
                             // Registrating the score for a given task
                             let taskResults = results.reduce(
@@ -359,29 +359,48 @@ extension TestSession {
                                 taskResults[result.1.taskID] = result.1.resultScore
                             }
 
-                            return Results(
-                                testTitle: test.title,
-                                executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
-                                shouldPresentDetails: test.isTeamBasedLearning == false,
-                                topicResults: tasks.group(by: \.1.id) // Grouping by topic id
-                                    .compactMap { (_, topicTasks) in
+                            guard let subjectID = tasks.first?.1.subjectId else {
+                                throw Abort(.internalServerError)
+                            }
 
-                                        guard let topic = topicTasks.first?.1 else {
-                                            return nil
-                                        }
+                            return try User.DatabaseRepository
+                                .canPractice(user: user, subjectID: subjectID, on: conn)
+                                .map {
+                                    true
+                            }
+                            .catchMap { _ in
+                                false
+                            }.map { canPractice in
+                                Results(
+                                    testTitle: test.title,
+                                    executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
+                                    shouldPresentDetails: test.isTeamBasedLearning == false,
+                                    subjectID: subjectID,
+                                    canPractice: canPractice,
+                                    topicResults: tasks.group(by: \.1.id) // Grouping by topic id
+                                        .compactMap { (id, topicTasks) in
 
-                                        return Results.Topic(
-                                            name: topic.name,
-                                            taskResults: topicTasks.map { task in
-                                                // Calculating the score for a given task and defaulting to 0 in score
-                                                Results.Task(
-                                                    question: task.0.question,
-                                                    score: taskResults[task.0.id ?? 0] ?? 0
-                                                )
+                                            guard
+                                                let topic = topicTasks.first?.1,
+                                                let topicID = id
+                                            else {
+                                                return nil
                                             }
-                                        )
-                                }
-                            )
+
+                                            return Results.Topic(
+                                                id: topicID,
+                                                name: topic.name,
+                                                taskResults: topicTasks.map { task in
+                                                    // Calculating the score for a given task and defaulting to 0 in score
+                                                    Results.Task(
+                                                        question: task.0.question,
+                                                        score: taskResults[task.0.id ?? 0] ?? 0
+                                                    )
+                                                }
+                                            )
+                                    }
+                                )
+                            }
                     }
             }
         }
