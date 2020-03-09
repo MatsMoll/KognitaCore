@@ -57,6 +57,8 @@ public class DatabaseMigrations {
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
         guard enviroment != .testing else { return }
-        migrations.add(migration: SubjectTest.Migration.IsTeamBasedLearning.self, database: .psql)
+        migrations.add(migration: SubjectTest.Migration.IsTeamBasedLearning.self,       database: .psql)
+        migrations.add(migration: TaskSolution.Migration.TaskIDDeleteReferance.self,    database: .psql)
+        migrations.add(migration: FlashCardTask.Migration.TaskIDReference.self,         database: .psql)
     }
 }
