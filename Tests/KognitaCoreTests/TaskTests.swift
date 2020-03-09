@@ -53,8 +53,22 @@ class TaskTests: VaporTestCase {
         XCTAssertNotNil(solutions.first(where: { $0.solution == secondSolution.solution })?.creatorUsername)
     }
 
+    func testSolutionsCascadeDelete() {
+        do {
+            let task = try Task.create(on: conn)
+            let solutions = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
+            XCTAssertEqual(solutions.count, 1)
+            try task.delete(force: true, on: conn).wait()
+            let newSolution = try TaskSolution.Repository.solutions(for: task.requireID(), on: conn).wait()
+            XCTAssertTrue(newSolution.isEmpty)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
-        ("testSolutions", testSolutions)
+        ("testSolutions", testSolutions),
+        ("testSolutionsCascadeDelete", testSolutionsCascadeDelete)
     ]
 }

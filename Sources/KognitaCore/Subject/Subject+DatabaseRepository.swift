@@ -54,54 +54,60 @@ extension Subject.DatabaseRepository {
 
         let knownTopic = peerWise.filter({ $0.topicName != "" })
 
-        var numberOfTopics = 1
+        return try Topic.query(on: conn)
+            .filter(\.subjectId == subject.requireID())
+            .count()
+            .flatMap { numberOfExistingTopics in
 
-        return try knownTopic
-            .group(by: \.topicName)
-            .map { topicName, tasks in
+                var numberOfTopics = numberOfExistingTopics
 
-                numberOfTopics += 1
+                return try knownTopic
+                    .group(by: \.topicName)
+                    .map { topicName, tasks in
 
-                return try Topic.DatabaseRepository.create(
-                    from: Topic.Create.Data(
-                        subjectId: subject.requireID(),
-                        name: topicName!,
-                        chapter: numberOfTopics
-                    ),
-                    by: user,
-                    on: conn
-                )
-                    .flatMap { topic in
-                        try Subtopic.DatabaseRepository
-                            .getSubtopics(in: topic, with: conn)
-                            .flatMap { subtopics in
+                        numberOfTopics += 1
 
-                                guard let subtopic = subtopics.first else { throw Abort(.internalServerError) }
+                        return try Topic.DatabaseRepository.create(
+                            from: Topic.Create.Data(
+                                subjectId: subject.requireID(),
+                                name: topicName,
+                                chapter: numberOfTopics
+                            ),
+                            by: user,
+                            on: conn
+                        )
+                            .flatMap { topic in
+                                try Subtopic.DatabaseRepository
+                                    .getSubtopics(in: topic, with: conn)
+                                    .flatMap { subtopics in
 
-                                return try tasks.map { task in
-                                    try MultipleChoiseTask.DatabaseRepository.create(
-                                        from: MultipleChoiseTask.Create.Data(
-                                            subtopicId: subtopic.requireID(),
-                                            description: nil,
-                                            question: task.question,
-                                            solution: task.solution,
-                                            isMultipleSelect: false,
-                                            examPaperSemester: nil,
-                                            examPaperYear: nil,
-                                            isTestable: false,
-                                            choises: task.choises
-                                        ),
-                                        by: user,
-                                        on: conn
-                                    )
-                                        .transform(to: ())
+                                        guard let subtopic = subtopics.first else { throw Abort(.internalServerError) }
+
+                                        return try tasks.map { task in
+                                            try MultipleChoiseTask.DatabaseRepository.create(
+                                                from: MultipleChoiseTask.Create.Data(
+                                                    subtopicId: subtopic.requireID(),
+                                                    description: nil,
+                                                    question: task.question,
+                                                    solution: task.solution,
+                                                    isMultipleSelect: false,
+                                                    examPaperSemester: nil,
+                                                    examPaperYear: nil,
+                                                    isTestable: false,
+                                                    choises: task.choises
+                                                ),
+                                                by: user,
+                                                on: conn
+                                            )
+                                                .transform(to: ())
+                                        }
+                                        .flatten(on: conn)
                                 }
-                                .flatten(on: conn)
                         }
                 }
+                .flatten(on: conn)
+                .transform(to: ())
         }
-        .flatten(on: conn)
-        .transform(to: ())
     }
 
     public static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]> {
