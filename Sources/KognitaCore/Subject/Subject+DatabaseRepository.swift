@@ -50,6 +50,66 @@ extension Subject.DatabaseRepository {
         }
     }
 
+    public static func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+        let knownTopic = peerWise.filter({ $0.topicName != "" })
+
+        return try Topic.query(on: conn)
+            .filter(\.subjectId == subject.requireID())
+            .count()
+            .flatMap { numberOfExistingTopics in
+
+                var numberOfTopics = numberOfExistingTopics
+
+                return try knownTopic
+                    .group(by: \.topicName)
+                    .map { topicName, tasks in
+
+                        numberOfTopics += 1
+
+                        return try Topic.DatabaseRepository.create(
+                            from: Topic.Create.Data(
+                                subjectId: subject.requireID(),
+                                name: topicName,
+                                chapter: numberOfTopics
+                            ),
+                            by: user,
+                            on: conn
+                        )
+                            .flatMap { topic in
+                                try Subtopic.DatabaseRepository
+                                    .getSubtopics(in: topic, with: conn)
+                                    .flatMap { subtopics in
+
+                                        guard let subtopic = subtopics.first else { throw Abort(.internalServerError) }
+
+                                        return try tasks.map { task in
+                                            try MultipleChoiseTask.DatabaseRepository.create(
+                                                from: MultipleChoiseTask.Create.Data(
+                                                    subtopicId: subtopic.requireID(),
+                                                    description: nil,
+                                                    question: task.question,
+                                                    solution: task.solution,
+                                                    isMultipleSelect: false,
+                                                    examPaperSemester: nil,
+                                                    examPaperYear: nil,
+                                                    isTestable: false,
+                                                    choises: task.choises
+                                                ),
+                                                by: user,
+                                                on: conn
+                                            )
+                                                .transform(to: ())
+                                        }
+                                        .flatten(on: conn)
+                                }
+                        }
+                }
+                .flatten(on: conn)
+                .transform(to: ())
+        }
+    }
+
     public static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]> {
 
         return try Subject.query(on: conn)
@@ -58,20 +118,6 @@ extension Subject.DatabaseRepository {
             .decode(Subject.self)
             .all()
     }
-
-//    public static func leaderboard(in subject: Subject, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<Subject.Leaderboard> {
-//        return conn.databaseConnection(to: .psql).flatMap { psqlConn in
-//            psqlConn.select()
-//                .column(.sum(\TaskResult.resultScore), as: "score")
-//                .all(table: User.self)
-//        }
-//        return try User.query(on: conn)
-//            .join(\TaskResult.userID, to: \User.id)
-//            .join(\Task.id, to: \TaskResult.taskID)
-//            .join(\Subtopic.id, to: \Task.subtopicId)
-//            .join(\Topic.id, to: \Subtopic.topicId)
-//            .filter(\Topic.subjectId == subject.requireID())
-//    }
 
     struct SubjectID: Decodable {
         let subjectId: Subject.ID
@@ -192,17 +238,6 @@ extension Subject.DatabaseRepository {
                 }
         }
     }
-
-//    public static func isActive(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Bool> {
-//
-//        try User.ActiveSubject.query(on: conn)
-//            .filter(\.userID == user.requireID())
-//            .filter(\.subjectID == subject.requireID())
-//            .first()
-//            .map { active in
-//                return active != nil
-//        }
-//    }
 
     public static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?> {
 

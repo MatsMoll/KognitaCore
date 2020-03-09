@@ -42,13 +42,32 @@ public final class TaskSolution: KognitaPersistenceModel {
         PostgreSQLDatabase.create(TaskSolution.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.taskID, to: \Task.id)
+            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
             builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
             PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
                 builder.deleteField(for: \.creatorID)
                 builder.field(for: \.creatorID, type: .int, .default(1))
+            }
+        }
+    }
+}
+
+extension TaskSolution {
+    enum Migration {
+        struct TaskIDDeleteReferance: PostgreSQLMigration {
+
+            static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
+
+                    builder.deleteReference(from: \.taskID, to: \Task.id)
+                    builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+                }
+            }
+
+            static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                conn.future()
             }
         }
     }

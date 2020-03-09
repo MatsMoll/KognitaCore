@@ -48,28 +48,17 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
         self.name           = name
         self.chapter        = chapter
         self.subjectId      = subjectId
-
-        try validateTopic()
     }
 
     init(content: Create.Data, subject: Subject, creator: User) throws {
         subjectId   = try subject.requireID()
         name        = content.name
         chapter     = content.chapter
-
-        try validateTopic()
-    }
-
-    private func validateTopic() throws {
-        guard try name.validateWith(regex: "[\\u0028-\\u003B\\u0041-\\u005A\\u0061-\\u007A\\u00B4-\\u00FF\\- ]*") else {
-            throw Abort(.badRequest, reason: "Misformed name")
-        }
     }
 
     public func updateValues(with content: Create.Data) throws {
         name        = content.name
         chapter     = content.chapter
-        try validateTopic()
     }
     
     

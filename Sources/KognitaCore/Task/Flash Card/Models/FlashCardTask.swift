@@ -28,7 +28,7 @@ public final class FlashCardTask: KognitaCRUDModel {
     }
     
     public static func addTableConstraints(to builder: SchemaCreator<FlashCardTask>) {
-        builder.reference(from: \.id, to: \Task.id)
+        builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
     }
 }
 
@@ -40,7 +40,25 @@ extension FlashCardTask {
         return parent(\.id)
     }
 
-    func content(on conn: DatabaseConnectable) -> Future<TaskPreviewContent> {
+    func content(on conn: DatabaseConnectable) -> EventLoopFuture<TaskPreviewContent> {
         return FlashCardTask.DatabaseRepository.content(for: self, on: conn)
+    }
+}
+
+extension FlashCardTask {
+    enum Migration {
+        struct TaskIDReference: PostgreSQLMigration {
+
+            static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                PostgreSQLDatabase.update(FlashCardTask.self, on: conn) { builder in
+                    builder.deleteReference(from: \.id, to: \Task.id)
+                    builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+                }
+            }
+
+            static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                conn.future()
+            }
+        }
     }
 }
