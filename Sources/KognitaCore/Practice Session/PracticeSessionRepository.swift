@@ -206,7 +206,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
         return conn.databaseConnection(to: .psql).flatMap { psqlConn in
             try TaskResult.DatabaseRepository
-                .getFlowZoneTasks(for: session, on: psqlConn)
+                .getSpaceRepetitionTask(for: session, on: psqlConn)
                 .flatMap { flowTask in
 
                     guard let task = flowTask else {

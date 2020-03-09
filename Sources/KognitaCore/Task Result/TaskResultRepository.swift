@@ -31,7 +31,7 @@ extension TaskResult.DatabaseRepository {
         case incompleateSqlStatment
     }
 
-    public struct FlowZoneTaskResult: Codable {
+    public struct SpaceRepetitionTask: Codable {
         public let taskID: Task.ID
         public let revisitDate: Date
         public let sessionID: TaskSession.ID?
@@ -66,7 +66,7 @@ extension TaskResult.DatabaseRepository {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' WHERE "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
+            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
@@ -134,42 +134,25 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getFlowZoneTasks(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<FlowZoneTaskResult?> {
+    public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<SpaceRepetitionTask?> {
 
         return try Query.flowTasks(
             for: session.userID,
             in: session.requireID()
         )
             .query(for: conn)
-            .all(decoding: FlowZoneTaskResult.self)
+            .all(decoding: SpaceRepetitionTask.self)
             .map { tasks in
                 let uncompletedTasks = try tasks.filter { try $0.sessionID != session.requireID() }
+                let now = Date()
+                let timeInADay: TimeInterval = 60 * 60 * 24
 
-                let groupedTasks = Dictionary(grouping: uncompletedTasks) { task in
-                    Calendar.current.dateComponents([.day, .month, .year], from: task.revisitDate)
+                return Dictionary(grouping: uncompletedTasks) { task in
+                    now.timeIntervalSince(task.revisitDate) / timeInADay
                 }
-                .sorted(by: { first, second in
-                    guard
-                        let firstYear = first.key.year,
-                        let firstMonth = first.key.month,
-                        let firstDay = first.key.day
-                    else {
-                        return false
-                    }
-                    guard
-                        let secondYear = second.key.year,
-                        let secondMonth = second.key.month,
-                        let secondDay = second.key.day
-                    else {
-                        return true
-                    }
-                    let firstDays = (firstYear - 2019) * 372 + firstMonth * 31 + firstDay
-                    let secondDays = (secondYear - 2019) * 372 + secondMonth * 31 + secondDay
-
-                    return firstDays < secondDays
-                })
-
-                return groupedTasks.first?.value.random
+                .min { first, second in
+                    first.key > second.key
+                }?.value.random
         }
     }
 

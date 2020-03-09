@@ -70,7 +70,7 @@ class TaskResultRepoTests: VaporTestCase {
         let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
         let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-        let taskType = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
@@ -78,7 +78,7 @@ class TaskResultRepoTests: VaporTestCase {
 
         _ = try TaskResult.create(task: taskTwo, sessionID: otherSession.requireID(), user: secondUser, score: 0.2,  on: conn)
 
-        let taskTypeOne = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
         
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
@@ -87,7 +87,7 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
         _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
 
-        let taskTypeTwo = try TaskResult.DatabaseRepository.getFlowZoneTasks(for: newSession, on: conn).wait()
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
         XCTAssertNotNil(taskTypeTwo)
         XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
