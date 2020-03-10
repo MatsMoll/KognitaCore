@@ -128,6 +128,39 @@ class TaskResultRepoTests: VaporTestCase {
         XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
     }
 
+    func testSpaceRepetitionWithTestTask() throws {
+        let user = try User.create(on: conn)
+        let subject = try Subject.create(name: "test", on: conn)
+        let topic = try Topic.create(subject: subject, on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let taskOne = try Task.create(subtopic: subtopic, on: conn)
+        let taskTwo = try Task.create(subtopic: subtopic, on: conn)
+        let testTask = try Task.create(subtopic: subtopic, isTestable: true, on: conn)
+
+        let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+        XCTAssertNil(taskType)
+
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+
+        _ = try TaskResult.create(task: testTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+
+        XCTAssertNotNil(taskTypeOne)
+        XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
+
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
+
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+
+        XCTAssertNotNil(taskTypeTwo)
+        XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
+    }
+
     func testSubjectProgress() throws {
         do {
             let user = try User.create(on: conn)
@@ -176,6 +209,7 @@ class TaskResultRepoTests: VaporTestCase {
         ("testHistogramRoute", testHistogramRoute),
         ("testSpaceRepetitionWithMultipleUsers", testSpaceRepetitionWithMultipleUsers),
         ("testSpaceRepetitionWithDeletedTask", testSpaceRepetitionWithDeletedTask),
+        ("testSpaceRepetitionWithTestTask", testSpaceRepetitionWithTestTask),
         ("testSubjectProgress", testSubjectProgress)
     ]
 }
