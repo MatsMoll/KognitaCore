@@ -422,22 +422,30 @@ extension SubjectTest {
 
                     try conn.select()
                         .all(table: SubjectTest.self)
-                        .all(table: TestSession.self)
                         .all(table: Subject.self)
                         .from(SubjectTest.self)
                         .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
                         .join(\SubjectTest.subjectID,   to: \Subject.id)
-                        .join(\SubjectTest.id,          to: \TestSession.testID, method: .left)
                         .where(\SubjectTest.openedAt != nil)
                         .where(\User.ActiveSubject.userID == user.requireID())
-                        .all(decoding: SubjectTest.self, Subject.self, TestSession?.self)
-                        .map { tests in
-                            tests.first { $0.0.isOpen }
-                                .map { test, subject, session in
+                        .all(decoding: SubjectTest.self, Subject.self)
+                        .flatMap { tests in
+                            guard let test = tests.first(where: { $0.0.isOpen }) else {
+                                return conn.future(nil)
+                            }
+                            return try conn.select()
+                                .all(table: TestSession.self)
+                                .from(TestSession.self)
+                                .join(\TestSession.id, to: \TaskSession.id)
+                                .where(\TaskSession.userID == user.requireID())
+                                .where(\TestSession.testID == test.0.requireID())
+                                .limit(1)
+                                .first(decoding: TestSession?.self)
+                                .map { session in
                                     SubjectTest.OverviewResponse(
-                                        test: test,
-                                        subjectName: subject.name,
-                                        subjectID: subject.id ?? 0,
+                                        test: test.0,
+                                        subjectName: test.1.name,
+                                        subjectID: test.1.id ?? 0,
                                         hasSubmitted: session?.hasSubmitted ?? false,
                                         testSessionID: session?.id
                                     )
@@ -453,21 +461,31 @@ extension SubjectTest {
 
                     try conn.select()
                         .all(table: SubjectTest.self)
-                        .all(table: TestSession.self)
+                        .all(table: Subject.self)
                         .from(SubjectTest.self)
                         .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
-                        .join(\SubjectTest.id,          to: \TestSession.testID, method: .left)
+                        .join(\SubjectTest.subjectID,   to: \Subject.id)
                         .where(\SubjectTest.openedAt != nil)
-                        .where(\SubjectTest.subjectID == subject.requireID())
                         .where(\User.ActiveSubject.userID == user.requireID())
-                        .all(decoding: SubjectTest.self, TestSession?.self)
-                        .map { tests in
-                            tests.first { $0.0.isOpen }
-                                .map { test, session in
+                        .where(\SubjectTest.subjectID == subject.requireID())
+                        .all(decoding: SubjectTest.self, Subject.self)
+                        .flatMap { tests in
+                            guard let test = tests.first(where: { $0.0.isOpen }) else {
+                                return conn.future(nil)
+                            }
+                            return try conn.select()
+                                .all(table: TestSession.self)
+                                .from(TestSession.self)
+                                .join(\TestSession.id, to: \TaskSession.id)
+                                .where(\TaskSession.userID == user.requireID())
+                                .where(\TestSession.testID == test.0.requireID())
+                                .limit(1)
+                                .first(decoding: TestSession?.self)
+                                .map { session in
                                     SubjectTest.OverviewResponse(
-                                        test: test,
-                                        subjectName: subject.name,
-                                        subjectID: subject.id ?? 0,
+                                        test: test.0,
+                                        subjectName: test.1.name,
+                                        subjectID: test.1.id ?? 0,
                                         hasSubmitted: session?.hasSubmitted ?? false,
                                         testSessionID: session?.id
                                     )
