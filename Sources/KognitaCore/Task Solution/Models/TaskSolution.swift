@@ -29,8 +29,8 @@ public final class TaskSolution: KognitaPersistenceModel {
 
     public var presentUser: Bool
 
-    init(data: Create.Data, creatorID: User.ID) {
-        self.solution = data.solution
+    init(data: Create.Data, creatorID: User.ID) throws {
+        self.solution = try data.solution.cleanXSS(whitelist: .basicWithImages())
         self.presentUser = data.presentUser
         self.taskID = data.taskID
         self.creatorID = creatorID

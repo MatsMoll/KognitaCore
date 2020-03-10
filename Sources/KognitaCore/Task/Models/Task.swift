@@ -90,14 +90,12 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         canAnswer: Bool = true
     ) throws {
         self.subtopicID     = subtopicID
-        self.description    = content.description
-        self.question       = content.question
+        self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
+        self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable     = content.isTestable
         self.creatorID      = try creator.requireID()
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
-
-        validate()
     }
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
@@ -123,11 +121,6 @@ extension Task {
 
     var creator: Parent<Task, User>? {
         return parent(\.creatorID)
-    }
-    
-    func validate() {
-        description?.makeHTMLSafe()
-        question.makeHTMLSafe()
     }
 
     var betaFormatted: BetaFormat {

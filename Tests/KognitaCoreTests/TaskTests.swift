@@ -51,7 +51,7 @@ class TaskTests: VaporTestCase {
             XCTAssertEqual(solutions.count, 2)
 
             let firstResponse = try XCTUnwrap(solutions.first(where: { $0.solution == firstSolution.solution }))
-            XCTAssertNil(firstResponse.creatorUsername)
+            XCTAssertEqual(firstResponse.creatorUsername, "Unknown")
             XCTAssertNil(firstResponse.approvedBy)
             XCTAssertEqual(firstResponse.numberOfVotes, 2)
 
@@ -62,11 +62,39 @@ class TaskTests: VaporTestCase {
         } catch {
             XCTFail(error.localizedDescription)
         }
+    }
 
+    func testCreateTaskWithXSS() {
+        do {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+                question: "Some question",
+                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let createData = Task.Create.Data(
+                content: xssData,
+                subtopicID: xssData.subtopicId,
+                solution: xssData.solution
+            )
+            let task = try Task.Repository.create(from: createData, by: user, on: conn).wait()
+            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+
+            XCTAssertEqual(task.description, "# XSS test")
+            XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
     }
 
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
+        ("testCreateTaskWithXSS", testCreateTaskWithXSS),
         ("testSolutions", testSolutions)
     ]
 }
