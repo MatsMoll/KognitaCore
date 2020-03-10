@@ -205,23 +205,30 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
     ) throws -> EventLoopFuture<Void> {
 
         return conn.databaseConnection(to: .psql).flatMap { psqlConn in
-            try TaskResult.DatabaseRepository
-                .getSpaceRepetitionTask(for: session, on: psqlConn)
-                .flatMap { flowTask in
 
-                    guard let task = flowTask else {
+            // 1/3 chanse of assigning a random task
+            if Int.random(in: 1...3) == 3 {
+                return try PracticeSession.DatabaseRepository
+                    .assignUncompletedTask(to: session, on: psqlConn)
+            } else {
+                return try TaskResult.DatabaseRepository
+                    .getSpaceRepetitionTask(for: session, on: psqlConn)
+                    .flatMap { repetitionTask in
+
+                        guard let task = repetitionTask else {
+                            return try PracticeSession.DatabaseRepository
+                                .assignUncompletedTask(to: session, on: psqlConn)
+                        }
+
                         return try PracticeSession.DatabaseRepository
-                            .assignUncompletedTask(to: session, on: psqlConn)
-                    }
+                            .currentTaskIndex(in: session, on: psqlConn)
+                            .flatMap { taskIndex in
 
-                    return try PracticeSession.DatabaseRepository
-                        .currentTaskIndex(in: session, on: psqlConn)
-                        .flatMap { taskIndex in
-
-                            try PracticeSession.Pivot.Task
-                                .create(session: session, taskID: task.taskID, index: taskIndex + 1, on: psqlConn)
-                                .transform(to: ())
-                    }
+                                try PracticeSession.Pivot.Task
+                                    .create(session: session, taskID: task.taskID, index: taskIndex + 1, on: psqlConn)
+                                    .transform(to: ())
+                        }
+                }
             }
         }
     }

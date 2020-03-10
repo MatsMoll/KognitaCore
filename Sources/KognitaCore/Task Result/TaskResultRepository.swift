@@ -34,6 +34,7 @@ extension TaskResult.DatabaseRepository {
     public struct SpaceRepetitionTask: Codable {
         public let taskID: Task.ID
         public let revisitDate: Date
+        public let createdAt: Date
         public let sessionID: TaskSession.ID?
     }
 
@@ -66,7 +67,7 @@ extension TaskResult.DatabaseRepository {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
+            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
@@ -147,9 +148,8 @@ extension TaskResult.DatabaseRepository {
                 let now = Date()
                 let timeInADay: TimeInterval = 60 * 60 * 24
 
-                return Dictionary(grouping: uncompletedTasks) { task in
-                    now.timeIntervalSince(task.revisitDate) / timeInADay
-                }
+                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+                .filter { $0.key < 10 }
                 .min { first, second in
                     first.key > second.key
                 }?.value.random

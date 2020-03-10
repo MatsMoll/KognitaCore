@@ -63,6 +63,7 @@ extension TaskSolution {
                                         userHasVoted: votes.contains(where: { vote in vote.userID == user.id && vote.solutionID == solution.id })
                                     )
                                 }
+                                .sorted(by: { first, second in first.numberOfVotes > second.numberOfVotes })
                         }
                 }
             }

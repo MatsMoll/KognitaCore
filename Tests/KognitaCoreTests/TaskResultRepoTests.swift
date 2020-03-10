@@ -55,7 +55,7 @@ class TaskResultRepoTests: VaporTestCase {
 
     }
 
-    func testFlowZoneTasks() throws {
+    func testSpaceRepetitionWithMultipleUsers() throws {
         let user = try User.create(on: conn)
         let secondUser = try User.create(on: conn)
         let subject = try Subject.create(name: "test", on: conn)
@@ -86,6 +86,41 @@ class TaskResultRepoTests: VaporTestCase {
 
         _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
         _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+
+        XCTAssertNotNil(taskTypeTwo)
+        XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
+    }
+
+    func testSpaceRepetitionWithDeletedTask() throws {
+        let user = try User.create(on: conn)
+        let subject = try Subject.create(name: "test", on: conn)
+        let topic = try Topic.create(subject: subject, on: conn)
+        let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let taskOne = try Task.create(subtopic: subtopic, on: conn)
+        let taskTwo = try Task.create(subtopic: subtopic, on: conn)
+        let deletedTask = try Task.create(subtopic: subtopic, on: conn)
+
+        let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+        let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+        XCTAssertNil(taskType)
+
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+
+        _ = try TaskResult.create(task: deletedTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+
+        try deletedTask.delete(on: conn).wait()
+
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
+
+        XCTAssertNotNil(taskTypeOne)
+        XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
+
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
 
         let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
@@ -132,8 +167,6 @@ class TaskResultRepoTests: VaporTestCase {
             }
 
             _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5,    on: conn)
-
-
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -141,7 +174,8 @@ class TaskResultRepoTests: VaporTestCase {
 
     static var allTests = [
         ("testHistogramRoute", testHistogramRoute),
-        ("testFlowZoneTasks", testFlowZoneTasks),
+        ("testSpaceRepetitionWithMultipleUsers", testSpaceRepetitionWithMultipleUsers),
+        ("testSpaceRepetitionWithDeletedTask", testSpaceRepetitionWithDeletedTask),
         ("testSubjectProgress", testSubjectProgress)
     ]
 }

@@ -19,7 +19,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         case fall
         case spring
 
-        var norwegianDescription: String {
+        public var norwegianDescription: String {
             switch self {
             case .fall:     return "Høst"
             case .spring:   return "Vår"
