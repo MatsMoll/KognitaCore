@@ -88,11 +88,11 @@ extension TaskSolution {
 
         public static func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Update.Response> {
             if try model.creatorID == user.requireID() {
-                model.update(with: data)
+                try model.update(with: data)
                 return model.save(on: conn).transform(to: .init())
             } else {
                 return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
-                    model.update(with: data)
+                    try model.update(with: data)
                     return model.save(on: conn).transform(to: .init())
                 }
             }

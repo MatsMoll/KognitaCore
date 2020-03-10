@@ -92,9 +92,85 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testUpdateTaskXSS() {
+        do {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+                question: "Some question",
+                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let task = try FlashCardTask.DatabaseRepository.create(from: xssData, by: user, on: conn).wait()
+            let flashCardTask = try FlashCardTask.find(task.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
+            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+
+            XCTAssertEqual(task.description, "# XSS test")
+            XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
+
+            let updatedTask = try FlashCardTask.DatabaseRepository.update(model: flashCardTask, to: xssData, by: user, on: conn).wait()
+            let updatedSolution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+
+            XCTAssertEqual(updatedTask.description, "# XSS test")
+            XCTAssertEqual(updatedSolution.solution, "<img>More XSS $$\\frac{1}{2}$$")
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testUpdateSolutionXSS() {
+        do {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+                question: "Some question",
+                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let task = try FlashCardTask.DatabaseRepository.create(from: xssData, by: user, on: conn).wait()
+
+            let solutionUpdateDate = TaskSolution.Update.Data(
+                solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
+                presentUser: false
+            )
+            let solution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+            _ = try TaskSolution.DatabaseRepository.update(model: solution, to: solutionUpdateDate, by: user, on: conn).wait()
+            let updatedSolution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+
+            XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testSolutionsCascadeDelete() {
+        do {
+            let task = try Task.create(on: conn)
+            let user = try User.create(on: conn)
+            let solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            XCTAssertEqual(solutions.count, 1)
+            try task.delete(force: true, on: conn).wait()
+            let newSolution = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            XCTAssertTrue(newSolution.isEmpty)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
         ("testCreateTaskWithXSS", testCreateTaskWithXSS),
-        ("testSolutions", testSolutions)
+        ("testUpdateTaskXSS", testUpdateTaskXSS),
+        ("testUpdateSolutionXSS", testUpdateSolutionXSS),
+        ("testSolutions", testSolutions),
+        ("testSolutionsCascadeDelete", testSolutionsCascadeDelete)
     ]
 }

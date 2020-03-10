@@ -42,7 +42,7 @@ public final class TaskSolution: KognitaPersistenceModel {
         PostgreSQLDatabase.create(TaskSolution.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.taskID, to: \Task.id)
+            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
             builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
@@ -53,12 +53,31 @@ public final class TaskSolution: KognitaPersistenceModel {
         }
     }
 
-    public func update(with data: TaskSolution.Update.Data) {
+    public func update(with data: TaskSolution.Update.Data) throws {
         if let solution = data.solution {
-            self.solution = solution
+            self.solution = try solution.cleanXSS(whitelist: .basicWithImages())
         }
         if let presentUser = data.presentUser {
             self.presentUser = presentUser
+        }
+    }
+}
+
+extension TaskSolution {
+    enum Migration {
+        struct TaskIDDeleteReferance: PostgreSQLMigration {
+
+            static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
+
+                    builder.deleteReference(from: \.taskID, to: \Task.id)
+                    builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+                }
+            }
+
+            static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+                conn.future()
+            }
         }
     }
 }
