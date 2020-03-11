@@ -162,7 +162,7 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try Task.query(on: conn)
+        return try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == taskID)
             .filter(\User.ModeratorPrivilege.userID == user.requireID())
             .join(\Subtopic.id, to: \Task.subtopicID)

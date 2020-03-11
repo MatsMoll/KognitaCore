@@ -10,15 +10,19 @@ import Foundation
 extension Sequence {
 
     public func group<P>(by path: KeyPath<Element, P>) -> [P : [Element]] where P : Hashable {
-        var result = [P : [Element]]()
+        return Dictionary(grouping: self) { $0[keyPath: path] }
+    }
+
+    public func count<T>(equal path: KeyPath<Element, T>) -> [T : Int] where T : Hashable {
+        var counts = [T : Int]()
         for object in self {
             let value = object[keyPath: path]
-            if let group = result[value] {
-                result[value] = group + [object]
+            if let count = counts[value] {
+                counts[value] = count + 1
             } else {
-                result[value] = [object]
+                counts[value] = 1
             }
         }
-        return result
+        return counts
     }
 }
