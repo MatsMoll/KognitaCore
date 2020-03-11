@@ -246,4 +246,106 @@ extension Subject.DatabaseRepository {
             .filter(\.subjectID == subject.requireID())
             .first()
     }
+
+    struct CompendiumData: Decodable {
+        let question: String
+        let solution: String
+        let subjectName: String
+        let subjectID: Subject.ID
+        let topicName: String
+        let topicChapter: Int
+        let topicID: Topic.ID
+        let subtopicName: String
+        let subtopicID: Subtopic.ID
+    }
+
+    public static func compendium(for subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
+
+        return conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                psqlConn.select()
+                    .column(\Task.question)
+                    .column(\TaskSolution.solution)
+                    .column(\Subject.name,  as: "subjectName")
+                    .column(\Subject.id,    as: "subjectID")
+                    .column(\Topic.name,    as: "topicName")
+                    .column(\Topic.id,      as: "topicID")
+                    .column(\Topic.chapter, as: "topicChapter")
+                    .column(\Subtopic.name, as: "subtopicName")
+                    .column(\Subtopic.id,   as: "subtopicID")
+                    .from(Task.self)
+                    .join(\Task.subtopicID,     to: \Subtopic.id)
+                    .join(\Subtopic.topicId,    to: \Topic.id)
+                    .join(\Topic.subjectId,     to: \Subject.id)
+                    .join(\Task.id,             to: \FlashCardTask.id) // Only flash card tasks
+                    .join(\Task.id,             to: \TaskSolution.taskID)
+                    .where(\Task.description == nil)
+                    .where(\Task.deletedAt == nil)
+                    .where(\Subject.id == subjectID)
+                    .all(decoding: CompendiumData.self)
+                    .map { data in
+
+                        guard let subjectName = data.first?.subjectName else {
+                            throw Abort(.badRequest)
+                        }
+
+                        return Subject.Compendium(
+                            subjectID: subjectID,
+                            subjectName: subjectName,
+                            topics: data.group(by: \.topicID)
+                                .map { _, topicData in
+
+                                    Subject.Compendium.TopicData(
+                                        name: topicData.first!.topicName,
+                                        chapter: topicData.first!.topicChapter,
+                                        subtopics: topicData.group(by: \.subjectID)
+                                            .map { _, questions in
+
+                                                Subject.Compendium.SubtopicData(
+                                                    name: questions.first!.subtopicName,
+                                                    questions: questions.map { question in
+                                                        
+                                                        Subject.Compendium.QuestionData(
+                                                            question: question.question,
+                                                            solution: question.solution
+                                                        )
+                                                    }
+                                                )
+                                        }
+                                    )
+                            }
+                            .sorted(by: { $0.chapter < $1.chapter })
+                        )
+                }
+        }
+    }
+}
+
+extension Subject {
+    public struct Compendium: Codable {
+
+        public struct QuestionData: Codable {
+            public let question: String
+            public let solution: String
+        }
+
+        public struct SubtopicData: Codable {
+            public let name: String
+            public let questions: [QuestionData]
+        }
+
+        public struct TopicData: Codable {
+            public let name: String
+            public let chapter: Int
+            public let subtopics: [SubtopicData]
+
+            public var nameID: String { name.lowercased().replacingOccurrences(of: " ", with: "-") }
+        }
+
+        public let subjectID: Subject.ID
+        public let subjectName: String
+        public let topics: [TopicData]
+    }
+
 }
