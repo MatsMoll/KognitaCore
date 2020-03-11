@@ -57,6 +57,7 @@ extension TaskDiscussion {
             TaskDiscussion.Pivot.Response.query(on: conn)
                 .filter(\TaskDiscussion.Pivot.Response.discussionID == discussionID)
                 .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
+                .sort(\TaskDiscussion.Pivot.Response.createdAt, .ascending)
                 .alsoDecode(User.self)
                 .all()
                 .map { responses in
