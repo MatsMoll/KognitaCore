@@ -61,6 +61,15 @@ public final class TaskSolution: KognitaPersistenceModel {
             self.presentUser = presentUser
         }
     }
+
+    public func approve(by user: User) throws -> TaskSolution {
+        guard approvedBy == nil else {
+            return self
+        }
+        approvedBy = try user.requireID()
+        isApproved = true
+        return self
+    }
 }
 
 extension TaskSolution {

@@ -19,4 +19,11 @@ public protocol TaskSolutionRepositoring:
 
     /// Downvote/revoke vote on a solution
     static func revokeVote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+
+    /// Approves a `TaskSolution`
+    /// - Parameters:
+    ///   - solutionID: The `TaskSolutions`s id
+    ///   - user: The user approving the solution
+    ///   - conn: The database connection
+    static func approve(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }

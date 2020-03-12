@@ -27,9 +27,26 @@ extension TaskSolution {
 
             guard let user = user else { throw Abort(.unauthorized) }
 
-            return try TaskSolution(data: content, creatorID: user.requireID())
-                .save(on: conn)
-                .transform(to: .init())
+            return try TaskSolution(
+                data: TaskSolution.Create.Data(
+                    solution: content.solution,
+                    presentUser: true,
+                    taskID: content.taskID
+                ),
+                creatorID: user.requireID()
+            )
+            .save(on: conn)
+            .flatMap { solution in
+
+                try User.DatabaseRepository
+                    .isModerator(user: user, taskID: content.taskID, on: conn)
+                    .flatMap {
+                        solution.isApproved = true
+                        try solution.approvedBy = user.requireID()
+                        return solution.save(on: conn)
+                            .transform(to: .init())
+                }.catchMap { _ in .init() }
+            }
         }
 
         public static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
@@ -109,6 +126,24 @@ extension TaskSolution {
                     model.delete(on: conn)
                 }
             }
+        }
+
+        public static func approve(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+            TaskSolution
+                .find(solutionID, on: conn)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { (solution: TaskSolution) in
+
+                    try User.DatabaseRepository
+                        .isModerator(user: user, taskID: solution.taskID, on: conn)
+                        .flatMap {
+
+                            try solution.approve(by: user)
+                                .save(on: conn)
+                    }
+            }
+            .transform(to: ())
         }
     }
 }
