@@ -64,6 +64,36 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testCreateMultipleLineSolution() {
+        failableTest {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "Test",
+                question: "Some question",
+                solution:
+"""
+Hallo
+
+Dette er flere linjer
+""",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let createData = Task.Create.Data(
+                content: xssData,
+                subtopicID: xssData.subtopicId,
+                solution: xssData.solution
+            )
+            let task = try Task.Repository.create(from: createData, by: user, on: conn).wait()
+            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+
+            XCTAssertEqual(solution.solution, "Hallo\n\nDette er flere linjer")
+        }
+    }
+
     func testCreateTaskWithXSS() {
         do {
             let subtopic = try Subtopic.create(on: conn)
@@ -209,5 +239,6 @@ class TaskTests: VaporTestCase {
         ("testSolutionsCascadeDelete", testSolutionsCascadeDelete),
         ("testApproveSolution", testApproveSolution),
         ("testApproveSolutionUnauthorized", testApproveSolutionUnauthorized),
+        ("testCreateMultipleLineSolution", testCreateMultipleLineSolution),
     ]
 }
