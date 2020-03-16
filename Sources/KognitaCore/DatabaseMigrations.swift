@@ -34,6 +34,7 @@ public class DatabaseMigrations {
         migrations.add(model: Subtopic.self,                        database: .psql)
         migrations.add(model: Task.self,                            database: .psql)
         migrations.add(model: TaskSolution.self,                    database: .psql)
+        migrations.add(model: TaskSolution.Pivot.Vote.self,         database: .psql)
         migrations.add(model: MultipleChoiseTask.self,              database: .psql)
         migrations.add(model: MultipleChoiseTaskChoise.self,        database: .psql)
         migrations.add(model: TaskSession.self,                     database: .psql)
@@ -57,6 +58,8 @@ public class DatabaseMigrations {
 
     static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
         guard enviroment != .testing else { return }
-        migrations.add(migration: SubjectTest.Migration.IsTeamBasedLearning.self, database: .psql)
+        migrations.add(migration: SubjectTest.Migration.IsTeamBasedLearning.self,       database: .psql)
+        migrations.add(migration: TaskSolution.Migration.TaskIDDeleteReferance.self,    database: .psql)
+        migrations.add(migration: FlashCardTask.Migration.TaskIDReference.self,         database: .psql)
     }
 }

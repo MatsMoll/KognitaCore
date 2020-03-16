@@ -39,6 +39,14 @@ class VaporTestCase: XCTestCase {
         }
         conn.close()
     }
+
+    func failableTest(line: UInt = #line, file: StaticString = #file, test: (() throws -> Void)) {
+        do {
+            try test()
+        } catch {
+            XCTFail(error.localizedDescription, file: file, line: line)
+        }
+    }
 }
 
 

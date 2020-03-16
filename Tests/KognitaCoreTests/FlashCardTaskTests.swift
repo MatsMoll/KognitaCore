@@ -12,7 +12,7 @@ import FluentPostgreSQL
 
 class FlashCardTaskTests: VaporTestCase {
 
-    func testCreate() throws {
+    func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
@@ -31,14 +31,48 @@ class FlashCardTaskTests: VaporTestCase {
                 .create(from: taskData, by: user, on: conn)
                 .wait()
 
-            let solution = try TaskSolution.Repository
-                .solutions(for: flashCardTask.requireID(), on: conn)
+            let solution = try TaskSolution.DatabaseRepository
+                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)
             XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
             XCTAssertEqual(flashCardTask.question, taskData.question)
             XCTAssertEqual(solution.first?.solution, taskData.solution)
+            XCTAssertEqual(solution.first?.approvedBy, user.username)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testCreateAsStudent() throws {
+        let subtopic = try Subtopic.create(on: conn)
+        let user = try User.create(isAdmin: false, on: conn)
+
+        let taskData = try FlashCardTask.Create.Data(
+            subtopicId: subtopic.requireID(),
+            description: nil,
+            question: "Test",
+            solution: "Some solution",
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+
+        do {
+            let flashCardTask = try FlashCardTask.DatabaseRepository
+                .create(from: taskData, by: user, on: conn)
+                .wait()
+
+            let solution = try TaskSolution.DatabaseRepository
+                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
+                .wait()
+
+            XCTAssertNotNil(flashCardTask.createdAt)
+            XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
+            XCTAssertEqual(flashCardTask.question, taskData.question)
+            XCTAssertEqual(solution.first?.solution, taskData.solution)
+            XCTAssertNil(solution.first?.approvedBy)
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -109,7 +143,8 @@ class FlashCardTaskTests: VaporTestCase {
     }
 
     static var allTests = [
-        ("testCreate", testCreate),
+        ("testCreateAsAdmin", testCreateAsAdmin),
+        ("testCreateAsStudent", testCreateAsStudent),
         ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit),
     ]
 }

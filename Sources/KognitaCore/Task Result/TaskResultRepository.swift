@@ -31,8 +31,11 @@ extension TaskResult.DatabaseRepository {
         case incompleateSqlStatment
     }
 
-    public struct FlowZoneTaskResult: Codable {
+    public struct SpaceRepetitionTask: Codable {
         public let taskID: Task.ID
+        public let revisitDate: Date
+        public let createdAt: Date
+        public let sessionID: TaskSession.ID?
     }
 
     private struct SubqueryResult: Codable {
@@ -55,7 +58,7 @@ extension TaskResult.DatabaseRepository {
     private enum Query {
         case subtopics
         case taskResults
-        case flowTasks(for: User.ID, in: PracticeSession.ID, under: Double)
+        case flowTasks(for: User.ID, in: PracticeSession.ID)
         case results(revisitingAfter: Date, for: User.ID)
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
@@ -64,7 +67,7 @@ extension TaskResult.DatabaseRepository {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks: return "SELECT * FROM (\(Query.taskResults.rawQuery)) AS \"Result\" INNER JOIN \"Task\" ON \"Task\".\"id\" = \"Result\".\"taskID\" WHERE \"Result\".\"sessionID\" != ($2) AND \"Task\".\"isTestable\" = 'false' AND \"Task\".\"deletedAt\" IS NULL AND \"Result\".\"resultScore\" <= ($3) AND \"Task\".\"subtopicID\" = ANY (\(Query.subtopics.rawQuery)) ORDER BY \"Result\".\"resultScore\" DESC, \"Result\".\"createdAt\" DESC"
+            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
@@ -76,11 +79,10 @@ extension TaskResult.DatabaseRepository {
 
         func query(for conn: PostgreSQLConnection) throws -> SQLRawBuilder<PostgreSQLConnection> {
             switch self {
-            case .flowTasks(let userId, let sessionId, let scoreThreshold):
+            case .flowTasks(let userId, let sessionId):
                 return conn.raw(self.rawQuery)
                     .bind(userId)
                     .bind(sessionId)
-                    .bind(scoreThreshold)
             case .results(revisitingAfter: let date, for: let userId):
                 return conn.raw(self.rawQuery)
                     .bind(userId)
@@ -133,18 +135,25 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getFlowZoneTasks(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<FlowZoneTaskResult?> {
-
-//        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
-        let scoreThreshold: Double = 0.8
+    public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<SpaceRepetitionTask?> {
 
         return try Query.flowTasks(
             for: session.userID,
-            in: session.requireID(),
-            under: scoreThreshold
+            in: session.requireID()
         )
             .query(for: conn)
-            .first(decoding: FlowZoneTaskResult.self)
+            .all(decoding: SpaceRepetitionTask.self)
+            .map { tasks in
+                let uncompletedTasks = try tasks.filter { try $0.sessionID != session.requireID() }
+                let now = Date()
+                let timeInADay: TimeInterval = 60 * 60 * 24
+
+                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+                .filter { $0.key < 10 }
+                .min { first, second in
+                    first.key > second.key
+                }?.value.random
+        }
     }
 
     public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> EventLoopFuture<[TaskResult]> {

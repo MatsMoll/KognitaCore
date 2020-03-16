@@ -36,7 +36,7 @@ extension Task.Repository {
     
     public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
-        guard let user = user else { throw Abort(.forbidden) }
+        guard let user = user else { throw Abort(.unauthorized) }
         
         return try Task(
             content: content.content,
@@ -45,16 +45,16 @@ extension Task.Repository {
         )
             .save(on: conn)
             .flatMap { task in
-                try TaskSolution(
-                    data: TaskSolution.Create.Data(
+                try TaskSolution.DatabaseRepository.create(
+                    from: TaskSolution.Create.Data(
                         solution: content.solution,
                         presentUser: true,
                         taskID: task.requireID()
-                    ),
-                    creatorID: user.requireID()
+                ),
+                    by: user,
+                    on: conn
                 )
-                .save(on: conn)
-                .transform(to: task)
+                    .transform(to: task)
         }
     }
 
@@ -118,27 +118,52 @@ extension Task.Repository {
         }
     }
 
-    public static func getTasks(in subjectId: Subject.ID, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
+    public struct CreatorOverviewQuery: Codable {
+        let taskQuestion: String?
+        let topics: [Topic.ID]
+    }
 
-        Task.query(on: conn, withSoftDeleted: withSoftDeleted)
-            .join(\User.id, to: \Task.creatorID)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
-            .filter(\Topic.subjectId == subjectId)
-            .alsoDecode(User.self)
-            .alsoDecode(Topic.self)
-            .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
-            .range(lower: 0, upper: maxAmount)
-            .all()
-            .map { content in
-                content.map { taskContent in
-                    CreatorTaskContent(
-                        task: taskContent.0.0.0,
-                        topic: taskContent.0.1,
-                        creator: taskContent.0.0.1,
-                        IsMultipleChoise: taskContent.1.isMultipleSelect != nil
-                    )
+    public static func getTasks(in subjectId: Subject.ID, user: User, query: CreatorOverviewQuery? = nil, maxAmount: Int? = nil, withSoftDeleted: Bool = false, conn: DatabaseConnectable) throws -> EventLoopFuture<[CreatorTaskContent]> {
+
+        try User.DatabaseRepository
+            .isModerator(user: user, subjectID: subjectId, on: conn)
+            .map { true }
+            .catchMap { _ in false }
+            .flatMap { isModerator in
+
+                let useSoftDeleted = isModerator ? withSoftDeleted : false
+                var dbQuery = Task.query(on: conn, withSoftDeleted: useSoftDeleted)
+                    .join(\User.id, to: \Task.creatorID)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
+                    .join(\Topic.id, to: \Subtopic.topicId)
+                    .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
+                    .filter(\Topic.subjectId == subjectId)
+                    .alsoDecode(User.self)
+                    .alsoDecode(Topic.self)
+                    .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
+                    .range(lower: 0, upper: maxAmount)
+
+                if let topics = query?.topics, topics.isEmpty == false {
+                    dbQuery = dbQuery.filter(\Topic.id ~~ topics)
+                }
+                if let question = query?.taskQuestion, question.isEmpty == false {
+                    dbQuery = dbQuery.filter(\Task.question, .ilike, "%\(question)%")
+                }
+                if isModerator == false {
+                    dbQuery = dbQuery.filter(\Task.isTestable == false)
+                }
+
+                return dbQuery
+                    .all()
+                    .map { content in
+                        content.map { taskContent in
+                            CreatorTaskContent(
+                                task: taskContent.0.0.0,
+                                topic: taskContent.0.1,
+                                creator: taskContent.0.0.1,
+                                isMultipleChoise: taskContent.1.isMultipleSelect != nil
+                            )
+                        }
                 }
         }
     }

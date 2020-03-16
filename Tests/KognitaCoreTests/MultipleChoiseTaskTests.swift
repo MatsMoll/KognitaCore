@@ -13,7 +13,7 @@ import FluentPostgreSQL
 
 class MultipleChoiseTaskTests: VaporTestCase {
     
-    func testCreate() throws {
+    func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
@@ -39,8 +39,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             .content(on: conn)
             .wait()
 
-        let solution = try TaskSolution.Repository
-            .solutions(for: multiple.requireID(), on: conn)
+        let solution = try TaskSolution.DatabaseRepository
+            .solutions(for: multiple.requireID(), for: user, on: conn)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
@@ -48,14 +48,15 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(content.task.subtopicID, subtopic.id)
         XCTAssertEqual(content.task.question, taskData.question)
         XCTAssertEqual(solution.first?.solution, taskData.solution)
+        XCTAssertEqual(solution.first?.approvedBy, user.username)
         XCTAssertEqual(content.choises.count, taskData.choises.count)
     }
 
-    func testCreateWithoutPrivilage() throws {
+    func testCreateAsStudent() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(isAdmin: false, on: conn)
 
-        let content = try MultipleChoiseTask.Create.Data(
+        let taskData = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),
             description: nil,
             question: "Some question",
@@ -69,7 +70,25 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        XCTAssertThrowsError(try MultipleChoiseTask.DatabaseRepository.create(from: content, by: user, on: conn).wait())
+        let multiple = try MultipleChoiseTask.DatabaseRepository
+            .create(from: taskData, by: user, on: conn)
+            .wait()
+
+        let content = try multiple
+            .content(on: conn)
+            .wait()
+
+        let solution = try TaskSolution.DatabaseRepository
+            .solutions(for: multiple.requireID(), for: user, on: conn)
+            .wait()
+
+        XCTAssertNotNil(multiple.createdAt)
+        XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
+        XCTAssertEqual(content.task.subtopicID, subtopic.id)
+        XCTAssertEqual(content.task.question, taskData.question)
+        XCTAssertEqual(solution.first?.solution, taskData.solution)
+        XCTAssertNil(solution.first?.approvedBy)
+        XCTAssertEqual(content.choises.count, taskData.choises.count)
     }
 
     func testEdit() throws {
@@ -192,8 +211,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
     }
 
     static var allTests = [
-        ("testCreate", testCreate),
-        ("testCreateWithoutPrivilage", testCreateWithoutPrivilage),
+        ("testCreateAsAdmin", testCreateAsAdmin),
+        ("testCreateAsStudent", testCreateAsStudent),
         ("testEdit", testEdit),
         ("testEditEqualChoisesError", testEditEqualChoisesError),
         ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit)
