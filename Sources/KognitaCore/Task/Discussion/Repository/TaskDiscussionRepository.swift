@@ -40,7 +40,7 @@ extension TaskDiscussion {
             guard user.id == model.userID else {
                 throw Abort(.forbidden)
             }
-            model.update(with: data)
+            try model.update(with: data)
             return model.save(on: conn)
                 .transform(to: .init())
         }

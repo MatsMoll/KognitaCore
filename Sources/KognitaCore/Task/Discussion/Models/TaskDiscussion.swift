@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class TaskDiscussion : KognitaCRUDModel {
+public final class TaskDiscussion : KognitaCRUDModel, Validatable {
 
     public var id: Int?
 
@@ -22,14 +22,16 @@ public final class TaskDiscussion : KognitaCRUDModel {
 
     public var updatedAt: Date?
 
-    init(data: TaskDiscussion.Create.Data, userID: User.ID) {
+    init(data: TaskDiscussion.Create.Data, userID: User.ID) throws {
         self.description = data.description
         self.taskID = data.taskID
         self.userID = userID
+        try validate()
     }
 
-    func update(with data: TaskDiscussion.Update.Data) {
+    func update(with data: TaskDiscussion.Update.Data) throws {
         description = data.description
+        try validate()
     }
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
@@ -45,6 +47,15 @@ public final class TaskDiscussion : KognitaCRUDModel {
                 builder.field(for: \.userID, type: .int, .default(1))
             }
         }
+    }
+
+
+    public static func validations() throws -> Validations<TaskDiscussion> {
+        var validations = Validations(TaskDiscussion.self)
+        try validations.add(\.description, .count(4...))
+        try validations.add(\.userID, .range(1...))
+        try validations.add(\.taskID, .range(1...))
+        return validations
     }
 }
 
