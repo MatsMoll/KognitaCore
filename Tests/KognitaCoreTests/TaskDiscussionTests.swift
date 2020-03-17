@@ -58,12 +58,12 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            let UnsufficientData = try TaskDiscussion.Create.Data(
+            let insufficientData = try TaskDiscussion.Create.Data(
                 description: "tre",
                 taskID: task.requireID()
             )
 
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: UnsufficientData, by: user, on: conn))
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: insufficientData, by: user, on: conn))
             XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: noDescriptionData, by: user, on: conn))
 
         } catch {
