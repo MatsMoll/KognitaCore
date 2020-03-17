@@ -21,6 +21,7 @@ public protocol SubjectRepositoring:
     UpdateResponse  == Subject.Edit.Response,
     ResponseModel   == Subject
 {
+    static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]>
     static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]>
     static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?>
     static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>

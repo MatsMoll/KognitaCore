@@ -286,6 +286,37 @@ extension Subject.DatabaseRepository {
         }
         .catchMap { _ in [] }
     }
+
+    struct ActiveSubjectQuery: Codable {
+        let canPractice: Bool
+    }
+
+    public static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]> {
+
+        return conn.databaseConnection(to: .psql)
+            .flatMap { psqlConn in
+
+                try psqlConn.select()
+                    .all(table: Subject.self)
+                    .column(\User.ActiveSubject.canPractice)
+                    .column(\User.ActiveSubject.userID)
+                    .column(\User.ActiveSubject.createdAt)
+                    .from(Subject.self)
+                    .join(\Subject.id, to: \User.ActiveSubject.subjectID, method: .left)
+                    .where(\User.ActiveSubject.userID == user.requireID())
+                    .orWhere(\User.ActiveSubject.createdAt == nil)
+                    .all(decoding: Subject.self, ActiveSubjectQuery?.self)
+                    .map { subjects in
+//                        []
+                        subjects.map { (subject, isActive) in
+                            Subject.ListOverview(
+                                subject: subject,
+                                isActive: isActive != nil
+                            )
+                        }
+                }
+        }
+    }
 }
 
 
