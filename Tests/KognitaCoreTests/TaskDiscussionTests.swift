@@ -48,6 +48,29 @@ final class TaskDiscussionTests: VaporTestCase {
         }
     }
 
+    func testCreateDiscussionNoDescription() {
+        do {
+            let task = try Task.create(on: conn)
+            let user = try User.create(on: conn)
+
+            let noDescriptionData = try TaskDiscussion.Create.Data(
+                description: "",
+                taskID: task.requireID()
+            )
+
+            let data = try TaskDiscussion.Create.Data(
+                description: "tre",
+                taskID: task.requireID()
+            )
+
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: data, by: user, on: conn))
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: noDescriptionData, by: user, on: conn))
+
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
 
     func testCreateDiscussionResponseWithoutDiscussion() {
         do {
@@ -104,6 +127,9 @@ final class TaskDiscussionTests: VaporTestCase {
 
     static let allTests = [
         ("testCreateDiscussionNotLoggedIn", testCreateDiscussionNotLoggedIn),
-        ("testCreateDiscussions", testCreateDiscussions)
+        ("testCreateDiscussions", testCreateDiscussions),
+        ("testCreateDiscussionResponseWithoutDiscussion", testCreateDiscussionResponseWithoutDiscussion),
+        ("testCreateDiscussionResponse", testCreateDiscussionResponse),
+        ("testCreateDiscussionNoDescription", testCreateDiscussionNoDescription)
     ]
 }
