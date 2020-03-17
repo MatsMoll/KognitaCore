@@ -72,25 +72,42 @@ extension FlashCardTask.DatabaseRepository {
     
     public static func update(model flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
-        try User.DatabaseRepository.isModerator(user: user, taskID: flashCard.requireID(), on: conn)
-            .flatMap {
+        guard let task = flashCard.task else {
+            throw Abort(.internalServerError)
+        }
+        try content.validate()
 
-                guard let task = flashCard.task else {
-                    throw Abort(.internalServerError)
+        return try User.DatabaseRepository
+            .isModerator(user: user, taskID: flashCard.requireID(), on: conn)
+            .flatMap {
+                try update(task: task, to: content, by: user, on: conn)
+        }
+        .catchFlatMap { _ in
+            task.get(on: conn).flatMap { newTask in
+                guard try newTask.creatorID == user.requireID() else {
+                    throw Abort(.forbidden)
                 }
-                try content.validate()
-                return try FlashCardTask.DatabaseRepository
-                    .create(from: content, by: user, on: conn)
-                    .flatMap { newTask in
-                        task.get(on: conn)
-                            .flatMap { task in
-                                task.deletedAt = Date()  // Equilent to .delete(on: conn)
-                                task.editedTaskID = newTask.id
-                                return task
-                                    .save(on: conn)
-                                    .transform(to: newTask)
-                        }
-                }
+                return try update(task: task, to: content, by: user, on: conn)
+            }
+        }
+    }
+
+    private static func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+
+        conn.transaction(on: .psql) { conn in
+            try FlashCardTask.DatabaseRepository
+                .create(from: content, by: user, on: conn)
+                .flatMap { newTask in
+
+                    task.get(on: conn)
+                        .flatMap { task in
+                            task.deletedAt = Date()  // Equilent to .delete(on: conn)
+                            task.editedTaskID = newTask.id
+                            return task
+                                .save(on: conn)
+                                .transform(to: newTask)
+                    }
+            }
         }
     }
 

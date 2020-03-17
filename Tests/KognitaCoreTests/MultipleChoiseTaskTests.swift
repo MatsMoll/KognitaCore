@@ -124,6 +124,46 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
     }
 
+    func testEditAsStudent() throws {
+        let creatorStudent = try User.create(isAdmin: false, on: conn)
+        let otherStudent = try User.create(isAdmin: false, on: conn)
+
+        let startingMultiple = try MultipleChoiseTask.create(creator: creatorStudent, on: conn)
+        var startingTask = try startingMultiple.task!.get(on: conn).wait()
+
+        let content = MultipleChoiseTask.Create.Data(
+            subtopicId: startingTask.subtopicID,
+            description: nil,
+            question: "Some question",
+            solution: "Some solution",
+            isMultipleSelect: false,
+            examPaperSemester: nil,
+            examPaperYear: nil,
+            isTestable: true,
+            choises: [
+                .init(choise: "not", isCorrect: false),
+                .init(choise: "yes", isCorrect: true)
+            ]
+        )
+
+        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
+            .update(model: startingMultiple, to: content, by: creatorStudent, on: conn).wait()
+        let editedTask = try editedMultiple.task!.get(on: conn).wait()
+        startingTask = try Task.query(on: conn, withSoftDeleted: true)
+            .filter(\.id == startingTask.id)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
+            .wait() // refershing
+
+        XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
+        XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
+
+        throwsError(of: Abort.self) {
+            _ = try MultipleChoiseTask.DatabaseRepository
+                .update(model: editedMultiple, to: content, by: otherStudent, on: conn).wait()
+        }
+    }
+
     func testEditEqualChoisesError() throws {
         _ = try MultipleChoiseTask.create(on: conn)
         let startingMultiple = try MultipleChoiseTask.create(on: conn)
@@ -214,6 +254,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         ("testCreateAsAdmin", testCreateAsAdmin),
         ("testCreateAsStudent", testCreateAsStudent),
         ("testEdit", testEdit),
+        ("testEditAsStudent", testEditAsStudent),
         ("testEditEqualChoisesError", testEditEqualChoisesError),
         ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit)
     ]
