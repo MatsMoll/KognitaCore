@@ -15,7 +15,7 @@ extension TaskDiscussion {
 
 extension TaskDiscussion.Pivot {
 
-    public final class Response: KognitaPersistenceModel {
+    public final class Response: KognitaPersistenceModel, Validatable {
 
         public var id: Int?
 
@@ -29,10 +29,19 @@ extension TaskDiscussion.Pivot {
 
         public var updatedAt: Date?
 
-        init(data: TaskDiscussion.Pivot.Response.Create.Data, userID: User.ID) {
+        init(data: TaskDiscussion.Pivot.Response.Create.Data, userID: User.ID) throws {
             self.response = data.response
             self.discussionID = data.discussionID
             self.userID = userID
+            try validate()
+        }
+
+        public static func validations() throws -> Validations<TaskDiscussion.Pivot.Response> {
+            var validations = Validations(TaskDiscussion.Pivot.Response.self)
+            try validations.add(\.response, .count(4...))
+            try validations.add(\.userID, .range(1...))
+            try validations.add(\.discussionID, .range(1...))
+            return validations
         }
     }
 }

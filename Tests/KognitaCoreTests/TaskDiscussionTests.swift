@@ -58,12 +58,12 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            let data = try TaskDiscussion.Create.Data(
+            let UnsufficientData = try TaskDiscussion.Create.Data(
                 description: "tre",
                 taskID: task.requireID()
             )
 
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: data, by: user, on: conn))
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: UnsufficientData, by: user, on: conn))
             XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: noDescriptionData, by: user, on: conn))
 
         } catch {
@@ -72,7 +72,7 @@ final class TaskDiscussionTests: VaporTestCase {
     }
 
 
-    func testCreateDiscussionResponseWithoutDiscussion() {
+    func testCreateDiscussionResponseWithoutDescription() {
         do {
             let user = try User.create(on: conn)
 
@@ -125,11 +125,38 @@ final class TaskDiscussionTests: VaporTestCase {
 
     }
 
+    func testResponseWithoutDescription() {
+        do {
+
+            let discussion = try TaskDiscussion.create(on: conn)
+            let user = try User.create(on: conn)
+
+            let noResponse = try TaskDiscussion.Pivot.Response.Create.Data(
+                response: "",
+                discussionID: discussion.requireID()
+            )
+
+            let insufficientData = try TaskDiscussion.Pivot.Response.Create.Data(
+                response: "tre",
+                discussionID: discussion.requireID()
+            )
+
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: insufficientData, by: user, on: conn))
+            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: noResponse, by: user, on: conn))
+
+
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
+    }
+
     static let allTests = [
         ("testCreateDiscussionNotLoggedIn", testCreateDiscussionNotLoggedIn),
         ("testCreateDiscussions", testCreateDiscussions),
-        ("testCreateDiscussionResponseWithoutDiscussion", testCreateDiscussionResponseWithoutDiscussion),
+        ("testCreateDiscussionResponseWithoutDescription", testCreateDiscussionResponseWithoutDescription),
         ("testCreateDiscussionResponse", testCreateDiscussionResponse),
-        ("testCreateDiscussionNoDescription", testCreateDiscussionNoDescription)
+        ("testCreateDiscussionNoDescription", testCreateDiscussionNoDescription),
+        ("testResponseWithoutDescription", testResponseWithoutDescription)
     ]
 }
