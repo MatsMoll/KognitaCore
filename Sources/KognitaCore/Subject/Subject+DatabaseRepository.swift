@@ -293,25 +293,19 @@ extension Subject.DatabaseRepository {
 
     public static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
+        return Subject.query(on: conn)
+            .all()
+            .flatMap { subjects in
 
-                try psqlConn.select()
-                    .all(table: Subject.self)
-                    .column(\User.ActiveSubject.canPractice)
-                    .column(\User.ActiveSubject.userID)
-                    .column(\User.ActiveSubject.createdAt)
-                    .from(Subject.self)
-                    .join(\Subject.id, to: \User.ActiveSubject.subjectID, method: .left)
-                    .where(\User.ActiveSubject.userID == user.requireID())
-                    .orWhere(\User.ActiveSubject.createdAt == nil)
-                    .all(decoding: Subject.self, ActiveSubjectQuery?.self)
-                    .map { subjects in
-//                        []
-                        subjects.map { (subject, isActive) in
+                try User.ActiveSubject.query(on: conn)
+                    .filter(\.userID == user.requireID())
+                    .all()
+                    .map { activeSubjects in
+
+                        subjects.map { subject in
                             Subject.ListOverview(
                                 subject: subject,
-                                isActive: isActive != nil
+                                isActive: activeSubjects.contains(where: { $0.subjectID == subject.id })
                             )
                         }
                 }
