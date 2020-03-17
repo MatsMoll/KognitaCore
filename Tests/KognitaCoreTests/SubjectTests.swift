@@ -171,6 +171,33 @@ class SubjectTests: VaporTestCase {
         }
     }
 
+    func testGetSubjects() {
+        failableTest {
+            let user = try User.create(on: conn)
+            let userTwo = try User.create(on: conn)
+
+            let task = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+
+            let subject = try Task.query(on: conn)
+                .join(\Subtopic.id, to: \Task.subtopicID)
+                .join(\Topic.id, to: \Subtopic.id)
+                .join(\Subject.id, to: \Topic.subjectId)
+                .filter(\Task.id == task.requireID())
+                .decode(Subject.self)
+                .first()
+                .unwrap(or: Errors.badTest)
+                .wait()
+
+            try Subject.DatabaseRepository.mark(active: subject, canPractice: true, for: userTwo, on: conn).wait()
+
+            let subjects = try Subject.DatabaseRepository.allSubjects(for: user, on: conn).wait()
+            XCTAssertEqual(subjects.count, 4)
+        }
+    }
+
     static let allTests = [
         ("testExportAndImport", testExportAndImport),
         ("testModeratorPrivilege", testModeratorPrivilege),
@@ -178,5 +205,6 @@ class SubjectTests: VaporTestCase {
         ("testOverviewContentNotModerator", testOverviewContentNotModerator),
         ("testOverviewContentAsModerator", testOverviewContentAsModerator),
         ("testUnverifedSolutions", testUnverifedSolutions),
+        ("testGetSubjects", testGetSubjects),
     ]
 }
