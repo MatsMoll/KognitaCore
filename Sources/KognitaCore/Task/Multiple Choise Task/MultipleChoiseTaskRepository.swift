@@ -87,21 +87,38 @@ extension MultipleChoiseTask.DatabaseRepository {
         guard let task = model.task else {
             throw Abort(.internalServerError)
         }
-        return try User.DatabaseRepository.isModerator(user: user, taskID: model.requireID(), on: conn)
+        return try User.DatabaseRepository
+            .isModerator(user: user, taskID: model.requireID(), on: conn)
             .flatMap {
-                try MultipleChoiseTask.DatabaseRepository
-                .create(from: data, by: user, on: conn)
-                .flatMap { newTask in
+                try update(task: task, to: data, by: user, on: conn)
+        }
+        .catchFlatMap { _ in
+            task.get(on: conn).flatMap { taskModel in
+                guard try taskModel.creatorID == user.requireID() else {
+                    throw Abort(.forbidden)
+                }
+                return try update(task: task, to: data, by: user, on: conn)
+            }
+        }
+    }
 
-                    task.get(on: conn)
-                        .flatMap { task in
+    private static func update(
+        task: Parent<MultipleChoiseTask, Task>,
+        to data: MultipleChoiseTask.Edit.Data,
+        by user: User,
+        on conn: DatabaseConnectable
+    ) throws -> EventLoopFuture<MultipleChoiseTask> {
+        try MultipleChoiseTask.DatabaseRepository
+            .create(from: data, by: user, on: conn)
+            .flatMap { newTask in
 
-                            task.deletedAt = Date() // Equilent to .delete(on: conn)
-                            task.editedTaskID = newTask.id
-                            return task
-                                .save(on: conn)
-                                .transform(to: newTask)
-                    }
+                task.get(on: conn)
+                    .flatMap { task in
+                        task.deletedAt = Date() // Equilent to .delete(on: conn)
+                        task.editedTaskID = newTask.id
+                        return task
+                            .save(on: conn)
+                            .transform(to: newTask)
                 }
         }
     }
