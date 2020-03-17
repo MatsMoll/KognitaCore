@@ -64,6 +64,36 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testCreateMultipleLineSolution() {
+        failableTest {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "Test",
+                question: "Some question",
+                solution:
+"""
+Hallo
+
+Dette er flere linjer
+""",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let createData = Task.Create.Data(
+                content: xssData,
+                subtopicID: xssData.subtopicId,
+                solution: xssData.solution
+            )
+            let task = try Task.Repository.create(from: createData, by: user, on: conn).wait()
+            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+
+            XCTAssertEqual(solution.solution, "Hallo\n\nDette er flere linjer")
+        }
+    }
+
     func testCreateTaskWithXSS() {
         do {
             let subtopic = try Subtopic.create(on: conn)
@@ -165,12 +195,50 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testApproveSolution() {
+        failableTest {
+            let user = try User.create(on: conn)
+            let unauthorizedUser = try User.create(isAdmin: false, on: conn)
+            let task = try Task.create(creator: unauthorizedUser, on: conn)
+
+            var solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            var solution = try XCTUnwrap(solutions.first)
+            XCTAssertNil(solution.approvedBy)
+
+            try TaskSolution.DatabaseRepository.approve(for: solution.id, by: user, on: conn).wait()
+            solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            solution = try XCTUnwrap(solutions.first)
+
+            XCTAssertEqual(solution.approvedBy, user.username)
+        }
+    }
+
+    func testApproveSolutionUnauthorized() {
+        failableTest {
+            let user = try User.create(isAdmin: false, on: conn)
+            let task = try Task.create(creator: user, on: conn)
+
+            var solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            var solution = try XCTUnwrap(solutions.first)
+            XCTAssertNil(solution.approvedBy)
+
+            XCTAssertThrowsError(try TaskSolution.DatabaseRepository.approve(for: solution.id, by: user, on: conn).wait())
+            solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            solution = try XCTUnwrap(solutions.first)
+
+            XCTAssertNil(solution.approvedBy)
+        }
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
         ("testCreateTaskWithXSS", testCreateTaskWithXSS),
         ("testUpdateTaskXSS", testUpdateTaskXSS),
         ("testUpdateSolutionXSS", testUpdateSolutionXSS),
         ("testSolutions", testSolutions),
-        ("testSolutionsCascadeDelete", testSolutionsCascadeDelete)
+        ("testSolutionsCascadeDelete", testSolutionsCascadeDelete),
+        ("testApproveSolution", testApproveSolution),
+        ("testApproveSolutionUnauthorized", testApproveSolutionUnauthorized),
+        ("testCreateMultipleLineSolution", testCreateMultipleLineSolution),
     ]
 }

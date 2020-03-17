@@ -7,6 +7,7 @@
 
 import Vapor
 import FluentPostgreSQL
+import FluentSQL
 
 extension Subject {
     public final class DatabaseRepository: SubjectRepositoring {}
@@ -245,5 +246,68 @@ extension Subject.DatabaseRepository {
             .filter(\.userID == user.requireID())
             .filter(\.subjectID == subject.requireID())
             .first()
+    }
+
+
+    /// Should be in `TaskSolutionRepositoring`
+    public static func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
+
+        return try User.DatabaseRepository
+            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+            .flatMap {
+
+                Task.query(on: conn)
+                    .join(\TaskSolution.taskID, to: \Task.id)
+                    .join(\Subtopic.id,         to: \Task.subtopicID)
+                    .join(\Topic.id,            to: \Subtopic.topicId)
+                    .filter(\Topic.subjectId == subjectID)
+                    .filter(\TaskSolution.approvedBy == nil)
+                    .range(0..<10)
+                    .alsoDecode(TaskSolution.self)
+                    .all()
+                    .flatMap { tasks in
+
+                        MultipleChoiseTaskChoise.query(on: conn)
+                            .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
+                            .all()
+                            .map { (choises: [MultipleChoiseTaskChoise]) in
+
+                                let groupedChoises = choises.group(by: \.taskId)
+
+                                return tasks.map { task, solution in
+                                    TaskSolution.Unverified(
+                                        task: task,
+                                        solution: solution,
+                                        choises: groupedChoises[solution.taskID] ?? []
+                                    )
+                                }
+                        }
+                }
+        }
+        .catchMap { _ in [] }
+    }
+}
+
+
+extension TaskSolution {
+
+    public struct Unverified: Codable {
+
+        public let taskID: Task.ID
+        public let solutionID: TaskSolution.ID
+        public let description: String?
+        public let question: String
+        public let solution: String
+
+        public let choises: [MultipleChoiseTaskChoise.Data]
+
+        init(task: Task, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) {
+            self.taskID = task.id ?? 0
+            self.solutionID = solution.id ?? 0
+            self.description = task.description
+            self.question = task.question
+            self.solution = solution.solution
+            self.choises = choises.map { .init(choise: $0) }
+        }
     }
 }

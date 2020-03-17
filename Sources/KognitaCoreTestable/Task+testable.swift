@@ -23,7 +23,7 @@ extension Task {
         let usedCreator = try creator ?? User.create(on: conn)
         let usedSubtopic = try subtopic ?? Subtopic.create(on: conn)
         
-        return try create(creatorId: usedCreator.requireID(),
+        return try create(creator: usedCreator,
                           subtopicId: usedSubtopic.requireID(),
                           description: description,
                           question: question,
@@ -33,7 +33,7 @@ extension Task {
                           on: conn)
     }
     
-    public static func create(creatorId:       User.ID,
+    public static func create(creator:       User,
                        subtopicId:      Subtopic.ID,
                        description:     String          = "Some description",
                        question:        String          = "Some question",
@@ -41,24 +41,26 @@ extension Task {
                        createSolution:  Bool            = true,
                        isTestable:      Bool            = false,
                        on conn:         PostgreSQLConnection) throws -> Task {
-        
+
         return try Task(subtopicID:     subtopicId,
                         description:    description,
                         question:       question,
-                        creatorID:      creatorId,
+                        creatorID:      creator.requireID(),
                         isTestable:     isTestable)
             
             .save(on: conn)
             .flatMap { task in
                 if createSolution {
-                    return try TaskSolution(
-                        data: TaskSolution.Create.Data(
-                            solution: explenation,
-                            presentUser: true,
-                            taskID: task.requireID()),
-                        creatorID: creatorId)
-                        .save(on: conn)
-                        .transform(to: task)
+                    return try TaskSolution.DatabaseRepository
+                        .create(from:
+                            TaskSolution.Create.Data(
+                                solution: explenation,
+                                presentUser: true,
+                                taskID: task.requireID()
+                            ),
+                            by: creator,
+                            on: conn
+                    ).transform(to: task)
                 } else {
                     return conn.future(task)
                 }
