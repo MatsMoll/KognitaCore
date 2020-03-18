@@ -11,31 +11,38 @@ import XCTest
 
 final class PracticeSessionTests: VaporTestCase {
 
-    func testIncorrectTaskIndex() throws {
+    func testUpdateFlashAnswer() {
+        failableTest {
 
-        let user = try User.create(on: conn)
+            let user = try User.create(on: conn)
 
-        let subtopic = try Subtopic.create(on: conn)
+            let subtopic = try Subtopic.create(on: conn)
 
-        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-        _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
 
-        let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
+            let session = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-        var answer = FlashCardTask.Submit(
-            timeUsed: 20,
-            knowledge: 3,
-            taskIndex: 1,
-            answer: ""
-        )
+            var answer = FlashCardTask.Submit(
+                timeUsed: 20,
+                knowledge: 3,
+                taskIndex: 1,
+                answer: ""
+            )
+            let updatedAnswer = FlashCardTask.Submit(
+                timeUsed: 20,
+                knowledge: 4,
+                taskIndex: 2,
+                answer: ""
+            )
 
-        XCTAssertNoThrow(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
-        answer.taskIndex = 2
-        XCTAssertNoThrow(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
-        answer.taskIndex = 2
-        XCTAssertThrowsError(try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait())
+            _ = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
+            answer.taskIndex = 2
+            _ = try PracticeSession.DatabaseRepository.submit(answer, in: session, by: user, on: conn).wait()
+            _ = try PracticeSession.DatabaseRepository.submit(updatedAnswer, in: session, by: user, on: conn).wait()
+        }
     }
 
     func testUnverifiedEmailPractice() throws {
@@ -391,7 +398,7 @@ final class PracticeSessionTests: VaporTestCase {
     }
 
     static let allTests = [
-        ("testIncorrectTaskIndex", testIncorrectTaskIndex),
+        ("testUpdateFlashAnswer", testUpdateFlashAnswer),
         ("testPracticeSessionAssignment", testPracticeSessionAssignment),
         ("testPracticeSessionAssignmentWithoutPracticeCapability", testPracticeSessionAssignmentWithoutPracticeCapability),
         ("testPracticeSessionAssignmentMultiple", testPracticeSessionAssignmentMultiple),
