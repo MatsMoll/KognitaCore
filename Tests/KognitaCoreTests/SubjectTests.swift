@@ -96,6 +96,20 @@ class SubjectTests: VaporTestCase {
         }
     }
 
+    func testAllInactive() throws {
+        failableTest {
+
+            let user = try User.create(on: conn)
+            let subject = try Subject.create(on: conn)
+
+            try subject.makeActive(for: user, canPractice: true, on: conn)
+            try subject.makeInactive(for: user, on: conn)
+
+            let activeSubjects = try Subject.DatabaseRepository.allActive(for: user, on: conn).wait()
+            XCTAssertEqual(activeSubjects.count, 0)
+        }
+    }
+
     func testOverviewContentNotModerator() {
         failableTest {
 

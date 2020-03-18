@@ -196,6 +196,17 @@ extension Subject.DatabaseRepository {
         }
     }
 
+    public static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+        try User.ActiveSubject.query(on: conn)
+            .filter(\User.ActiveSubject.subjectID == subject.requireID())
+            .filter(\User.ActiveSubject.userID == user.requireID())
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .delete(on: conn)
+            .transform(to: ())
+    }
+
     public static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         try User.ActiveSubject(
             userID: user.requireID(),
