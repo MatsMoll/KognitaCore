@@ -380,37 +380,60 @@ extension PracticeSession.DatabaseRepository {
                 .createAnswer(for: task, with: submit, on: conn)
                 .flatMap { answer in
 
-                    try PracticeSession.DatabaseRepository
-                        .save(answer: answer, to: session.requireID(), on: conn)
-                        .flatMap {
+                    try update(submit, in: session, on: conn)
+                        .map { _ in
+                            TaskSessionResult(result: submit, score: 0, progress: 0)
+                    }
+                    .catchFlatMap { _ in
+                        try PracticeSession.DatabaseRepository
+                            .save(answer: answer, to: session.requireID(), on: conn)
+                            .flatMap {
 
-                            let score = ScoreEvaluater.shared
-                                .compress(score: submit.knowledge, range: 0...4)
+                                let score = ScoreEvaluater.shared
+                                    .compress(score: submit.knowledge, range: 0...4)
 
-                            let result = TaskSessionResult(
-                                result:     submit,
-                                score:      score,
-                                progress:   0
-                            )
+                                let result = TaskSessionResult(
+                                    result:     submit,
+                                    score:      score,
+                                    progress:   0
+                                )
 
-                            let submitResult = try TaskSubmitResult(
-                                submit: submit,
-                                result: result,
-                                taskID: task.requireID()
-                            )
+                                let submitResult = try TaskSubmitResult(
+                                    submit: submit,
+                                    result: result,
+                                    taskID: task.requireID()
+                                )
 
-                            return try PracticeSession.DatabaseRepository
-                                .register(submitResult, result: result, in: session, by: user, on: conn)
-                                .flatMap { _ in
+                                return try PracticeSession.DatabaseRepository
+                                    .register(submitResult, result: result, in: session, by: user, on: conn)
+                                    .flatMap { _ in
 
-                                    try goalProgress(in: session, on: conn)
-                                        .map { progress in
-                                            result.progress = Double(progress)
-                                            return result
-                                    }
-                            }
+                                        try goalProgress(in: session, on: conn)
+                                            .map { progress in
+                                                result.progress = Double(progress)
+                                                return result
+                                        }
+                                }
+                        }
                     }
             }
+        }
+    }
+
+    public static func update(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        try PracticeSession.Pivot.Task.query(on: conn)
+            .filter(\TaskResult.sessionID                   == session.requireID())
+            .filter(\PracticeSession.Pivot.Task.sessionID   == session.requireID())
+            .filter(\PracticeSession.Pivot.Task.index       == submit.taskIndex)
+            .join(\TaskResult.taskID,   to: \PracticeSession.Pivot.Task.taskID)
+            .join(\FlashCardTask.id,    to: \TaskResult.taskID)
+            .decode(TaskResult.self)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { (result: TaskResult) in
+                result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
+                return result.save(on: conn)
+                    .transform(to: ())
         }
     }
 
