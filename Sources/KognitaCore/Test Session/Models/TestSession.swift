@@ -89,6 +89,7 @@ extension TestSession {
     public struct Results: Content {
 
         public struct Task: Content {
+            public let pivotID: SubjectTest.Pivot.Task.ID
             public let question: String
             public let score: Double
         }
