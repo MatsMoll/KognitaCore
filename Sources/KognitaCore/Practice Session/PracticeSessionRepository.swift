@@ -530,18 +530,28 @@ extension PracticeSession.DatabaseRepository {
     public static func getResult(
         for sessionID: PracticeSession.ID,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<[PSTaskResult]> {
+    ) throws -> EventLoopFuture<[PracticeSession.TaskResult]> {
 
-        return TaskResult.query(on: conn)
-            .filter(\TaskResult.sessionID == sessionID)
-            .join(\Task.id, to: \TaskResult.taskID)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .alsoDecode(Task.self)
-            .alsoDecode(Topic.self)
-            .all()
-            .map { tasks in
-                tasks.map { PSTaskResult(task: $0.0.1, topic: $0.1, result: $0.0.0) }
+        return conn.databaseConnection(to: .psql)
+            .flatMap { conn in
+
+                conn.select()
+                    .column(\Topic.name,                        as: "topicName")
+                    .column(\Topic.id,                          as: "topicID")
+                    .column(\PracticeSession.Pivot.Task.index,  as: "taskIndex")
+                    .column(\TaskResult.createdAt,              as: "date")
+                    .column(\Task.question,                     as: "question")
+                    .column(\TaskResult.resultScore,            as: "score")
+                    .column(\TaskResult.timeUsed,               as: "timeUsed")
+                    .column(\TaskResult.revisitDate,            as: "revisitDate")
+                    .from(PracticeSession.Pivot.Task.self)
+                    .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+                    .join(\Task.subtopicID, to: \Subtopic.id)
+                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .join(\Task.id, to: \TaskResult.taskID)
+                    .where(\TaskResult.sessionID == sessionID)
+                    .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
+                    .all(decoding: PracticeSession.TaskResult.self)
         }
     }
 
