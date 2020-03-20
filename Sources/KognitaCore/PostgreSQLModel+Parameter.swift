@@ -36,12 +36,14 @@ extension ParametersContainer {
         }
         return T.resolveParameter(parameter, conn: conn)
     }
+}
 
-    public func first<T: Parameter>(_ parameter: T.Type, on container: Container) throws -> T.ResolvedParameter {
-        guard let parameter = self.rawValues(for: T.self).first else {
+extension Request {
+    public func first<T: Parameter>(_ parameter: T.Type) throws -> T.ResolvedParameter {
+        guard let parameter = self.parameters.rawValues(for: T.self).first else {
             throw Abort(.badRequest)
         }
-        return try T.resolveParameter(parameter, on: container)
+        return try T.resolveParameter(parameter, on: self)
     }
 }
 

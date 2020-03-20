@@ -89,6 +89,7 @@ extension TestSession {
     public struct Results: Content {
 
         public struct Task: Content {
+            public let pivotID: SubjectTest.Pivot.Task.ID
             public let question: String
             public let score: Double
         }
@@ -121,6 +122,7 @@ extension TestSession {
         }
 
         public let testTitle: String
+        public let testIsOpen: Bool
         public let executedAt: Date
         public let shouldPresentDetails: Bool
         public let topicResults: [Topic]
@@ -135,8 +137,9 @@ extension TestSession {
             return score / maximumScore
         }
 
-        init(testTitle: String, executedAt: Date, shouldPresentDetails: Bool, subjectID: Subject.ID, canPractice: Bool, topicResults: [Topic]) {
+        init(testTitle: String, testIsOpen: Bool, executedAt: Date, shouldPresentDetails: Bool, subjectID: Subject.ID, canPractice: Bool, topicResults: [Topic]) {
             self.testTitle = testTitle
+            self.testIsOpen = testIsOpen
             self.executedAt = executedAt
             self.shouldPresentDetails = shouldPresentDetails
             self.subjectID = subjectID
