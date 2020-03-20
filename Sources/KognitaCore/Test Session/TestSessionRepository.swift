@@ -481,7 +481,7 @@ extension TestSession {
 
                     guard isOpen == false else { throw TestSessionRepositoringError.testIsNotFinnished }
 
-                    return SubjectTest.Pivot.Task.query(on: conn)
+                    return SubjectTest.Pivot.Task.query(on: conn, withSoftDeleted: true)
                         .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
                         .join(\MultipleChoiseTask.id, to: \Task.id)
                         .filter(\SubjectTest.Pivot.Task.id == pivotID)
