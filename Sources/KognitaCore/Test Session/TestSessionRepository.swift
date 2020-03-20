@@ -67,6 +67,10 @@ public protocol TestSessionRepositoring {
     static func results(in session: TestSessionRepresentable, pivotID: SubjectTest.Pivot.Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSession.DetailedTaskResult>
 }
 
+public enum TestSessionRepositoringError: Error {
+    case testIsNotFinnished
+}
+
 
 extension TestSession {
     public class DatabaseRepository: TestSessionRepositoring {
@@ -392,6 +396,7 @@ extension TestSession {
                             .map { canPractice in
                                 Results(
                                     testTitle: test.title,
+                                    testIsOpen: test.isOpen,
                                     executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
                                     shouldPresentDetails: test.isTeamBasedLearning == false,
                                     subjectID: subjectID,
@@ -470,39 +475,46 @@ extension TestSession {
 
             guard session.hasSubmitted else { throw Abort(.badRequest) }
 
-            return SubjectTest.Pivot.Task.query(on: conn)
-                .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
-                .join(\MultipleChoiseTask.id, to: \Task.id)
-                .filter(\SubjectTest.Pivot.Task.id == pivotID)
-                .filter(\SubjectTest.Pivot.Task.testID == session.testID)
-                .alsoDecode(Task.self)
-                .alsoDecode(MultipleChoiseTask.self)
-                .first()
-                .unwrap(or: Abort(.badRequest))
-                .flatMap { (taskContent, multiple) in
+            return SubjectTest.DatabaseRepository
+                .isOpen(testID: session.testID, on: conn)
+                .flatMap { isOpen in
 
-                    let subjectTask = taskContent.0
-                    let task = taskContent.1
+                    guard isOpen == false else { throw TestSessionRepositoringError.testIsNotFinnished }
 
-                    guard subjectTask.testID == session.testID else { throw Abort(.badRequest) }
+                    return SubjectTest.Pivot.Task.query(on: conn)
+                        .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
+                        .join(\MultipleChoiseTask.id, to: \Task.id)
+                        .filter(\SubjectTest.Pivot.Task.id == pivotID)
+                        .filter(\SubjectTest.Pivot.Task.testID == session.testID)
+                        .alsoDecode(Task.self)
+                        .alsoDecode(MultipleChoiseTask.self)
+                        .first()
+                        .unwrap(or: Abort(.badRequest))
+                        .flatMap { (taskContent, multiple) in
 
-                    return MultipleChoiseTask.DatabaseRepository
-                        .choisesFor(taskID: subjectTask.taskID, on: conn)
-                        .flatMap { choises in
+                            let subjectTask = taskContent.0
+                            let task = taskContent.1
 
-                            try TaskSessionAnswer.DatabaseRepository
-                                .multipleChoiseAnswers(in: session.requireID(), taskID: subjectTask.taskID, on: conn)
-                                .map { selectedChoise in
+                            guard subjectTask.testID == session.testID else { throw Abort(.badRequest) }
 
-                                    try TestSession.DetailedTaskResult(
-                                        taskID: task.requireID(),
-                                        description: task.description,
-                                        question: task.question,
-                                        isMultipleSelect: multiple.isMultipleSelect,
-                                        testSessionID: session.requireID(),
-                                        choises: choises,
-                                        selectedChoises: selectedChoise.map { $0.choiseID }
-                                    )
+                            return MultipleChoiseTask.DatabaseRepository
+                                .choisesFor(taskID: subjectTask.taskID, on: conn)
+                                .flatMap { choises in
+
+                                    try TaskSessionAnswer.DatabaseRepository
+                                        .multipleChoiseAnswers(in: session.requireID(), taskID: subjectTask.taskID, on: conn)
+                                        .map { selectedChoise in
+
+                                            try TestSession.DetailedTaskResult(
+                                                taskID: task.requireID(),
+                                                description: task.description,
+                                                question: task.question,
+                                                isMultipleSelect: multiple.isMultipleSelect,
+                                                testSessionID: session.requireID(),
+                                                choises: choises,
+                                                selectedChoises: selectedChoise.map { $0.choiseID }
+                                            )
+                                    }
                             }
                     }
             }
