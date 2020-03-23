@@ -25,7 +25,7 @@ public final class PracticeSession: KognitaCRUDModel, SoftDeleatableModel {
     public var endedAt: Date?
 
     /// The number of task to complete in the session
-    public private(set) var numberOfTaskGoal: Int
+    public var numberOfTaskGoal: Int
     
     /// The date when the session was started
     public var createdAt: Date?

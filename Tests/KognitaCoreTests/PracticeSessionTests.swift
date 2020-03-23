@@ -386,6 +386,26 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertEqual(createdSesssion.practiceSession.id,          parameterSession.session.id)
     }
 
+    func testExtendSession() {
+        failableTest {
+
+            let user = try User.create(on: conn)
+
+            let subtopic = try Subtopic.create(on: conn)
+
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(on: conn)
+            let createdSesssion = try PracticeSession.create(in: [subtopic.requireID()], for: user, numberOfTaskGoal: 10, on: conn)
+
+            let parameterSession = try TaskSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", conn: conn).wait()
+
+            XCTAssertEqual(parameterSession.numberOfTaskGoal, 10)
+            try PracticeSession.DatabaseRepository.extend(session: parameterSession, for: user, on: conn).wait()
+            XCTAssertEqual(parameterSession.numberOfTaskGoal, 15)
+        }
+    }
+
 
     func choisesAt(index: Int, for session: PracticeSessionRepresentable) throws -> [MultipleChoiseTaskChoise] {
         try PracticeSession.Pivot.Task.query(on: conn)
@@ -405,6 +425,7 @@ final class PracticeSessionTests: VaporTestCase {
         ("testNumberOfCompletedTasksFlashCard", testNumberOfCompletedTasksFlashCard),
         ("testNumberOfCompletedTasksMultipleChoice", testNumberOfCompletedTasksMultipleChoice),
         ("testAsignTaskWithTaskResult", testAsignTaskWithTaskResult),
-        ("testPracticeSessionAssignmentWithTestTasks", testPracticeSessionAssignmentWithTestTasks)
+        ("testPracticeSessionAssignmentWithTestTasks", testPracticeSessionAssignmentWithTestTasks),
+        ("testExtendSession", testExtendSession)
     ]
 }
