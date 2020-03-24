@@ -9,6 +9,23 @@ import Vapor
 import FluentPostgreSQL
 import FluentSQL
 
+extension String {
+
+    func removeCharacters(from forbiddenChars: CharacterSet) -> String {
+        let passed = self.unicodeScalars.filter { !forbiddenChars.contains($0) }
+        return String(String.UnicodeScalarView(passed))
+    }
+
+    func removeCharacters(from: String) -> String {
+        return removeCharacters(from: CharacterSet(charactersIn: from))
+    }
+
+    func keepCharacetrs(in charset: CharacterSet) -> String {
+        let passed = self.unicodeScalars.filter { charset.contains($0) }
+        return String(String.UnicodeScalarView(passed))
+    }
+}
+
 extension Subject {
     public final class DatabaseRepository: SubjectRepositoring {}
 }
@@ -374,10 +391,12 @@ extension Subject.DatabaseRepository {
                                     Subject.Compendium.TopicData(
                                         name: topicData.first!.topicName,
                                         chapter: topicData.first!.topicChapter,
-                                        subtopics: topicData.group(by: \.subjectID)
-                                            .map { _, questions in
+                                        subtopics: topicData.group(by: \.subtopicID)
+                                            .map { subtopicID, questions in
 
                                                 Subject.Compendium.SubtopicData(
+                                                    subjectID: subjectID,
+                                                    subtopicID: subtopicID,
                                                     name: questions.first!.subtopicName,
                                                     questions: questions.map { question in
                                                         
@@ -406,6 +425,8 @@ extension Subject {
         }
 
         public struct SubtopicData: Codable {
+            public let subjectID: Subject.ID
+            public let subtopicID: Subtopic.ID
             public let name: String
             public let questions: [QuestionData]
         }
@@ -415,7 +436,7 @@ extension Subject {
             public let chapter: Int
             public let subtopics: [SubtopicData]
 
-            public var nameID: String { name.lowercased().replacingOccurrences(of: " ", with: "-") }
+            public var nameID: String { name.lowercased().keepCharacetrs(in: .alphanumerics) }
         }
 
         public let subjectID: Subject.ID
