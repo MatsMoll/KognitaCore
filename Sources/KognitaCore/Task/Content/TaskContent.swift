@@ -20,10 +20,10 @@ public struct CreatorTaskContent {
     public let task: Task
     public let topic: Topic
     public let creator: User
-    public let IsMultipleChoise: Bool
+    public let isMultipleChoise: Bool
     
     public var taskTypePath: String {
-        if IsMultipleChoise {
+        if isMultipleChoise {
             return "tasks/multiple-choise"
         } else {
             return "tasks/flash-card"

@@ -7,6 +7,7 @@
 
 import Vapor
 import FluentPostgreSQL
+import FluentSQL
 
 extension Subject {
     public final class DatabaseRepository: SubjectRepositoring {}
@@ -195,6 +196,17 @@ extension Subject.DatabaseRepository {
         }
     }
 
+    public static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+
+        try User.ActiveSubject.query(on: conn)
+            .filter(\User.ActiveSubject.subjectID == subject.requireID())
+            .filter(\User.ActiveSubject.userID == user.requireID())
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .delete(on: conn)
+            .transform(to: ())
+    }
+
     public static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
         try User.ActiveSubject(
             userID: user.requireID(),
@@ -245,6 +257,69 @@ extension Subject.DatabaseRepository {
             .filter(\.userID == user.requireID())
             .filter(\.subjectID == subject.requireID())
             .first()
+    }
+
+    /// Should be in `TaskSolutionRepositoring`
+    public static func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
+
+        return try User.DatabaseRepository
+            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+            .flatMap {
+
+                Task.query(on: conn)
+                    .join(\TaskSolution.taskID, to: \Task.id)
+                    .join(\Subtopic.id,         to: \Task.subtopicID)
+                    .join(\Topic.id,            to: \Subtopic.topicId)
+                    .filter(\Topic.subjectId == subjectID)
+                    .filter(\TaskSolution.approvedBy == nil)
+                    .range(0..<10)
+                    .alsoDecode(TaskSolution.self)
+                    .all()
+                    .flatMap { tasks in
+
+                        MultipleChoiseTaskChoise.query(on: conn)
+                            .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
+                            .all()
+                            .map { (choises: [MultipleChoiseTaskChoise]) in
+
+                                let groupedChoises = choises.group(by: \.taskId)
+
+                                return tasks.map { task, solution in
+                                    TaskSolution.Unverified(
+                                        task: task,
+                                        solution: solution,
+                                        choises: groupedChoises[solution.taskID] ?? []
+                                    )
+                                }
+                        }
+                }
+        }
+        .catchMap { _ in [] }
+    }
+
+    struct ActiveSubjectQuery: Codable {
+        let canPractice: Bool
+    }
+
+    public static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]> {
+
+        return Subject.query(on: conn)
+            .all()
+            .flatMap { subjects in
+
+                try User.ActiveSubject.query(on: conn)
+                    .filter(\.userID == user.requireID())
+                    .all()
+                    .map { activeSubjects in
+
+                        subjects.map { subject in
+                            Subject.ListOverview(
+                                subject: subject,
+                                isActive: activeSubjects.contains(where: { $0.subjectID == subject.id })
+                            )
+                        }
+                }
+        }
     }
 
     struct CompendiumData: Decodable {
@@ -347,5 +422,28 @@ extension Subject {
         public let subjectName: String
         public let topics: [TopicData]
     }
+}
 
+
+extension TaskSolution {
+
+    public struct Unverified: Codable {
+
+        public let taskID: Task.ID
+        public let solutionID: TaskSolution.ID
+        public let description: String?
+        public let question: String
+        public let solution: String
+
+        public let choises: [MultipleChoiseTaskChoise.Data]
+
+        init(task: Task, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) {
+            self.taskID = task.id ?? 0
+            self.solutionID = solution.id ?? 0
+            self.description = task.description
+            self.question = task.question
+            self.solution = solution.solution
+            self.choises = choises.map { .init(choise: $0) }
+        }
+    }
 }

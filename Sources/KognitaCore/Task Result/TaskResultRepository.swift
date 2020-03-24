@@ -23,6 +23,7 @@ public protocol PracticeSessionRepresentable: Codable {
     func requireID() throws -> Int
 
     func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
+    func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
 }
 
 extension TaskResult.DatabaseRepository {

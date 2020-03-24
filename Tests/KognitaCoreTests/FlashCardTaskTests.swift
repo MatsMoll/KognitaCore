@@ -78,6 +78,44 @@ class FlashCardTaskTests: VaporTestCase {
         }
     }
 
+    func testEditAsStudent() {
+        failableTest {
+            let creatorStudent = try User.create(isAdmin: false, on: conn)
+            let otherStudent = try User.create(isAdmin: false, on: conn)
+
+            let startingFlash = try FlashCardTask.create(creator: creatorStudent, on: conn)
+            var startingTask = try startingFlash.task!.get(on: conn).wait()
+
+            let content = FlashCardTask.Create.Data(
+                subtopicId: startingTask.subtopicID,
+                description: nil,
+                question: "Some question 2",
+                solution: "Some solution",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+
+            let editedTask = try FlashCardTask.DatabaseRepository
+                .update(model: startingFlash, to: content, by: creatorStudent, on: conn).wait()
+            startingTask = try Task.query(on: conn, withSoftDeleted: true)
+                .filter(\.id == startingTask.id)
+                .first()
+                .unwrap(or: Abort(.internalServerError))
+                .wait() // refershing
+
+            XCTAssertEqual(editedTask.question, content.question)
+            XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
+
+            let editedFlash = try FlashCardTask.find(editedTask.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
+
+            throwsError(of: Abort.self) {
+                _ = try FlashCardTask.DatabaseRepository
+                    .update(model: editedFlash, to: content, by: otherStudent, on: conn).wait()
+            }
+        }
+    }
+
     func testAnswerIsSavedOnSubmit() throws {
 
         let user = try User.create(on: conn)
@@ -146,5 +184,6 @@ class FlashCardTaskTests: VaporTestCase {
         ("testCreateAsAdmin", testCreateAsAdmin),
         ("testCreateAsStudent", testCreateAsStudent),
         ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit),
+        ("testEditAsStudent", testEditAsStudent),
     ]
 }

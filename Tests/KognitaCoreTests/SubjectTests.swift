@@ -11,6 +11,7 @@ import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
 
+
 class SubjectTests: VaporTestCase {
 
     func testExportAndImport() throws {
@@ -95,9 +96,129 @@ class SubjectTests: VaporTestCase {
         }
     }
 
+    func testAllInactive() throws {
+        failableTest {
+
+            let user = try User.create(on: conn)
+            let subject = try Subject.create(on: conn)
+
+            try subject.makeActive(for: user, canPractice: true, on: conn)
+            try subject.makeInactive(for: user, on: conn)
+
+            let activeSubjects = try Subject.DatabaseRepository.allActive(for: user, on: conn).wait()
+            XCTAssertEqual(activeSubjects.count, 0)
+        }
+    }
+
+    func testOverviewContentNotModerator() {
+        failableTest {
+
+            let user = try User.create(isAdmin: false, on: conn)
+            let topic = try Topic.create(on: conn)
+            let subtopic = try Subtopic.create(topic: topic, on: conn)
+
+            let task = try Task.create(subtopic: subtopic, question: "Kognita?", on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, task: task, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
+
+            let tasks = try Task.Repository.getTasks(in: topic.subjectId, user: user, query: nil, maxAmount: nil, withSoftDeleted: true, conn: conn).wait()
+
+            XCTAssertFalse(tasks.contains(where: { $0.task.isTestable == true }))
+            XCTAssertEqual(tasks.count, 3)
+
+            let filteredTasks = try Task.Repository.getTasks(in: topic.subjectId, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true, conn: conn).wait()
+            XCTAssertEqual(filteredTasks.count, 1)
+            XCTAssertTrue(tasks.contains(where: { $0.task.question == task.question }))
+        }
+    }
+
+    func testOverviewContentAsModerator() {
+        failableTest {
+
+            let user = try User.create(isAdmin: false, on: conn)
+            let admin = try User.create(on: conn)
+            let topic = try Topic.create(on: conn)
+            let subtopic = try Subtopic.create(topic: topic, on: conn)
+
+            try Subject.DatabaseRepository.grantModeratorPrivilege(for: user.requireID(), in: topic.subjectId, by: admin, on: conn).wait()
+
+            let task = try Task.create(subtopic: subtopic, question: "Kognita?", on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, task: task, isTestable: true, on: conn)
+            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
+
+            let tasks = try Task.Repository.getTasks(in: topic.subjectId, user: user, query: nil, maxAmount: nil, withSoftDeleted: true, conn: conn).wait()
+
+            XCTAssertTrue(tasks.contains(where: { $0.task.isTestable == true }))
+            XCTAssertEqual(tasks.count, 5)
+
+            let filteredTasks = try Task.Repository.getTasks(in: topic.subjectId, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true, conn: conn).wait()
+            XCTAssertEqual(filteredTasks.count, 1)
+            XCTAssertTrue(tasks.contains(where: { $0.task.question == task.question }))
+            XCTAssertTrue(tasks.contains(where: { $0.task.isTestable == true }))
+        }
+    }
+
+    func testUnverifedSolutions() {
+        failableTest {
+            let user = try User.create(isAdmin: false, on: conn)
+            let admin = try User.create(on: conn)
+            let topic = try Topic.create(on: conn)
+            let subtopic = try Subtopic.create(topic: topic, on: conn)
+
+            _ = try FlashCardTask.create(creator: admin, subtopic: subtopic, on: conn) // Verified as the creator is Admin and therefore a moderator
+            _ = try FlashCardTask.create(creator: user, subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, on: conn)
+            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
+
+            let notModeratorSolutions = try Subject.DatabaseRepository.unverifiedSolutions(in: topic.subjectId, for: user, on: conn).wait()
+            let solutions = try Subject.DatabaseRepository.unverifiedSolutions(in: topic.subjectId, for: admin, on: conn).wait()
+
+            XCTAssertEqual(notModeratorSolutions.count, 0)
+            XCTAssertEqual(solutions.count, 4)
+        }
+    }
+
+    func testGetSubjects() {
+        failableTest {
+            let user = try User.create(on: conn)
+            let userTwo = try User.create(on: conn)
+
+            let task = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+            _ = try Task.create(on: conn)
+
+            let subject = try Task.query(on: conn)
+                .join(\Subtopic.id, to: \Task.subtopicID)
+                .join(\Topic.id, to: \Subtopic.id)
+                .join(\Subject.id, to: \Topic.subjectId)
+                .filter(\Task.id == task.requireID())
+                .decode(Subject.self)
+                .first()
+                .unwrap(or: Errors.badTest)
+                .wait()
+
+            try Subject.DatabaseRepository.mark(active: subject, canPractice: true, for: userTwo, on: conn).wait()
+
+            let subjects = try Subject.DatabaseRepository.allSubjects(for: user, on: conn).wait()
+            XCTAssertEqual(subjects.count, 4)
+        }
+    }
+
     static let allTests = [
         ("testExportAndImport", testExportAndImport),
         ("testModeratorPrivilege", testModeratorPrivilege),
-        ("testAllActive", testAllActive)
+        ("testAllActive", testAllActive),
+        ("testOverviewContentNotModerator", testOverviewContentNotModerator),
+        ("testOverviewContentAsModerator", testOverviewContentAsModerator),
+        ("testUnverifedSolutions", testUnverifedSolutions),
+        ("testGetSubjects", testGetSubjects),
     ]
 }

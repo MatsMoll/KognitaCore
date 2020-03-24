@@ -17,6 +17,7 @@ public protocol PracticeSessionRepository:
     CreateResponse == PracticeSession.Create.Response
 {
     static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
+    static func extend(session: PracticeSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
 
 
@@ -380,37 +381,60 @@ extension PracticeSession.DatabaseRepository {
                 .createAnswer(for: task, with: submit, on: conn)
                 .flatMap { answer in
 
-                    try PracticeSession.DatabaseRepository
-                        .save(answer: answer, to: session.requireID(), on: conn)
-                        .flatMap {
+                    try update(submit, in: session, on: conn)
+                        .map { _ in
+                            TaskSessionResult(result: submit, score: 0, progress: 0)
+                    }
+                    .catchFlatMap { _ in
+                        try PracticeSession.DatabaseRepository
+                            .save(answer: answer, to: session.requireID(), on: conn)
+                            .flatMap {
 
-                            let score = ScoreEvaluater.shared
-                                .compress(score: submit.knowledge, range: 0...4)
+                                let score = ScoreEvaluater.shared
+                                    .compress(score: submit.knowledge, range: 0...4)
 
-                            let result = TaskSessionResult(
-                                result:     submit,
-                                score:      score,
-                                progress:   0
-                            )
+                                let result = TaskSessionResult(
+                                    result:     submit,
+                                    score:      score,
+                                    progress:   0
+                                )
 
-                            let submitResult = try TaskSubmitResult(
-                                submit: submit,
-                                result: result,
-                                taskID: task.requireID()
-                            )
+                                let submitResult = try TaskSubmitResult(
+                                    submit: submit,
+                                    result: result,
+                                    taskID: task.requireID()
+                                )
 
-                            return try PracticeSession.DatabaseRepository
-                                .register(submitResult, result: result, in: session, by: user, on: conn)
-                                .flatMap { _ in
+                                return try PracticeSession.DatabaseRepository
+                                    .register(submitResult, result: result, in: session, by: user, on: conn)
+                                    .flatMap { _ in
 
-                                    try goalProgress(in: session, on: conn)
-                                        .map { progress in
-                                            result.progress = Double(progress)
-                                            return result
-                                    }
-                            }
+                                        try goalProgress(in: session, on: conn)
+                                            .map { progress in
+                                                result.progress = Double(progress)
+                                                return result
+                                        }
+                                }
+                        }
                     }
             }
+        }
+    }
+
+    public static func update(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        try PracticeSession.Pivot.Task.query(on: conn)
+            .filter(\TaskResult.sessionID                   == session.requireID())
+            .filter(\PracticeSession.Pivot.Task.sessionID   == session.requireID())
+            .filter(\PracticeSession.Pivot.Task.index       == submit.taskIndex)
+            .join(\TaskResult.taskID,   to: \PracticeSession.Pivot.Task.taskID)
+            .join(\FlashCardTask.id,    to: \TaskResult.taskID)
+            .decode(TaskResult.self)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { (result: TaskResult) in
+                result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
+                return result.save(on: conn)
+                    .transform(to: ())
         }
     }
 
@@ -507,18 +531,28 @@ extension PracticeSession.DatabaseRepository {
     public static func getResult(
         for sessionID: PracticeSession.ID,
         on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<[PSTaskResult]> {
+    ) throws -> EventLoopFuture<[PracticeSession.TaskResult]> {
 
-        return TaskResult.query(on: conn)
-            .filter(\TaskResult.sessionID == sessionID)
-            .join(\Task.id, to: \TaskResult.taskID)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .alsoDecode(Task.self)
-            .alsoDecode(Topic.self)
-            .all()
-            .map { tasks in
-                tasks.map { PSTaskResult(task: $0.0.1, topic: $0.1, result: $0.0.0) }
+        return conn.databaseConnection(to: .psql)
+            .flatMap { conn in
+
+                conn.select()
+                    .column(\Topic.name,                        as: "topicName")
+                    .column(\Topic.id,                          as: "topicID")
+                    .column(\PracticeSession.Pivot.Task.index,  as: "taskIndex")
+                    .column(\TaskResult.createdAt,              as: "date")
+                    .column(\Task.question,                     as: "question")
+                    .column(\TaskResult.resultScore,            as: "score")
+                    .column(\TaskResult.timeUsed,               as: "timeUsed")
+                    .column(\TaskResult.revisitDate,            as: "revisitDate")
+                    .from(PracticeSession.Pivot.Task.self)
+                    .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+                    .join(\Task.subtopicID, to: \Subtopic.id)
+                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .join(\Task.id, to: \TaskResult.taskID)
+                    .where(\TaskResult.sessionID == sessionID)
+                    .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
+                    .all(decoding: PracticeSession.TaskResult.self)
         }
     }
 
@@ -684,6 +718,14 @@ extension PracticeSession.DatabaseRepository {
         )
         .create(on: conn)
         .transform(to: ())
+    }
+
+    public static func extend(session: PracticeSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard try session.userID == user.requireID() else {
+            throw Abort(.forbidden)
+        }
+        return session.extendSession(with: 5, on: conn)
+            .transform(to: ())
     }
 }
 

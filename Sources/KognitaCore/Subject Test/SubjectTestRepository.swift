@@ -686,5 +686,11 @@ extension SubjectTest {
                     }
             }
         }
+
+        static func isOpen(testID: SubjectTest.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Bool> {
+            SubjectTest.find(testID, on: conn)
+                .unwrap(or: Abort(.badRequest))
+                .map { $0.isOpen }
+        }
     }
 }
