@@ -28,6 +28,7 @@ public protocol SubjectRepositoring:
     static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
     static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
     static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func compendium(for subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium>
 }
 
 extension Subject {
