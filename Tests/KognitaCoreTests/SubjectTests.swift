@@ -212,6 +212,26 @@ class SubjectTests: VaporTestCase {
         }
     }
 
+    func testCompendium() {
+        failableTest {
+            let subject = try Subject.create(on: conn)
+            let topic = try Topic.create(subject: subject, on: conn)
+            let firstSubtopic = try Subtopic.create(topic: topic, on: conn)
+            let secondSubtopic = try Subtopic.create(topic: topic, on: conn)
+
+            _ = try MultipleChoiseTask.create(subtopic: firstSubtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: firstSubtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: secondSubtopic, on: conn)
+            _ = try FlashCardTask.create(subtopic: secondSubtopic, on: conn)
+
+            let compendium = try Subject.DatabaseRepository.compendium(for: subject.requireID(), on: conn).wait()
+            XCTAssertEqual(compendium.topics.count, 1)
+            let compendiumTopic = try XCTUnwrap(compendium.topics.first)
+            XCTAssertEqual(compendiumTopic.subtopics.count, 2)
+            XCTAssertEqual(compendiumTopic.subtopics.reduce(0) { $0 + $1.questions.count }, 3)
+        }
+    }
+
     static let allTests = [
         ("testExportAndImport", testExportAndImport),
         ("testModeratorPrivilege", testModeratorPrivilege),
