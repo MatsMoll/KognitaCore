@@ -8,6 +8,10 @@
 import Vapor
 import FluentPostgreSQL
 
+public struct SubjectCompendiumFilter: Codable {
+    let subtopicIDs: Set<Subtopic.ID>?
+}
+
 public protocol SubjectRepositoring:
     CreateModelRepository,
     UpdateModelRepository,
@@ -28,6 +32,7 @@ public protocol SubjectRepositoring:
     static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
     static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
     static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium>
 }
 
 extension Subject {

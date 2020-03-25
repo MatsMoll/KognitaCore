@@ -9,6 +9,23 @@ import Vapor
 import FluentPostgreSQL
 import FluentSQL
 
+extension String {
+
+    func removeCharacters(from forbiddenChars: CharacterSet) -> String {
+        let passed = self.unicodeScalars.filter { !forbiddenChars.contains($0) }
+        return String(String.UnicodeScalarView(passed))
+    }
+
+    func removeCharacters(from: String) -> String {
+        return removeCharacters(from: CharacterSet(charactersIn: from))
+    }
+
+    func keepCharacetrs(in charset: CharacterSet) -> String {
+        let passed = self.unicodeScalars.filter { charset.contains($0) }
+        return String(String.UnicodeScalarView(passed))
+    }
+}
+
 extension Subject {
     public final class DatabaseRepository: SubjectRepositoring {}
 }
@@ -259,7 +276,6 @@ extension Subject.DatabaseRepository {
             .first()
     }
 
-
     /// Should be in `TaskSolutionRepositoring`
     public static func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
 
@@ -321,6 +337,113 @@ extension Subject.DatabaseRepository {
                         }
                 }
         }
+    }
+
+    struct CompendiumData: Decodable {
+        let question: String
+        let solution: String
+        let topicName: String
+        let topicChapter: Int
+        let topicID: Topic.ID
+        let subtopicName: String
+        let subtopicID: Subtopic.ID
+    }
+
+    public static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
+
+        return conn.databaseConnection(to: .psql)
+            .flatMap { conn in
+
+                Subject.find(subjectID, on: conn)
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { subject in
+
+                        var query = conn.select()
+                            .column(\Task.question)
+                            .column(\TaskSolution.solution)
+                            .column(\Topic.name,    as: "topicName")
+                            .column(\Topic.id,      as: "topicID")
+                            .column(\Topic.chapter, as: "topicChapter")
+                            .column(\Subtopic.name, as: "subtopicName")
+                            .column(\Subtopic.id,   as: "subtopicID")
+                            .from(Task.self)
+                            .join(\Task.subtopicID,     to: \Subtopic.id)
+                            .join(\Subtopic.topicId,    to: \Topic.id)
+                            .join(\Task.id,             to: \FlashCardTask.id) // Only flash card tasks
+                            .join(\Task.id,             to: \TaskSolution.taskID)
+                            .where(\Task.description == nil)
+                            .where(\Task.deletedAt == nil)
+                            .where(\Topic.subjectId == subjectID)
+
+                        if let subtopicIDs = filter.subtopicIDs {
+                            query = query.where(\Subtopic.id, .in, Array(subtopicIDs))
+                        }
+
+                        return query
+                            .all(decoding: CompendiumData.self)
+                            .map { data in
+
+                                Subject.Compendium(
+                                    subjectID: subjectID,
+                                    subjectName: subject.name,
+                                    topics: data.group(by: \.topicID)
+                                        .map { _, topicData in
+
+                                            Subject.Compendium.TopicData(
+                                                name: topicData.first!.topicName,
+                                                chapter: topicData.first!.topicChapter,
+                                                subtopics: topicData.group(by: \.subtopicID)
+                                                    .map { subtopicID, questions in
+
+                                                        Subject.Compendium.SubtopicData(
+                                                            subjectID: subjectID,
+                                                            subtopicID: subtopicID,
+                                                            name: questions.first!.subtopicName,
+                                                            questions: questions.map { question in
+
+                                                                Subject.Compendium.QuestionData(
+                                                                    question: question.question,
+                                                                    solution: question.solution
+                                                                )
+                                                            }
+                                                        )
+                                                }
+                                            )
+                                    }
+                                    .sorted(by: { $0.chapter < $1.chapter })
+                                )
+                        }
+                }
+        }
+    }
+}
+
+extension Subject {
+    public struct Compendium: Content {
+
+        public struct QuestionData: Codable {
+            public let question: String
+            public let solution: String
+        }
+
+        public struct SubtopicData: Codable {
+            public let subjectID: Subject.ID
+            public let subtopicID: Subtopic.ID
+            public let name: String
+            public let questions: [QuestionData]
+        }
+
+        public struct TopicData: Codable {
+            public let name: String
+            public let chapter: Int
+            public let subtopics: [SubtopicData]
+
+            public var nameID: String { name.lowercased().keepCharacetrs(in: .alphanumerics) }
+        }
+
+        public let subjectID: Subject.ID
+        public let subjectName: String
+        public let topics: [TopicData]
     }
 }
 

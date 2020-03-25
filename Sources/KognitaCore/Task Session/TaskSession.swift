@@ -85,5 +85,11 @@ extension TaskSession {
                     )
             }
         }
+
+        public func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
+            practiceSession.numberOfTaskGoal += abs(numberOfTasks)
+            return practiceSession.save(on: conn)
+                .transform(to: self)
+        }
     }
 }

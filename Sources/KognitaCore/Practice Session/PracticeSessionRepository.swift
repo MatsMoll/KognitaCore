@@ -17,6 +17,7 @@ public protocol PracticeSessionRepository:
     CreateResponse == PracticeSession.Create.Response
 {
     static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
+    static func extend(session: PracticeSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
 
 
@@ -717,6 +718,14 @@ extension PracticeSession.DatabaseRepository {
         )
         .create(on: conn)
         .transform(to: ())
+    }
+
+    public static func extend(session: PracticeSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        guard try session.userID == user.requireID() else {
+            throw Abort(.forbidden)
+        }
+        return session.extendSession(with: 5, on: conn)
+            .transform(to: ())
     }
 }
 

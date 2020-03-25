@@ -30,7 +30,7 @@ extension TaskDiscussion.Pivot {
         public var updatedAt: Date?
 
         init(data: TaskDiscussion.Pivot.Response.Create.Data, userID: User.ID) throws {
-            self.response = data.response
+            self.response = try data.response.cleanXSS(whitelist: .basicWithImages())
             self.discussionID = data.discussionID
             self.userID = userID
             try validate()
