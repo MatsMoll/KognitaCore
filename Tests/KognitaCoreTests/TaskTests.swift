@@ -230,6 +230,25 @@ Dette er flere linjer
         }
     }
 
+    func testDeleteSolution() {
+        failableTest {
+            let user = try User.create(on: conn)
+            let task = try Task.create(on: conn)
+
+            let solutions = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).all().wait()
+
+            XCTAssertEqual(solutions.count, 1)
+            let solution = try XCTUnwrap(solutions.first)
+
+            throwsError(of: TaskSolutionRepositoryError.self) {
+                try TaskSolution.DatabaseRepository.delete(model: solution, by: user, on: conn).wait()
+            }
+            throwsError(of: Abort.self) {
+                try TaskSolution.DatabaseRepository.delete(model: solution, by: nil, on: conn).wait()
+            }
+        }
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
         ("testCreateTaskWithXSS", testCreateTaskWithXSS),
@@ -240,5 +259,6 @@ Dette er flere linjer
         ("testApproveSolution", testApproveSolution),
         ("testApproveSolutionUnauthorized", testApproveSolutionUnauthorized),
         ("testCreateMultipleLineSolution", testCreateMultipleLineSolution),
+        ("testDeleteSolution", testDeleteSolution)
     ]
 }

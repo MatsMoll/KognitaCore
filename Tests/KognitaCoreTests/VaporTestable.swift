@@ -48,9 +48,10 @@ class VaporTestCase: XCTestCase {
         }
     }
 
-    func throwsError<T: Error>(of type: T.Type, line: UInt = #line, file: StaticString = #file, test: (() throws -> Void)) {
+    func throwsError<T: Error>(of type: T.Type, line: UInt = #line, file: StaticString = #file, test: () throws -> Void) {
         do {
             try test()
+            XCTFail("Did not throw an error", file: file, line: line)
         } catch let error {
             switch error {
             case is T: return

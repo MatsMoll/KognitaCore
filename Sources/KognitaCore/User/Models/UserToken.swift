@@ -10,6 +10,8 @@ extension User {
 extension User.Login {
     public final class Token: PostgreSQLModel {
 
+        public typealias Database = PostgreSQLDatabase
+
         public static var entity: String = "User.Login.Token"
         public static var name: String = "User.Login.Token"
 
