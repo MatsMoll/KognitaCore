@@ -64,6 +64,28 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testCreateTaskWithEmptySolution() {
+        failableTest {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "Test",
+                question: "Some question",
+                solution: "",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let createData = Task.Create.Data(
+                content: xssData,
+                subtopicID: xssData.subtopicId,
+                solution: xssData.solution
+            )
+            XCTAssertThrowsError(try Task.Repository.create(from: createData, by: user, on: conn).wait())
+        }
+    }
+
     func testCreateMultipleLineSolution() {
         failableTest {
             let subtopic = try Subtopic.create(on: conn)
@@ -251,6 +273,7 @@ Dette er flere linjer
 
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
+        ("testCreateTaskWithEmptySolution", testCreateTaskWithEmptySolution),
         ("testCreateTaskWithXSS", testCreateTaskWithXSS),
         ("testUpdateTaskXSS", testUpdateTaskXSS),
         ("testUpdateSolutionXSS", testUpdateSolutionXSS),
