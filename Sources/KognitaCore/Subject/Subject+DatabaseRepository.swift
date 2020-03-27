@@ -342,8 +342,6 @@ extension Subject.DatabaseRepository {
     struct CompendiumData: Decodable {
         let question: String
         let solution: String
-        let subjectName: String
-        let subjectID: Subject.ID
         let topicName: String
         let topicChapter: Int
         let topicID: Topic.ID
@@ -351,73 +349,77 @@ extension Subject.DatabaseRepository {
         let subtopicID: Subtopic.ID
     }
 
-    public static func compendium(for subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
+    public static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
 
         return conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
+            .flatMap { conn in
 
-                psqlConn.select()
-                    .column(\Task.question)
-                    .column(\TaskSolution.solution)
-                    .column(\Subject.name,  as: "subjectName")
-                    .column(\Subject.id,    as: "subjectID")
-                    .column(\Topic.name,    as: "topicName")
-                    .column(\Topic.id,      as: "topicID")
-                    .column(\Topic.chapter, as: "topicChapter")
-                    .column(\Subtopic.name, as: "subtopicName")
-                    .column(\Subtopic.id,   as: "subtopicID")
-                    .from(Task.self)
-                    .join(\Task.subtopicID,     to: \Subtopic.id)
-                    .join(\Subtopic.topicId,    to: \Topic.id)
-                    .join(\Topic.subjectId,     to: \Subject.id)
-                    .join(\Task.id,             to: \FlashCardTask.id) // Only flash card tasks
-                    .join(\Task.id,             to: \TaskSolution.taskID)
-                    .where(\Task.description == nil)
-                    .where(\Task.deletedAt == nil)
-                    .where(\Subject.id == subjectID)
-                    .all(decoding: CompendiumData.self)
-                    .map { data in
+                Subject.find(subjectID, on: conn)
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { subject in
 
-                        guard let subjectName = data.first?.subjectName else {
-                            throw Abort(.badRequest)
+                        var query = conn.select()
+                            .column(\Task.question)
+                            .column(\TaskSolution.solution)
+                            .column(\Topic.name,    as: "topicName")
+                            .column(\Topic.id,      as: "topicID")
+                            .column(\Topic.chapter, as: "topicChapter")
+                            .column(\Subtopic.name, as: "subtopicName")
+                            .column(\Subtopic.id,   as: "subtopicID")
+                            .from(Task.self)
+                            .join(\Task.subtopicID,     to: \Subtopic.id)
+                            .join(\Subtopic.topicId,    to: \Topic.id)
+                            .join(\Task.id,             to: \FlashCardTask.id) // Only flash card tasks
+                            .join(\Task.id,             to: \TaskSolution.taskID)
+                            .where(\Task.description == nil)
+                            .where(\Task.deletedAt == nil)
+                            .where(\Topic.subjectId == subjectID)
+
+                        if let subtopicIDs = filter.subtopicIDs {
+                            query = query.where(\Subtopic.id, .in, Array(subtopicIDs))
                         }
 
-                        return Subject.Compendium(
-                            subjectID: subjectID,
-                            subjectName: subjectName,
-                            topics: data.group(by: \.topicID)
-                                .map { _, topicData in
+                        return query
+                            .all(decoding: CompendiumData.self)
+                            .map { data in
 
-                                    Subject.Compendium.TopicData(
-                                        name: topicData.first!.topicName,
-                                        chapter: topicData.first!.topicChapter,
-                                        subtopics: topicData.group(by: \.subtopicID)
-                                            .map { subtopicID, questions in
+                                Subject.Compendium(
+                                    subjectID: subjectID,
+                                    subjectName: subject.name,
+                                    topics: data.group(by: \.topicID)
+                                        .map { _, topicData in
 
-                                                Subject.Compendium.SubtopicData(
-                                                    subjectID: subjectID,
-                                                    subtopicID: subtopicID,
-                                                    name: questions.first!.subtopicName,
-                                                    questions: questions.map { question in
-                                                        
-                                                        Subject.Compendium.QuestionData(
-                                                            question: question.question,
-                                                            solution: question.solution
+                                            Subject.Compendium.TopicData(
+                                                name: topicData.first!.topicName,
+                                                chapter: topicData.first!.topicChapter,
+                                                subtopics: topicData.group(by: \.subtopicID)
+                                                    .map { subtopicID, questions in
+
+                                                        Subject.Compendium.SubtopicData(
+                                                            subjectID: subjectID,
+                                                            subtopicID: subtopicID,
+                                                            name: questions.first!.subtopicName,
+                                                            questions: questions.map { question in
+
+                                                                Subject.Compendium.QuestionData(
+                                                                    question: question.question,
+                                                                    solution: question.solution
+                                                                )
+                                                            }
                                                         )
-                                                    }
-                                                )
-                                        }
-                                    )
-                            }
-                            .sorted(by: { $0.chapter < $1.chapter })
-                        )
+                                                }
+                                            )
+                                    }
+                                    .sorted(by: { $0.chapter < $1.chapter })
+                                )
+                        }
                 }
         }
     }
 }
 
 extension Subject {
-    public struct Compendium: Codable {
+    public struct Compendium: Content {
 
         public struct QuestionData: Codable {
             public let question: String

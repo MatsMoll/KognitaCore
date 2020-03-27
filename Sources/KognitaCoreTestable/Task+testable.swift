@@ -13,7 +13,7 @@ extension Task {
     
     public static func create(creator:         User?           = nil,
                        subtopic:        Subtopic?       = nil,
-                       description:     String          = "Some description",
+                       description:     String?         = nil,
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,
@@ -35,7 +35,7 @@ extension Task {
     
     public static func create(creator:       User,
                        subtopicId:      Subtopic.ID,
-                       description:     String          = "Some description",
+                       description:     String?         = nil,
                        question:        String          = "Some question",
                        explenation:     String          = "Some explenation",
                        createSolution:  Bool            = true,

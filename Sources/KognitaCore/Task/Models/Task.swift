@@ -86,8 +86,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
     init(
         content: TaskCreationContentable,
         subtopicID: Subtopic.ID,
-        creator: User,
-        canAnswer: Bool = true
+        creator: User
     ) throws {
         self.subtopicID     = subtopicID
         self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
@@ -96,6 +95,9 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         self.creatorID      = try creator.requireID()
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
+        if description?.isEmpty == true {
+            self.description = nil
+        }
     }
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

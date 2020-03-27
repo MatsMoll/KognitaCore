@@ -64,6 +64,28 @@ class TaskTests: VaporTestCase {
         }
     }
 
+    func testCreateTaskWithEmptySolution() {
+        failableTest {
+            let subtopic = try Subtopic.create(on: conn)
+            let user = try User.create(on: conn)
+            let xssData = try FlashCardTask.Create.Data(
+                subtopicId: subtopic.requireID(),
+                description: "Test",
+                question: "Some question",
+                solution: "",
+                isTestable: false,
+                examPaperSemester: nil,
+                examPaperYear: nil
+            )
+            let createData = Task.Create.Data(
+                content: xssData,
+                subtopicID: xssData.subtopicId,
+                solution: xssData.solution
+            )
+            XCTAssertThrowsError(try Task.Repository.create(from: createData, by: user, on: conn).wait())
+        }
+    }
+
     func testCreateMultipleLineSolution() {
         failableTest {
             let subtopic = try Subtopic.create(on: conn)
@@ -230,8 +252,28 @@ Dette er flere linjer
         }
     }
 
+    func testDeleteSolution() {
+        failableTest {
+            let user = try User.create(on: conn)
+            let task = try Task.create(on: conn)
+
+            let solutions = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).all().wait()
+
+            XCTAssertEqual(solutions.count, 1)
+            let solution = try XCTUnwrap(solutions.first)
+
+            throwsError(of: TaskSolutionRepositoryError.self) {
+                try TaskSolution.DatabaseRepository.delete(model: solution, by: user, on: conn).wait()
+            }
+            throwsError(of: Abort.self) {
+                try TaskSolution.DatabaseRepository.delete(model: solution, by: nil, on: conn).wait()
+            }
+        }
+    }
+
     static var allTests = [
         ("testTasksInSubject", testTasksInSubject),
+        ("testCreateTaskWithEmptySolution", testCreateTaskWithEmptySolution),
         ("testCreateTaskWithXSS", testCreateTaskWithXSS),
         ("testUpdateTaskXSS", testUpdateTaskXSS),
         ("testUpdateSolutionXSS", testUpdateSolutionXSS),
@@ -240,5 +282,6 @@ Dette er flere linjer
         ("testApproveSolution", testApproveSolution),
         ("testApproveSolutionUnauthorized", testApproveSolutionUnauthorized),
         ("testCreateMultipleLineSolution", testCreateMultipleLineSolution),
+        ("testDeleteSolution", testDeleteSolution)
     ]
 }

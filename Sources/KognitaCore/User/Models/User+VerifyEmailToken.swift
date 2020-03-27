@@ -11,6 +11,8 @@ extension User {
     public enum VerifyEmail {
         public final class Token: PostgreSQLModel {
 
+            public typealias Database = PostgreSQLDatabase
+
             public static var entity: String = "User.VerifyEmail.Token"
             public static var name: String = "User.VerifyEmail.Token"
 

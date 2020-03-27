@@ -21,6 +21,8 @@ public protocol TaskSubmitResultable {
 /// A Result from a executed task
 public final class TaskResult: PostgreSQLModel, Codable {
 
+    public typealias Database = PostgreSQLDatabase
+
     public static var createdAtKey: TimestampKey? = \.createdAt
 
     public var id: Int?

@@ -19,7 +19,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
         let taskData = try MultipleChoiseTask.Create.Data(
             subtopicId: subtopic.requireID(),
-            description: nil,
+            description: "",
             question: "Some question",
             solution: "Some solution",
             isMultipleSelect: false,
@@ -46,6 +46,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertNotNil(multiple.createdAt)
         XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
         XCTAssertEqual(content.task.subtopicID, subtopic.id)
+        XCTAssertEqual(content.task.description, nil)
         XCTAssertEqual(content.task.question, taskData.question)
         XCTAssertEqual(solution.first?.solution, taskData.solution)
         XCTAssertEqual(solution.first?.approvedBy, user.username)

@@ -21,9 +21,7 @@ extension FlashCardTask {
         return try create(task: usedTask, on: conn)
     }
     
-    public static func create(task:                Task,
-                       on conn:             PostgreSQLConnection) throws -> FlashCardTask {
-        
+    public static func create(task: Task, on conn: PostgreSQLConnection) throws -> FlashCardTask {
         return try FlashCardTask(task: task)
             .create(on: conn)
             .wait()
