@@ -3,6 +3,8 @@ import Vapor
 
 public final class TaskSession: PostgreSQLModel, Migration {
 
+    public typealias Database = PostgreSQLDatabase
+
     public var createdAt: Date?
 
     public var id: Int?

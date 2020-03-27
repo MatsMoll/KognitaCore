@@ -1,6 +1,22 @@
 import Vapor
 import FluentPostgreSQL
 
+enum TaskSolutionRepositoryError: String, Debuggable {
+
+    var identifier: String {
+        return "TaskSolutionRepositoryError.\(self.rawValue)"
+    }
+
+    var reason: String {
+        switch self {
+        case .toFewSolutions: return "There are to few solutions"
+        }
+    }
+
+    case toFewSolutions
+}
+
+
 extension TaskSolution {
 
     public final class DatabaseRepository: TaskSolutionRepositoring {
@@ -119,12 +135,21 @@ extension TaskSolution {
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
-            if try model.creatorID == user.requireID() {
-                return model.delete(on: conn)
-            } else {
-                return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
-                    model.delete(on: conn)
-                }
+
+            return TaskSolution.query(on: conn)
+                .filter(\.taskID == model.taskID)
+                .count()
+                .flatMap { numberOfSolutions in
+
+                    guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
+
+                    if try model.creatorID == user.requireID() {
+                        return model.delete(on: conn)
+                    } else {
+                        return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
+                            model.delete(on: conn)
+                        }
+                    }
             }
         }
 

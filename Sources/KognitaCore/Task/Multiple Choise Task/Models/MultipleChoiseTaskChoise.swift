@@ -10,6 +10,8 @@ import FluentPostgreSQL
 
 public final class MultipleChoiseTaskChoise: PostgreSQLModel {
 
+    public typealias Database = PostgreSQLDatabase
+
     public var id: Int?
 
     /// The choise description

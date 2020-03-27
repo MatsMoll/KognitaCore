@@ -1,4 +1,4 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -19,16 +19,16 @@ let package = Package(
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
-        .package(url: "https://github.com/vapor/vapor.git", from: "3.3.1"),
+        .package(name: "Vapor", url: "https://github.com/vapor/vapor.git", from: "3.3.3"),
 
         // 👤 Authentication and Authorization layer for Fluent.
-        .package(url: "https://github.com/vapor/auth.git", from: "2.0.0"),
+        .package(name: "Auth", url: "https://github.com/vapor/auth.git", from: "2.0.0"),
 
         // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
-        .package(url: "https://github.com/vapor/fluent-postgresql.git", from: "1.0.0"),
+        .package(name: "FluentPostgreSQL", url: "https://github.com/vapor/fluent-postgres-driver.git", from: "1.0.0"),
 
         // SwiftSoup for HTML sanitizing
-        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.3.0"),
+        .package(name: "SwiftSoup", url: "https://github.com/scinfu/SwiftSoup.git", from: "2.3.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -36,20 +36,23 @@ let package = Package(
         .target(
             name: "KognitaCore",
             dependencies: [
-                "Authentication",
-                "FluentPostgreSQL",
-                "Vapor",
-                "SwiftSoup"
+                .product(name: "Authentication", package: "Auth"),
+                .product(name: "FluentPostgreSQL", package: "FluentPostgreSQL"),
+                .product(name: "Vapor", package: "Vapor"),
+                .product(name: "SwiftSoup", package: "SwiftSoup"),
             ]
         ),
         .target(
             name: "KognitaCoreTestable",
             dependencies: [
-                "KognitaCore"
+                .target(name: "KognitaCore")
             ]
         ),
         .testTarget(
             name: "KognitaCoreTests",
-            dependencies: ["KognitaCoreTestable"]),
+            dependencies: [
+                .target(name: "KognitaCoreTestable")
+            ]
+        ),
     ]
 )

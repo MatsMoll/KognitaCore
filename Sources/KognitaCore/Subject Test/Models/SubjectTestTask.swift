@@ -7,6 +7,8 @@ extension SubjectTest {
     public enum Pivot {
         public final class Task: PostgreSQLPivot {
 
+            public typealias Database = PostgreSQLDatabase
+
             public typealias Left = SubjectTest
             public typealias Right = KognitaCore.Task
 

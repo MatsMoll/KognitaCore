@@ -11,6 +11,8 @@ import FluentPostgreSQL
 extension PracticeSession.Pivot {
     
     public final class Task: PostgreSQLPivot {
+
+        public typealias Database = PostgreSQLDatabase
         
         public var id: Int?
 
