@@ -24,6 +24,24 @@ extension TaskDiscussion {
             }
         }
 
+        public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
+            try TaskDiscussion.query(on: conn)
+                .filter(\TaskDiscussion.userID == user.requireID())
+                .all()
+                .map { discussions in
+
+                    return discussions.map { (discussion) in
+
+                        TaskDiscussion.Details(
+                            id: discussion.id ?? 0,
+                            description: discussion.description,
+                            createdAt: discussion.createdAt,
+                            username: user.username
+                        )
+                    }
+            }
+        }
+
         public static func create(from content: TaskDiscussion.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Create.Response> {
 
             guard let user = user else {
