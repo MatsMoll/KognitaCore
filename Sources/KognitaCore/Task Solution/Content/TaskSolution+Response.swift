@@ -5,6 +5,7 @@ extension TaskSolution {
         public let id: TaskSolution.ID
         public let createdAt: Date?
         public let solution: String
+        public var creatorID: User.ID
         public var creatorUsername: String
         public let presentUser: Bool
         public let approvedBy: String?
@@ -14,6 +15,7 @@ extension TaskSolution {
         init(queryResponse: DatabaseRepository.Query.Response, numberOfVotes: Int, userHasVoted: Bool) {
             self.createdAt = queryResponse.createdAt
             self.solution = queryResponse.solution
+            self.creatorID = queryResponse.creatorID
             self.creatorUsername = queryResponse.creatorUsername ?? "Unknown"
             self.presentUser = queryResponse.presentUser
             self.approvedBy = queryResponse.approvedBy
