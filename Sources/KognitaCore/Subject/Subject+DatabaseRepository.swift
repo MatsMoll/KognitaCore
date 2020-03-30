@@ -437,8 +437,6 @@ extension Subject {
             public let name: String
             public let chapter: Int
             public let subtopics: [SubtopicData]
-
-            public var nameID: String { name.lowercased().keepCharacetrs(in: .alphanumerics) }
         }
 
         public let subjectID: Subject.ID
