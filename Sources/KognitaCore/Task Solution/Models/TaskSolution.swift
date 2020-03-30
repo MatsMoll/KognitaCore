@@ -61,6 +61,7 @@ public final class TaskSolution: KognitaPersistenceModel, Validatable {
         if let presentUser = data.presentUser {
             self.presentUser = presentUser
         }
+        try validate()
     }
 
     public func approve(by user: User) throws -> TaskSolution {
