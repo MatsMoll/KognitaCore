@@ -6,11 +6,6 @@ extension TaskSession {
 
     public struct HistoryList: Content {
 
-        public struct PracticeSessionContent: Content {
-            public let session: PracticeSession
-            public let subject: Subject
-        }
-
         public let testSessions: [TestSession.HighOverview]
         public let practiceSessions: [PracticeSession.HighOverview]
 
@@ -36,6 +31,7 @@ extension PracticeSession {
 
         public let id: TaskSession.ID
         public let createdAt: Date
+        public let endedAt: Date
         public let subjectName: String
         public let subjectID: Subject.ID
     }
