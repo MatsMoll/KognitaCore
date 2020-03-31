@@ -9,27 +9,31 @@ import Vapor
 import FluentPostgreSQL
 
 extension PracticeSession {
-    public class Pivot {
-        public final class Subtopic: PostgreSQLPivot {
+    public enum Pivot {}
+}
 
-            public typealias Left = PracticeSession
-            public typealias Right = KognitaCore.Subtopic
+extension PracticeSession.Pivot {
+    public final class Subtopic: PostgreSQLPivot {
 
-            public static var leftIDKey: LeftIDKey = \.sessionID
-            public static var rightIDKey: RightIDKey = \.subtopicID
+        public typealias Database = PostgreSQLDatabase
 
-            public static var createdAtKey: TimestampKey? = \.createdAt
+        public typealias Left = PracticeSession
+        public typealias Right = KognitaCore.Subtopic
 
-            public var id: Int?
-            var sessionID: PracticeSession.ID
-            var subtopicID: KognitaCore.Subtopic.ID
+        public static var leftIDKey: LeftIDKey = \.sessionID
+        public static var rightIDKey: RightIDKey = \.subtopicID
 
-            public var createdAt: Date?
+        public static var createdAtKey: TimestampKey? = \.createdAt
 
-            init(subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession) throws {
-                self.sessionID = try session.requireID()
-                self.subtopicID = subtopicID
-            }
+        public var id: Int?
+        public var sessionID: PracticeSession.ID
+        public var subtopicID: KognitaCore.Subtopic.ID
+
+        public var createdAt: Date?
+
+        init(subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession) throws {
+            self.sessionID = try session.requireID()
+            self.subtopicID = subtopicID
         }
     }
 }
@@ -44,17 +48,17 @@ extension PracticeSession.Pivot.Subtopic {
 
 extension PracticeSession.Pivot.Subtopic: Migration {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.create(PracticeSession.Pivot.Subtopic.self, on: conn) { builder in
             try addProperties(to: builder)
             builder.unique(on: \.sessionID, \.subtopicID)
-            
+
             builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
+    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.delete(PracticeSession.Pivot.Subtopic.self, on: connection)
     }
 }

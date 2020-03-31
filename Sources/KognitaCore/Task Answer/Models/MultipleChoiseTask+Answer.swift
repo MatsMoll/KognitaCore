@@ -11,6 +11,8 @@ import FluentPostgreSQL
 /// A submittet choise in a task
 public final class MultipleChoiseTaskAnswer: PostgreSQLModel, Codable {
 
+    public typealias Database = PostgreSQLDatabase
+
     public var id: Int?
 
     public var choiseID: MultipleChoiseTaskChoise.ID

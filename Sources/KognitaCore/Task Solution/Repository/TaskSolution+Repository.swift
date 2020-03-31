@@ -1,6 +1,22 @@
 import Vapor
 import FluentPostgreSQL
 
+enum TaskSolutionRepositoryError: String, Debuggable {
+
+    var identifier: String {
+        return "TaskSolutionRepositoryError.\(self.rawValue)"
+    }
+
+    var reason: String {
+        switch self {
+        case .toFewSolutions: return "There are to few solutions"
+        }
+    }
+
+    case toFewSolutions
+}
+
+
 extension TaskSolution {
 
     public final class DatabaseRepository: TaskSolutionRepositoring {
@@ -15,12 +31,13 @@ extension TaskSolution {
                 public let id: TaskSolution.ID
                 public let createdAt: Date?
                 public let solution: String
+                public var creatorID: User.ID
                 public var creatorUsername: String?
                 public let presentUser: Bool
                 public let approvedBy: String?
             }
 
-            static let taskSolutionForTaskID = #"SELECT "sol"."id", "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."username" AS "creatorUsername", "approved"."username" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
+            static let taskSolutionForTaskID = #"SELECT "sol"."id", "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."id" AS "creatorID", "creator"."username" AS "creatorUsername", "approved"."username" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
         }
 
         public static func create(from content: TaskSolution.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Create.Response> {
@@ -119,12 +136,21 @@ extension TaskSolution {
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
-            if try model.creatorID == user.requireID() {
-                return model.delete(on: conn)
-            } else {
-                return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
-                    model.delete(on: conn)
-                }
+
+            return TaskSolution.query(on: conn)
+                .filter(\.taskID == model.taskID)
+                .count()
+                .flatMap { numberOfSolutions in
+
+                    guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
+
+                    if try model.creatorID == user.requireID() {
+                        return model.delete(on: conn)
+                    } else {
+                        return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
+                            model.delete(on: conn)
+                        }
+                    }
             }
         }
 

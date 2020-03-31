@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 /// One solution to a `Task`
-public final class TaskSolution: KognitaPersistenceModel {
+public final class TaskSolution: KognitaPersistenceModel, Validatable {
 
     public var id: Int?
 
@@ -36,6 +36,7 @@ public final class TaskSolution: KognitaPersistenceModel {
         self.creatorID = creatorID
         self.isApproved = false
         self.approvedBy = nil
+        try validate()
     }
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
@@ -60,6 +61,7 @@ public final class TaskSolution: KognitaPersistenceModel {
         if let presentUser = data.presentUser {
             self.presentUser = presentUser
         }
+        try validate()
     }
 
     public func approve(by user: User) throws -> TaskSolution {
@@ -69,6 +71,14 @@ public final class TaskSolution: KognitaPersistenceModel {
         approvedBy = try user.requireID()
         isApproved = true
         return self
+    }
+
+    public static func validations() throws -> Validations<TaskSolution> {
+        var validator = Validations(TaskSolution.self)
+        try validator.add(\.solution, .count(3...))
+        try validator.add(\.creatorID, .range(1...))
+        try validator.add(\.taskID, .range(1...))
+        return validator
     }
 }
 
