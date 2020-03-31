@@ -433,6 +433,7 @@ extension PracticeSession.DatabaseRepository {
             .unwrap(or: Abort(.badRequest))
             .flatMap { (result: TaskResult) in
                 result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
+                result.isSetManually = true
                 return result.save(on: conn)
                     .transform(to: ())
         }
