@@ -44,6 +44,9 @@ public final class TaskResult: PostgreSQLModel, Codable {
 
     public var sessionID: TaskSession.ID?
 
+    /// If the result value is set manually
+    public var isSetManually: Bool
+
 
     init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.ID? = nil) {
         self.taskID = result.taskID
@@ -51,6 +54,7 @@ public final class TaskResult: PostgreSQLModel, Codable {
         self.timeUsed = result.timeUsed
         self.resultScore = result.score.clamped(to: 0...1)
         self.sessionID = sessionID
+        self.isSetManually = false
 
         let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: resultScore)
         let interval = Double(numberOfDays) * 60 * 60 * 24
@@ -105,5 +109,22 @@ struct TaskResultUniqueMigration: PostgreSQLMigration {
     }
     static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return conn.future()
+    }
+}
+
+extension TaskResult {
+    struct IsSetManuallyMigration: PostgreSQLMigration {
+
+        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
+                builder.field(for: \.isSetManually, type: .bool, .default(.literal(.boolean(.false))))
+            }
+        }
+
+        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
+                builder.deleteField(for: \.isSetManually)
+            }
+        }
     }
 }

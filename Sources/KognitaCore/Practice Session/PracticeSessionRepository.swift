@@ -433,6 +433,7 @@ extension PracticeSession.DatabaseRepository {
             .unwrap(or: Abort(.badRequest))
             .flatMap { (result: TaskResult) in
                 result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
+                result.isSetManually = true
                 return result.save(on: conn)
                     .transform(to: ())
         }
@@ -545,6 +546,7 @@ extension PracticeSession.DatabaseRepository {
                     .column(\TaskResult.resultScore,            as: "score")
                     .column(\TaskResult.timeUsed,               as: "timeUsed")
                     .column(\TaskResult.revisitDate,            as: "revisitDate")
+                    .column(\TaskResult.isSetManually,          as: "isSetManually")
                     .from(PracticeSession.Pivot.Task.self)
                     .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
                     .join(\Task.subtopicID, to: \Subtopic.id)
