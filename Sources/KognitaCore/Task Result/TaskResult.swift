@@ -117,7 +117,7 @@ extension TaskResult {
 
         static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
             PostgreSQLDatabase.update(TaskResult.self, on: conn) { builder in
-                builder.field(for: \.isSetManually, type: .bool, .default(.value(false)))
+                builder.field(for: \.isSetManually, type: .bool, .default(.literal(.boolean(.false))))
             }
         }
 

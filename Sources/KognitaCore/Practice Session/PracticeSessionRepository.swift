@@ -546,6 +546,7 @@ extension PracticeSession.DatabaseRepository {
                     .column(\TaskResult.resultScore,            as: "score")
                     .column(\TaskResult.timeUsed,               as: "timeUsed")
                     .column(\TaskResult.revisitDate,            as: "revisitDate")
+                    .column(\TaskResult.isSetManually,          as: "isSetManually")
                     .from(PracticeSession.Pivot.Task.self)
                     .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
                     .join(\Task.subtopicID, to: \Subtopic.id)
