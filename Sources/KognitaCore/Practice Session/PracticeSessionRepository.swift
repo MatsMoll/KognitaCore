@@ -614,6 +614,7 @@ extension PracticeSession.DatabaseRepository {
                     .column(\Subject.id,                as: "subjectID")
                     .column(\PracticeSession.id,        as: "id")
                     .column(\PracticeSession.createdAt, as: "createdAt")
+                    .column(\PracticeSession.endedAt,   as: "endedAt")
                     .from(PracticeSession.self)
                     .join(\PracticeSession.id,      to: \TaskSession.id)
                     .join(\PracticeSession.id,      to: \PracticeSession.Pivot.Subtopic.sessionID)

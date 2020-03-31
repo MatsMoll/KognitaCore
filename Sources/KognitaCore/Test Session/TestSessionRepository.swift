@@ -6,6 +6,7 @@ public protocol TestSessionRepresentable {
     var userID: User.ID { get }
     var testID: SubjectTest.ID { get }
     var submittedAt: Date? { get }
+    var executedAt: Date? { get }
     var hasSubmitted: Bool { get }
 
     func requireID() throws -> Int
@@ -349,22 +350,26 @@ extension TestSession {
         }
 
 
-        public static func results(in test: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
+        public static func results(in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
 
-            guard try test.userID == user.requireID() else {
+            guard try session.userID == user.requireID() else {
                 throw Abort(.forbidden)
             }
 
             return try TestSession.query(on: conn)
                 .join(\SubjectTest.id, to: \TestSession.testID)
                 .join(\TaskResult.sessionID, to: \TestSession.id)
-                .filter(\TestSession.id == test.requireID())
+                .filter(\TestSession.id == session.requireID())
                 .decode(SubjectTest.self)
                 .alsoDecode(TaskResult.self)
                 .all()
                 .flatMap { results in
 
-                    guard let test = results.first?.0 else {
+                    guard
+                        let test = results.first?.0,
+                        let endedAt = session.submittedAt,
+                        let startedAt = session.executedAt
+                    else {
                         throw Abort(.internalServerError)
                     }
 
@@ -396,8 +401,9 @@ extension TestSession {
                             .map { canPractice in
                                 Results(
                                     testTitle: test.title,
+                                    endedAt: endedAt,
                                     testIsOpen: test.isOpen,
-                                    executedAt: test.scheduledAt, // FIXME: - Set a correct executedAt date
+                                    executedAt: startedAt,
                                     shouldPresentDetails: test.isTeamBasedLearning == false,
                                     subjectID: subjectID,
                                     canPractice: canPractice,
@@ -436,11 +442,12 @@ extension TestSession {
                 .flatMap { conn in
 
                     return try conn.select()
-                        .column(\Subject.name,          as: "subjectName")
-                        .column(\Subject.id,            as: "subjectID")
-                        .column(\TestSession.id,        as: "id")
-                        .column(\TestSession.createdAt, as: "createdAt")
-                        .column(\SubjectTest.title,     as: "testTitle")
+                        .column(\Subject.name,              as: "subjectName")
+                        .column(\Subject.id,                as: "subjectID")
+                        .column(\TestSession.id,            as: "id")
+                        .column(\TestSession.createdAt,     as: "createdAt")
+                        .column(\TestSession.submittedAt,   as: "endedAt")
+                        .column(\SubjectTest.title,         as: "testTitle")
                         .from(TestSession.self)
                         .join(\TestSession.id,          to: \TaskSession.id)
                         .join(\TestSession.testID,      to: \SubjectTest.id)
