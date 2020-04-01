@@ -25,10 +25,14 @@ extension TaskDiscussion {
         }
 
         public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
+
             try TaskDiscussion.query(on: conn)
                 .filter(\TaskDiscussion.userID == user.requireID())
+                .join(\TaskDiscussion.Pivot.Response.discussionID, to: \TaskDiscussion.id)
+                .sort(\TaskDiscussion.Pivot.Response.createdAt, .descending)
                 .all()
                 .map { discussions in
+
 
                     return discussions.map { (discussion) in
 
@@ -38,9 +42,10 @@ extension TaskDiscussion {
                             createdAt: discussion.createdAt,
                             username: user.username
                         )
-                    }
+                    }.removingDuplicates()
             }
         }
+
 
         public static func create(from content: TaskDiscussion.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Create.Response> {
 
