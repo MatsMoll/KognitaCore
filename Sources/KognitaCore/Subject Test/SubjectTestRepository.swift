@@ -692,5 +692,109 @@ extension SubjectTest {
                 .unwrap(or: Abort(.badRequest))
                 .map { $0.isOpen }
         }
+
+        public static func stats(for subject: Subject, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest.DetailedResult]> {
+            return try SubjectTest.query(on: conn)
+                .filter(\.subjectID == subject.requireID())
+                .filter(\.endedAt != nil)
+                .sort(\.openedAt, .ascending)
+                .all()
+                .flatMap { tests in
+
+                    var lastTest: SubjectTest? = nil
+
+                    return try tests.map { test in
+                        defer { lastTest = test }
+                        return try results(for: test, lastTest: lastTest, on: conn)
+                    }
+                    .flatten(on: conn)
+            }
+        }
+
+
+        static func results(for test: SubjectTest, lastTest: SubjectTest? = nil, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.DetailedResult> {
+
+            try SubjectTest.Pivot.Task.query(on: conn)
+                .filter(\.testID == test.requireID())
+                .count()
+                .flatMap { numberOfTasks in
+
+                    try TestSession.query(on: conn)
+                        .join(\TaskResult.sessionID, to: \TestSession.id)
+                        .filter(\.testID == test.requireID())
+                        .decode(TaskResult.self)
+                        .all()
+                        .flatMap { testResults in
+
+                            guard let endedAt = test.endedAt else { throw Abort(.badRequest) }
+
+                            var query = PracticeSession.Pivot.Task.query(on: conn, withSoftDeleted: true)
+                                .join(\TaskResult.sessionID,    to: \PracticeSession.Pivot.Task.sessionID)
+                                .join(\Task.id,                 to: \TaskResult.taskID)
+                                .join(\Subtopic.id,             to: \Task.subtopicID)
+                                .join(\Topic.id,                to: \Subtopic.topicId)
+                                .filter(\PracticeSession.Pivot.Task.isCompleted == true)
+                                .filter(\Topic.subjectId == test.subjectID)
+                                .filter(\PracticeSession.Pivot.Task.createdAt < endedAt)
+                                .decode(TaskResult.self)
+
+                            if let lastTest = lastTest, let lastEndedAt = lastTest.endedAt {
+                                query = query.filter(\PracticeSession.Pivot.Task.createdAt > lastEndedAt)
+                            }
+
+                            return query.all()
+                                .map { practiceResults in
+                                    DetailedResult(
+                                        testID: test.id ?? 0,
+                                        testTitle: test.title,
+                                        maxScore: Double(numberOfTasks),
+                                        results: calculateStats(testResults: testResults, practiceResults: practiceResults)
+                                    )
+                            }
+                    }
+            }
+        }
+
+        static func calculateStats(testResults: [TaskResult], practiceResults: [TaskResult]) -> [SubjectTest.UserStats] {
+
+            let groupedTestResults = testResults.group(by: \.userID.unsafelyUnwrapped)
+            let groupedPracticeResults = practiceResults.group(by: \.userID.unsafelyUnwrapped)
+                .mapValues { results in results.sorted(by: \TaskResult.timeUsed.unsafelyUnwrapped) }
+
+            let testScores = groupedTestResults.mapValues { $0.reduce(0) { $0 + $1.resultScore } }
+            let timePracticed = groupedPracticeResults.mapValues { $0.reduce(0) { $0 + ($1.timeUsed ?? 0) } }
+            let medianTime: [User.ID : TimeInterval] = groupedPracticeResults.mapValues { results in
+                if results.count % 2 == 1 {
+                    return results[(results.count - 1)/2].timeUsed ?? 0
+                } else {
+                    return ((results[(results.count)/2].timeUsed ?? 0) + (results[(results.count)/2 + 1].timeUsed ?? 0)) / 2
+                }
+            }
+
+            return testScores.map { userID, testScore in
+
+                SubjectTest.UserStats(
+                    timePracticed: timePracticed[userID] ?? 0,
+                    medianTimePerTask: medianTime[userID] ?? 0,
+                    numberOfTaskExecuted: (groupedPracticeResults[userID] ?? []).count,
+                    testScore: testScore,
+                    userID: userID
+                )
+            }
+        }
+    }
+}
+
+
+
+enum SortDirection {
+    case acending
+    case decending
+}
+
+extension Array {
+    func sorted<T: Comparable>(by keyPath: KeyPath<Element, T>, direction: SortDirection = .acending) -> [Element] {
+        let sortFunction: (Element, Element) -> Bool = direction == .acending ? { $0[keyPath: keyPath] > $1[keyPath: keyPath] } : { $0[keyPath: keyPath] < $1[keyPath: keyPath] }
+        return sorted(by: sortFunction)
     }
 }
