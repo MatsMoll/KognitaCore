@@ -45,6 +45,15 @@ extension Subject.DatabaseRepository {
                     .transform(to: subject)
         }
     }
+    
+    public static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+        Topic.query(on: conn)
+            .filter(\.id == topicID)
+            .join(\Subject.id, to: \Topic.subjectId)
+            .decode(Subject.self)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+    }
 
     public static func getSubjectWith(id: Subject.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
         return Subject
