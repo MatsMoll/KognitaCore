@@ -26,23 +26,42 @@ extension TaskDiscussion {
 
         public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
 
-            try TaskDiscussion.query(on: conn)
-                .filter(\TaskDiscussion.userID == user.requireID())
-                .join(\TaskDiscussion.Pivot.Response.discussionID, to: \TaskDiscussion.id)
-                .sort(\TaskDiscussion.Pivot.Response.createdAt, .descending)
-                .all()
-                .map { discussions in
+            user.viewedNotificationsAt = Date()
 
+            return user.save(on: conn)
+                .flatMap { _ in
+                    try TaskDiscussion.query(on: conn)
+                        .filter(\TaskDiscussion.userID == user.requireID())
+                        .join(\TaskDiscussion.Pivot.Response.discussionID, to: \TaskDiscussion.id)
+                        .sort(\TaskDiscussion.Pivot.Response.createdAt, .descending)
+                        .all()
+                        .map { discussions in
 
-                    return discussions.map { (discussion) in
+                            return discussions.map { (discussion) in
 
-                        TaskDiscussion.Details(
-                            id: discussion.id ?? 0,
-                            description: discussion.description,
-                            createdAt: discussion.createdAt,
-                            username: user.username
-                        )
-                    }.removingDuplicates()
+                                TaskDiscussion.Details(
+                                    id: discussion.id ?? 0,
+                                    description: discussion.description,
+                                    createdAt: discussion.createdAt,
+                                    username: user.username
+                                )
+                            }.removingDuplicates()
+                    }
+            }
+        }
+
+        public static func setRecentlyVisited(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Bool> {
+
+            var query = try TaskDiscussion.Pivot.Response.query(on: conn)
+                .filter(\.userID == user.requireID())
+
+            if let recentlyVisited = user.viewedNotificationsAt {
+                query = query.filter(\.createdAt > recentlyVisited)
+            }
+
+            return query.count()
+                .map { numberOfResponses in
+                    numberOfResponses > 0
             }
         }
 
