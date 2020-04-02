@@ -5,7 +5,7 @@ extension Subject {
         public let name: String
         public let colorClass: ColorClass
 
-        init(subject: Subject) {
+        public init(subject: Subject) {
             self.id = subject.id ?? 0
             self.name = subject.name
             self.colorClass = subject.colorClass
