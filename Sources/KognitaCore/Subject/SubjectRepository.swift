@@ -40,7 +40,7 @@ extension Subject {
     public enum Create {
         public struct Data : Content {
             let name: String
-            let colorClass: Subject.ColorClass
+            let colorClass: Subject.ColorClass = .primary
             let description: String
             let category: String
         }
