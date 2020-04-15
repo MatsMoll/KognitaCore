@@ -3,7 +3,7 @@ import FluentPostgreSQL
 
 extension TaskDiscussion {
     public class DatabaseRepository: TaskDiscussionRepositoring {
-
+        
         public static func getDiscussions(in taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
             TaskDiscussion.query(on: conn)
                 .filter(\TaskDiscussion.taskID == taskID)
@@ -11,42 +11,39 @@ extension TaskDiscussion {
                 .alsoDecode(User.self)
                 .all()
                 .map { discussions in
-
+                    
                     return discussions.map { (discussion, user) in
-
+                        
                         TaskDiscussion.Details(
                             id: discussion.id ?? 0,
                             description: discussion.description,
                             createdAt: discussion.createdAt,
-                            username: user.username
+                            username: user.username,
+                            newestResponseCreatedAt: .now
                         )
                     }
             }
         }
-
+        
         public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
+            return conn.databaseConnection(to: .psql)
+                .flatMap { psqlConn in
+                    try psqlConn.select()
+                        .all(table: TaskDiscussion.self)
+                        .column(\User.username)
+                        .column(\TaskDiscussion.Pivot.Response.createdAt, as: "newestResponseCreatedAt")
+                        .from(TaskDiscussion.self)
+                        .join(\TaskDiscussion.id, to: \TaskDiscussion.Pivot.Response.discussionID)
+                        .join(\TaskDiscussion.userID, to: \User.id)
+                        .where(\TaskDiscussion.userID == user.requireID())
+                        .orderBy(\TaskDiscussion.Pivot.Response.createdAt, .descending)
+                        .all(decoding: TaskDiscussion.Details.self)
+                        .map {  discussions in
 
-            user.viewedNotificationsAt = Date()
+                            discussions.removingDuplicates()
 
-            return user.save(on: conn)
-                .flatMap { _ in
-                    try TaskDiscussion.query(on: conn)
-                        .filter(\TaskDiscussion.userID == user.requireID())
-                        .join(\TaskDiscussion.Pivot.Response.discussionID, to: \TaskDiscussion.id)
-                        .sort(\TaskDiscussion.Pivot.Response.createdAt, .descending)
-                        .all()
-                        .map { discussions in
-
-                            return discussions.map { (discussion) in
-
-                                TaskDiscussion.Details(
-                                    id: discussion.id ?? 0,
-                                    description: discussion.description,
-                                    createdAt: discussion.createdAt,
-                                    username: user.username
-                                )
-                            }.removingDuplicates()
                     }
+
             }
         }
 
@@ -61,10 +58,17 @@ extension TaskDiscussion {
 
             return query.count()
                 .map { numberOfResponses in
-                    numberOfResponses > 0
+                    return numberOfResponses > 0
             }
         }
 
+        public static func getLastResponse(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Pivot.Response?> {
+
+            try TaskDiscussion.Pivot.Response.query(on: conn)
+                .filter(\.userID == user.requireID())
+                .sort(\.createdAt, .descending)
+                .first()
+        }
 
         public static func create(from content: TaskDiscussion.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Create.Response> {
 
@@ -94,22 +98,30 @@ extension TaskDiscussion {
                 .transform(to: ())
         }
 
-        public static func responses(to discussionID: TaskDiscussion.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Pivot.Response.Details]> {
+        public static func responses(to discussionID: TaskDiscussion.ID, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Pivot.Response.Details]> {
 
-            TaskDiscussion.Pivot.Response.query(on: conn)
-                .filter(\TaskDiscussion.Pivot.Response.discussionID == discussionID)
-                .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
-                .sort(\TaskDiscussion.Pivot.Response.createdAt, .ascending)
-                .alsoDecode(User.self)
-                .all()
-                .map { responses in
-                    responses.map { response, user in
-                        TaskDiscussion.Pivot.Response.Details(
-                            response: response.response,
-                            createdAt: response.createdAt,
-                            username: user.username
-                        )
-                    }
+            let oldViewedDate = user.viewedNotificationsAt
+//            user.viewedNotificationsAt = Date()
+
+            return user.save(on: conn).flatMap { _ in
+                TaskDiscussion.Pivot.Response.query(on: conn)
+                    .filter(\TaskDiscussion.Pivot.Response.discussionID == discussionID)
+                    .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
+                    .sort(\TaskDiscussion.Pivot.Response.createdAt, .ascending)
+                    .alsoDecode(User.self)
+                    .all()
+                    .map { responses in
+                        responses.map { response, user in
+                            let isNew = response.createdAt! > oldViewedDate!
+
+                            return TaskDiscussion.Pivot.Response.Details(
+                                response: response.response,
+                                createdAt: response.createdAt,
+                                username: user.username,
+                                isNew: isNew
+                            )
+                        }
+                }
             }
         }
     }

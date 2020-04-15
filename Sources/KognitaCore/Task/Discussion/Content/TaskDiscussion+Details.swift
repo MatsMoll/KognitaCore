@@ -8,10 +8,19 @@ extension TaskDiscussion {
         public let description: String
         public let createdAt: Date?
         public let username: String
+        public let newestResponseCreatedAt: Date
     }
 }
 
-extension TaskDiscussion.Details: Hashable {}
+extension TaskDiscussion.Details: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id
+    }
+}
 
 
 extension Array where Element: Hashable {
