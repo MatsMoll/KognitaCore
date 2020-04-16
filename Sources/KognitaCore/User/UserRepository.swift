@@ -63,8 +63,8 @@ extension User.DatabaseRepository: UserRepository {
             case .passwordMismatch:                 return "Passordet må skrives likt to ganger"
             case .unauthorized:                     return "Sjekk at epost og passord stemmer"
             case .existingUser(let email):          return "Det finnes allerede en bruker med epost: \(email)"
-            case .invalidRecruterToken:             return "Ugyldig rekruterings kode"
-            case .misformed(let field, let reason): return "Ugyldig formentert \(field), fordi det \(reason)"
+            case .invalidRecruterToken:             return "Ugyldig rekrutteringskode"
+            case .misformed(let field, let reason): return "Ugyldig formatert \(field) fordi det \(reason)"
             case .invalidEmail:                     return "Ugyldig epost. Må være en NTNU-addresse"
             }
         }
