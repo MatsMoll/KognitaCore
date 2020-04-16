@@ -30,11 +30,11 @@ public struct TaskResultContent: Content {
 
     public var description: String {
         if result.resultScore < 0.2 {
-            return "Det gikk ikke så bra sist, så prøv igjen"
+            return "Det gikk ikke så bra som forrige gang, prøv igjen"
         } else if result.resultScore < 1 {
-            return "Du hadde noe peiling, kanskje det går bedre denne gangen?"
+            return "Du hadde noe riktig, kanskje det går bedre neste gang?"
         } else {
-            return "Dette gikk bra sist"
+            return "Dette gikk bra sist gang!"
         }
     }
 

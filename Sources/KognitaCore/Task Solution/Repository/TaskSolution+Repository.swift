@@ -9,7 +9,7 @@ enum TaskSolutionRepositoryError: String, Debuggable {
 
     var reason: String {
         switch self {
-        case .toFewSolutions: return "There are to few solutions"
+        case .toFewSolutions: return "There are too few solutions"
         }
     }
 

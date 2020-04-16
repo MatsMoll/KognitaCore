@@ -25,7 +25,7 @@ public final class MultipleChoiseTask: KognitaCRUDModel {
     }
 
     public var actionDescription: String {
-        return isMultipleSelect ? "Velg et eller flere alternativ" : "Velg et alternativ"
+        return isMultipleSelect ? "Velg ett eller flere alternativer" : "Velg ett alternativ"
     }
 
     public init(isMultipleSelect: Bool, taskID: Task.ID) {
