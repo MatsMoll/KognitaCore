@@ -55,6 +55,17 @@ extension Subject.DatabaseRepository {
             .unwrap(or: Abort(.badRequest))
     }
 
+    public static func subject(for session: PracticeSessionRepresentable, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+        PracticeSession.query(on: conn)
+            .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.id)
+            .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
+            .join(\Topic.id, to: \Subtopic.topicId)
+            .join(\Subject.id, to: \Topic.subjectId)
+            .decode(Subject.self)
+            .first()
+            .unwrap(or: Abort(.internalServerError))
+    }
+
     public static func getSubjectWith(id: Subject.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
         return Subject
             .find(id, on: conn)
