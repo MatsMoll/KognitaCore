@@ -7,7 +7,6 @@
 
 import Vapor
 
-
 public struct TopicResultContent: Content {
     public let results: [TaskResult]
     public let topic: Topic
@@ -51,4 +50,3 @@ public struct TaskResultContent: Content {
         return result.sessionID
     }
 }
-

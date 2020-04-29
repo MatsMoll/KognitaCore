@@ -20,8 +20,7 @@ extension UpdateModelRepository
     where
     Model: KognitaModelUpdatable,
     Model.EditData == UpdateData,
-    UpdateResponse == Model
-{
+    UpdateResponse == Model {
     public static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse> {
         try model.updateValues(with: data)
         return model.save(on: conn)

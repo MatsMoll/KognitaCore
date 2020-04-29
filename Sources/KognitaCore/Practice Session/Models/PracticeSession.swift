@@ -26,14 +26,13 @@ public final class PracticeSession: KognitaCRUDModel, SoftDeleatableModel {
 
     /// The number of task to complete in the session
     public var numberOfTaskGoal: Int
-    
+
     /// The date when the session was started
     public var createdAt: Date?
-    
+
     public var updatedAt: Date?
-    
+
     public var deletedAt: Date?
-    
 
     init(sessionID: TaskSession.ID, numberOfTaskGoal: Int) throws {
         self.id = sessionID
@@ -56,7 +55,7 @@ extension PracticeSession {
             .unwrap(or: Abort(.internalServerError))
             .map { TaskSession.PracticeParameter(session: $0, practiceSession: session) }
     }
-    
+
     func numberOfCompletedTasks(with conn: DatabaseConnectable) throws -> EventLoopFuture<Int> {
         return try assignedTasks
             .pivots(on: conn)
@@ -90,7 +89,7 @@ extension PracticeSession {
         return try DatabaseRepository
             .getCurrentTaskIndex(for: self.requireID(), on: conn)
     }
-    
+
     public func currentTask(on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
         return try DatabaseRepository
             .currentActiveTask(in: self, on: conn)
@@ -100,7 +99,7 @@ extension PracticeSession {
         return try DatabaseRepository
             .taskAt(index: index, in: requireID(), on: conn)
     }
-    
+
     public func pathFor(index: Int) throws -> String {
         return try "/practice-sessions/\(requireID())/tasks/\(index)"
     }
@@ -128,7 +127,6 @@ extension PracticeSession {
 }
 
 extension PracticeSession: Content {}
-
 
 public struct TaskType: Content {
 

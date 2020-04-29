@@ -63,41 +63,41 @@ class UserTests: VaporTestCase {
 
     func testResetPassword() throws {
         let user = try User.create(on: conn)
-        
+
         let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
-        
+
         let newPassword = "p1234"
-        
+
         XCTAssertFalse(try BCrypt.verify(newPassword, created: user.passwordHash))
-        
+
         let resetRequest = User.ResetPassword.Data(
-            password:       newPassword,
+            password: newPassword,
             verifyPassword: newPassword
         )
-        
+
         try User.ResetPassword.Token.Repository
             .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
-        
+
         let savedUser = try User.DatabaseRepository
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
-        
+
         XCTAssert(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }
-    
+
     func testResetPasswordPasswordMismatch() throws {
         let user = try User.create(on: conn)
-        
+
         let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
-        
+
         let newPassword = "p1234"
-        
+
         let resetRequest = User.ResetPassword.Data(
-            password:       newPassword,
+            password: newPassword,
             verifyPassword: "something else"
         )
-        
+
         XCTAssertThrowsError(
             try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
@@ -106,24 +106,24 @@ class UserTests: VaporTestCase {
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }
-    
+
     func testResetPasswordExpiredToken() throws {
         let user = try User.create(on: conn)
-        
+
         let tokenResponse = try User.ResetPassword.Token.Repository
             .create(by: user, on: conn).wait()
         var token = try User.ResetPassword.Token.Repository
             .first(where: \.string == tokenResponse.token, or: Abort(.internalServerError), on: conn).wait()
         token.deletedAt = Date()
         _ = try token.save(on: conn).wait()
-        
+
         let newPassword = "p1234"
-        
+
         let resetRequest = User.ResetPassword.Data(
-            password:       newPassword,
+            password: newPassword,
             verifyPassword: newPassword
         )
-        
+
         XCTAssertThrowsError(
             try User.ResetPassword.Token.Repository
                 .reset(to: resetRequest, with: tokenResponse.token, on: conn).wait()
@@ -132,7 +132,7 @@ class UserTests: VaporTestCase {
             .find(user.requireID(), or: Abort(.internalServerError), on: conn).wait()
         XCTAssertFalse(try BCrypt.verify(newPassword, created: savedUser.passwordHash))
     }
-    
+
     static let allTests = [
         ("testEmailVerificationTokenOnCreate", testEmailVerificationTokenOnCreate),
         ("testCreateUserWithInvalidEmailError", testCreateUserWithInvalidEmailError),

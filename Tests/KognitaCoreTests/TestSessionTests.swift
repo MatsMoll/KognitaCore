@@ -3,7 +3,6 @@ import Foundation
 import KognitaCoreTestable
 import XCTest
 
-
 @available(OSX 10.15, *)
 class TestSessionTests: VaporTestCase {
 
@@ -35,7 +34,6 @@ class TestSessionTests: VaporTestCase {
             try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionOne, by: userOne, on: conn).wait()
             try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionTwo, by: userTwo, on: conn).wait()
             try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-
 
             // Submitting a choise to a task that do not contain the choise
             secondIncorrectSubmittion.taskIndex = 1
@@ -164,7 +162,6 @@ class TestSessionTests: VaporTestCase {
         }
     }
 
-
     func testResultsAfterSubmittion() throws {
         do {
             let test = try setupTestWithTasks()
@@ -194,7 +191,6 @@ class TestSessionTests: VaporTestCase {
             try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
             try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
 
-
             let userOneResults = try TestSession.DatabaseRepository.results(in: sessionOne, for: userOne, on: conn).wait()
             let userTwoResults = try TestSession.DatabaseRepository.results(in: sessionTwo, for: userTwo, on: conn).wait()
 
@@ -216,7 +212,6 @@ class TestSessionTests: VaporTestCase {
             XCTFail(error.localizedDescription)
         }
     }
-
 
     func testOverview() throws {
         do {
@@ -261,8 +256,6 @@ class TestSessionTests: VaporTestCase {
         }
     }
 
-
-
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
         let choises = try choisesAt(index: index, for: test)
         return try MultipleChoiseTask.Submit(
@@ -306,12 +299,12 @@ class TestSessionTests: VaporTestCase {
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
-            tasks:          taskIds,
-            subjectID:      topic.subjectId,
-            duration:       duration,
-            scheduledAt:    scheduledAt,
-            password:       "password",
-            title:          "Testing",
+            tasks: taskIds,
+            subjectID: topic.subjectId,
+            duration: duration,
+            scheduledAt: scheduledAt,
+            password: "password",
+            title: "Testing",
             isTeamBasedLearning: false
         )
 
@@ -328,10 +321,10 @@ class TestSessionTests: VaporTestCase {
     }
 
     static let allTests = [
-        ("testUpdateAnswerInSession",                       testUpdateAnswerInSession),
-        ("testSubmittingAndUpdatingAnswerMultipleUsers",    testSubmittingAndUpdatingAnswerMultipleUsers),
-        ("testSubmittingTestSession",                       testSubmittingTestSession),
-        ("testResultsAfterSubmittion",                      testResultsAfterSubmittion),
-        ("testOverview",                                    testOverview)
+        ("testUpdateAnswerInSession", testUpdateAnswerInSession),
+        ("testSubmittingAndUpdatingAnswerMultipleUsers", testSubmittingAndUpdatingAnswerMultipleUsers),
+        ("testSubmittingTestSession", testSubmittingTestSession),
+        ("testResultsAfterSubmittion", testResultsAfterSubmittion),
+        ("testOverview", testOverview)
     ]
 }

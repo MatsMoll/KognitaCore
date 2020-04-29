@@ -184,6 +184,6 @@ class FlashCardTaskTests: VaporTestCase {
         ("testCreateAsAdmin", testCreateAsAdmin),
         ("testCreateAsStudent", testCreateAsStudent),
         ("testAnswerIsSavedOnSubmit", testAnswerIsSavedOnSubmit),
-        ("testEditAsStudent", testEditAsStudent),
+        ("testEditAsStudent", testEditAsStudent)
     ]
 }

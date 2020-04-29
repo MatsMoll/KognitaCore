@@ -10,7 +10,6 @@ import Vapor
 import FluentPostgreSQL
 @testable import KognitaCore
 
-
 class TopicTests: VaporTestCase {
 
     func testCreate() throws {
@@ -109,7 +108,7 @@ class TopicTests: VaporTestCase {
     static let allTests = [
         ("testCreate", testCreate),
         ("testTimlyTopics", testTimlyTopics),
-        ("testSoftDelete", testSoftDelete),
+        ("testSoftDelete", testSoftDelete)
 //        ("testLeveledTopics", testLeveledTopics)
     ]
 }

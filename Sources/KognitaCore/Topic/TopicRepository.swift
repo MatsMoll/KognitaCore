@@ -8,8 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public protocol TopicRepository:
-    CreateModelRepository,
+public protocol TopicRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository,
     RetriveAllModelsRepository
@@ -19,8 +18,7 @@ public protocol TopicRepository:
     CreateData      == Topic.Create.Data,
     CreateResponse  == Topic.Create.Response,
     UpdateData      == Topic.Edit.Data,
-    UpdateResponse  == Topic.Edit.Response
-{
+    UpdateResponse  == Topic.Edit.Response {
     static func getTopics(in subject: Subject, conn: DatabaseConnectable) throws -> EventLoopFuture<[Topic]>
 }
 
@@ -76,9 +74,9 @@ extension Topic {
 }
 
 extension Topic.DatabaseRepository: TopicRepository {
-    
+
     public static func create(from content: Topic.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Topic.Create.Response> {
-        
+
         guard let user = user else { throw Abort(.forbidden) }
 
         return try User.DatabaseRepository
@@ -88,7 +86,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 Subject.DatabaseRepository
                     .getSubjectWith(id: content.subjectId, on: conn)
                     .flatMap { subject in
-                        
+
                         try Topic(content: content, subject: subject, creator: user)
                             .create(on: conn)
                             .flatMap { topic in
@@ -111,14 +109,14 @@ extension Topic.DatabaseRepository: TopicRepository {
             .filter(\Subtopic.topicId == topic.requireID())
             .count()
     }
-    
+
     public static func tasks(in topic: Topic, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Task]> {
         return try Task.query(on: conn)
             .join(\Subtopic.id, to: \Task.subtopic)
             .filter(\Subtopic.topicId == topic.requireID())
             .all()
     }
-    
+
     public static func subtopics(in topic: Topic, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subtopic]> {
         return try Subtopic.DatabaseRepository
             .getSubtopics(in: topic, with: conn)
@@ -135,7 +133,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 Topic.Response(topic: .init(topic: topic), subtopics: subtopics.map { .init(subtopic: $0) })
         }
     }
-    
+
     public static func getAll(on conn: DatabaseConnectable) -> EventLoopFuture<[Topic]> {
         return Topic
             .query(on: conn)
@@ -158,7 +156,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .all(table: Topic.self)
                     .from(Topic.self)
                     .column(.count(\Task.id), as: "taskCount")
-                    .join(\Topic.id , to: \Subtopic.topicId)
+                    .join(\Topic.id, to: \Subtopic.topicId)
                     .join(\Subtopic.id, to: \Task.subtopicID)
                     .groupBy(\Topic.id)
                     .where(\Topic.subjectId == subject.requireID())
@@ -193,14 +191,14 @@ extension Topic.DatabaseRepository: TopicRepository {
     public static func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[TimelyTopic]> {
 
         return conn.select()
-            .column(\Subject.name,      as: "subjectName")
-            .column(\Topic.name,        as: "topicName")
-            .column(\Topic.id,          as: "topicID")
-            .column(.count(\Task.id),   as: "numberOfTasks")
+            .column(\Subject.name, as: "subjectName")
+            .column(\Topic.name, as: "topicName")
+            .column(\Topic.id, as: "topicID")
+            .column(.count(\Task.id), as: "numberOfTasks")
             .from(Subject.self)
-            .join(\Subject.id,          to: \Topic.subjectId)
-            .join(\Topic.id,            to: \Subtopic.topicId, method: .left)
-            .join(\Subtopic.id,         to: \Task.subtopicID,  method: .left)
+            .join(\Subject.id, to: \Topic.subjectId)
+            .join(\Topic.id, to: \Subtopic.topicId, method: .left)
+            .join(\Subtopic.id, to: \Task.subtopicID, method: .left)
             .where(\Task.deletedAt == nil)
             .groupBy(\Topic.id)
             .groupBy(\Subject.id)
@@ -254,7 +252,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .all(decoding: Task.BetaFormat.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
                     .map { tasks in
 
-                        var multipleTasks = [Int : MultipleChoiseTask.BetaFormat]()
+                        var multipleTasks = [Int: MultipleChoiseTask.BetaFormat]()
                         var flashTasks = [Task.BetaFormat]()
 
                         for task in tasks {
@@ -302,7 +300,6 @@ extension Topic.DatabaseRepository: TopicRepository {
                 .flatten(on: conn)
         }.transform(to: ())
     }
-
 
     public static func importContent(from content: SubtopicExportContent, in topic: Topic, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
 
@@ -396,7 +393,7 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 }
 
-public struct SubtopicExportContent : Content {
+public struct SubtopicExportContent: Content {
     let subtopic: Subtopic
     let multipleChoiseTasks: [MultipleChoiseTask.BetaFormat]
     let flashCards: [Task.BetaFormat]

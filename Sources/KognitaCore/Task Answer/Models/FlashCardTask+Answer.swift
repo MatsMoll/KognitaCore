@@ -12,7 +12,7 @@ import FluentPostgreSQL
 public final class FlashCardAnswer: PostgreSQLModel, Codable {
 
     public typealias Database = PostgreSQLDatabase
-    
+
     public var id: Int?
 
     public var taskID: FlashCardTask.ID

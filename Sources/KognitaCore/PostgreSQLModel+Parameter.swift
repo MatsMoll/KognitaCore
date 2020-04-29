@@ -9,12 +9,10 @@ import Foundation
 import Vapor
 import FluentPostgreSQL
 
-
 public protocol ModelParameterRepresentable: Parameter {
     associatedtype ParameterModel
     static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<ParameterModel>
 }
-
 
 extension PostgreSQLModel where Self: ModelParameterRepresentable {
 
@@ -46,7 +44,6 @@ extension Request {
         return try T.resolveParameter(parameter, on: self)
     }
 }
-
 
 extension PostgreSQLModel where Self: Parameter {
     public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<Self> {

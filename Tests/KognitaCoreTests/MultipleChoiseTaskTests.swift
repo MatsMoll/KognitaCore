@@ -10,9 +10,8 @@ import XCTest
 import FluentPostgreSQL
 @testable import KognitaCore
 
-
 class MultipleChoiseTaskTests: VaporTestCase {
-    
+
     func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)

@@ -11,11 +11,10 @@ import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
 
-
 class SubjectTests: VaporTestCase {
 
     func testExportAndImport() throws {
-        
+
         do {
             let subject     = try Subject.create(on: conn)
             let topic       = try Topic.create(subject: subject, on: conn)
@@ -240,6 +239,32 @@ class SubjectTests: VaporTestCase {
         }
     }
 
+    func testSubjectForPracticeSession() {
+        failableTest {
+            let user = try User.create(on: conn)
+
+            let taskOne = try Task.create(on: conn)
+            let taskTwo = try Task.create(on: conn)
+
+            let subjectIDOne = try Subject.DatabaseRepository.subjectIDFor(subtopicIDs: [taskOne.subtopicID], on: conn).wait()
+            let subjectOne = try Subject.find(subjectIDOne, on: conn).unwrap(or: Errors.badTest).wait()
+
+            let subjectIDTwo = try Subject.DatabaseRepository.subjectIDFor(subtopicIDs: [taskTwo.subtopicID], on: conn).wait()
+            let subjectTwo = try Subject.find(subjectIDTwo, on: conn).unwrap(or: Errors.badTest).wait()
+
+            XCTAssertNotEqual(subjectTwo.id, subjectOne.id)
+
+            let sessionOne = try PracticeSession.create(in: [taskOne.subtopicID], for: user, on: conn)
+            let sessionTwo = try PracticeSession.create(in: [taskTwo.subtopicID], for: user, on: conn)
+
+            let sessionSubjectOne = try Subject.DatabaseRepository.subject(for: sessionOne, on: conn).wait()
+            let sessionSubjectTwo = try Subject.DatabaseRepository.subject(for: sessionTwo, on: conn).wait()
+
+            XCTAssertEqual(subjectOne.id, sessionSubjectOne.id)
+            XCTAssertEqual(subjectTwo.id, sessionSubjectTwo.id)
+        }
+    }
+
     static let allTests = [
         ("testExportAndImport", testExportAndImport),
         ("testModeratorPrivilege", testModeratorPrivilege),
@@ -248,5 +273,6 @@ class SubjectTests: VaporTestCase {
         ("testOverviewContentAsModerator", testOverviewContentAsModerator),
         ("testUnverifedSolutions", testUnverifedSolutions),
         ("testGetSubjects", testGetSubjects),
+        ("testSubjectForPracticeSession", testSubjectForPracticeSession)
     ]
 }

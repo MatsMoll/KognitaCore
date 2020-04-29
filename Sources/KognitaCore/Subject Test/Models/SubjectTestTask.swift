@@ -38,8 +38,8 @@ extension SubjectTest.Pivot.Task: Migration {
             try addProperties(to: builder)
             builder.unique(on: \.taskID, \.testID)
 
-            builder.reference(from: \.taskID, to: \Task.id,         onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.testID, to: \SubjectTest.id,  onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.testID, to: \SubjectTest.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 
@@ -48,18 +48,14 @@ extension SubjectTest.Pivot.Task: Migration {
     }
 }
 
-
-public protocol SubjectTestTaskRepositoring:
-    CreateModelRepository,
+public protocol SubjectTestTaskRepositoring: CreateModelRepository,
     UpdateModelRepository
     where
     CreateData      == SubjectTest.Pivot.Task.Create.Data,
     CreateResponse  == SubjectTest.Pivot.Task.Create.Response,
     UpdateData      == SubjectTest.Pivot.Task.Update.Data,
     UpdateResponse  == SubjectTest.Pivot.Task.Update.Response,
-    Model           == SubjectTest
-{}
-
+    Model           == SubjectTest {}
 
 extension SubjectTest.Pivot.Task {
 
@@ -76,7 +72,6 @@ extension SubjectTest.Pivot.Task {
         public typealias Data = [Task.ID]
         public typealias Response = Void
     }
-
 
     struct DatabaseRepository: SubjectTestTaskRepositoring {
 
@@ -99,7 +94,7 @@ extension SubjectTest.Pivot.Task {
                 .flatMap { (tasks: [SubjectTest.Pivot.Task]) in
 
                     try data.changes(from: tasks.map { $0.taskID })
-                        .compactMap { (change: Array<Task.ID>.Change) in
+                        .compactMap { change in
 
                             switch change {
                             case .insert(let taskID):
@@ -120,7 +115,7 @@ extension SubjectTest.Pivot.Task {
     }
 }
 
-extension Array where Element : Hashable {
+extension Array where Element: Hashable {
 
     enum Change {
         case insert(Element)
@@ -129,7 +124,7 @@ extension Array where Element : Hashable {
 
     func changes<T: BidirectionalCollection>(from collection: T) -> [Change] where T.Element == Element {
         difference(from: collection)
-            .reduce(into: Dictionary<Element, Int>()) { changes, change in
+            .reduce(into: [Element: Int]()) { changes, change in
             switch change {
             case .insert(_, let element, _): changes[element] = (changes[element] ?? 0) + 1
             case .remove(_, let element, _): changes[element] = (changes[element] ?? 0) - 1

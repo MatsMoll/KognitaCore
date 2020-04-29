@@ -1,11 +1,10 @@
-
 import Vapor
 
 extension PracticeSession {
 
     public enum Create {
 
-        public struct Data : Decodable {
+        public struct Data: Decodable {
             /// The number of task to complete in a session
             public let numberOfTaskGoal: Int
 

@@ -31,7 +31,7 @@ extension PracticeSession {
         public var taskIndex: Int
 
         public var question: String
-        
+
         public var revisitTime: Int { 0 }
 
         public var resultDescription: String { "" }

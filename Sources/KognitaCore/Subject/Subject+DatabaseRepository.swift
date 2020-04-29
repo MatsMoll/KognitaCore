@@ -45,7 +45,7 @@ extension Subject.DatabaseRepository {
                     .transform(to: subject)
         }
     }
-    
+
     public static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
         Topic.query(on: conn)
             .filter(\.id == topicID)
@@ -61,6 +61,7 @@ extension Subject.DatabaseRepository {
             .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
+            .filter(\PracticeSession.id == session.id)
             .decode(Subject.self)
             .first()
             .unwrap(or: Abort(.internalServerError))
@@ -305,8 +306,8 @@ extension Subject.DatabaseRepository {
 
                 Task.query(on: conn)
                     .join(\TaskSolution.taskID, to: \Task.id)
-                    .join(\Subtopic.id,         to: \Task.subtopicID)
-                    .join(\Topic.id,            to: \Subtopic.topicId)
+                    .join(\Subtopic.id, to: \Task.subtopicID)
+                    .join(\Topic.id, to: \Subtopic.topicId)
                     .filter(\Topic.subjectId == subjectID)
                     .filter(\TaskSolution.approvedBy == nil)
                     .range(0..<10)
@@ -381,16 +382,16 @@ extension Subject.DatabaseRepository {
                         var query = conn.select()
                             .column(\Task.question)
                             .column(\TaskSolution.solution)
-                            .column(\Topic.name,    as: "topicName")
-                            .column(\Topic.id,      as: "topicID")
+                            .column(\Topic.name, as: "topicName")
+                            .column(\Topic.id, as: "topicID")
                             .column(\Topic.chapter, as: "topicChapter")
                             .column(\Subtopic.name, as: "subtopicName")
-                            .column(\Subtopic.id,   as: "subtopicID")
+                            .column(\Subtopic.id, as: "subtopicID")
                             .from(Task.self)
-                            .join(\Task.subtopicID,     to: \Subtopic.id)
-                            .join(\Subtopic.topicId,    to: \Topic.id)
-                            .join(\Task.id,             to: \FlashCardTask.id) // Only flash card tasks
-                            .join(\Task.id,             to: \TaskSolution.taskID)
+                            .join(\Task.subtopicID, to: \Subtopic.id)
+                            .join(\Subtopic.topicId, to: \Topic.id)
+                            .join(\Task.id, to: \FlashCardTask.id) // Only flash card tasks
+                            .join(\Task.id, to: \TaskSolution.taskID)
                             .where(\Task.description == nil)
                             .where(\Task.deletedAt == nil)
                             .where(\Topic.subjectId == subjectID)
@@ -464,7 +465,6 @@ extension Subject {
         public let topics: [TopicData]
     }
 }
-
 
 extension TaskSolution {
 
