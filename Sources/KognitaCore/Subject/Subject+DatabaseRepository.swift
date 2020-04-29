@@ -61,6 +61,7 @@ extension Subject.DatabaseRepository {
             .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
+            .filter(\PracticeSession.id == session.id)
             .decode(Subject.self)
             .first()
             .unwrap(or: Abort(.internalServerError))

@@ -4,6 +4,7 @@
 //
 //  Created by Mats Mollestad on 9/2/19.
 //
+// swiftlint:disable large_tuple
 
 import SQL
 import PostgreSQL
