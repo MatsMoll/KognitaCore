@@ -55,11 +55,11 @@ extension TaskResult.DatabaseRepository {
         let topicID: Int
     }
 
-
     private enum Query {
+
         case subtopics
         case taskResults
-        case flowTasks(for: User.ID, in: PracticeSession.ID)
+        case flowTasks(userID: User.ID, sessionID: PracticeSession.ID)
         case results(revisitingAfter: Date, for: User.ID)
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
@@ -139,8 +139,8 @@ extension TaskResult.DatabaseRepository {
     public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<SpaceRepetitionTask?> {
 
         return try Query.flowTasks(
-            for: session.userID,
-            in: session.requireID()
+            userID: session.userID,
+            sessionID: session.requireID()
         )
             .query(for: conn)
             .all(decoding: SpaceRepetitionTask.self)
@@ -203,10 +203,10 @@ extension TaskResult.DatabaseRepository {
                 return TaskResult.query(on: conn)
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
-                    .join(\Task.id,     to: \TaskResult.taskID)
+                    .join(\Task.id, to: \TaskResult.taskID)
                     .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id,    to: \Subtopic.topicId)
-                    .join(\Subject.id,  to: \Topic.subjectId)
+                    .join(\Topic.id, to: \Subtopic.topicId)
+                    .join(\Subject.id, to: \Topic.subjectId)
                     .alsoDecode(Topic.self)
                     .alsoDecode(Subject.self)
                     .range(...limit)
@@ -250,7 +250,7 @@ extension TaskResult.DatabaseRepository {
                 // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
                 let now = Date()
 
-                var data = [String : TaskResult.History]()
+                var data = [String: TaskResult.History]()
 
                 try (0...(numberOfWeeks - 1)).forEach {
                     let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
@@ -310,7 +310,7 @@ extension TaskResult.DatabaseRepository {
                 // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
                 let now = Date()
 
-                var data = [String : TaskResult.History]()
+                var data = [String: TaskResult.History]()
 
                 try (0...(numberOfWeeks - 1)).forEach {
                     let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
@@ -478,8 +478,8 @@ struct TaskSubmitResult: TaskSubmitResultRepresentable {
     public let result: TaskSubmitResultable
     public let taskID: Task.ID
 
-    var timeUsed: TimeInterval?     { submit.timeUsed }
-    var score: Double               { result.score }
+    var timeUsed: TimeInterval? { submit.timeUsed }
+    var score: Double { result.score }
 }
 
 extension User {

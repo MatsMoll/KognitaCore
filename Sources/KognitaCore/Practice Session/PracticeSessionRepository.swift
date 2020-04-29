@@ -9,17 +9,13 @@ import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-
-public protocol PracticeSessionRepository:
-    CreateModelRepository
+public protocol PracticeSessionRepository: CreateModelRepository
     where
     CreateData == PracticeSession.Create.Data,
-    CreateResponse == PracticeSession.Create.Response
-{
+    CreateResponse == PracticeSession.Create.Response {
     static func getSessions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
     static func extend(session: PracticeSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 }
-
 
 extension PracticeSession {
     public final class DatabaseRepository {}
@@ -139,7 +135,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             }
         }
     }
-    
+
     public static func subtopics(
         in session: PracticeSessionRepresentable,
         on conn: DatabaseConnectable
@@ -152,7 +148,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             .decode(Subtopic.self)
             .all()
     }
-    
+
     public static func assignedTasks(
         in session: PracticeSessionRepresentable,
         on conn: DatabaseConnectable
@@ -165,7 +161,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             .decode(Task.self)
             .all()
     }
-    
+
     static func uncompletedTasks(
         in session: PracticeSessionRepresentable,
         on conn: DatabaseConnectable
@@ -173,11 +169,11 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
         return try subtopics(in: session, on: conn)
             .flatMap { subtopics in
-            
+
                 try PracticeSession.DatabaseRepository
                     .assignedTasks(in: session, on: conn)
                     .flatMap { assignedTasks in
-                        
+
                         try Task.query(on: conn)
                             .filter(
                                 FilterOperator.make(
@@ -190,7 +186,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
                             .filter(\.isTestable == false)
                             .all()
                             .map { uncompletedTasks in
-                                
+
                                 SessionTasks(
                                     uncompletedTasks: uncompletedTasks,
                                     assignedTasks: assignedTasks
@@ -199,7 +195,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
                 }
         }
     }
-    
+
     public static func assignTask(
         to session: PracticeSessionRepresentable,
         on conn: DatabaseConnectable
@@ -261,7 +257,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             .filter(\.sessionID == session.requireID())
             .count()
     }
-    
+
     public static func currentActiveTask(
         in session: PracticeSession,
         on conn: PostgreSQLConnection
@@ -374,7 +370,7 @@ extension PracticeSession.DatabaseRepository {
         guard try user.requireID() == session.userID else {
             throw Abort(.forbidden)
         }
-        
+
         return try get(FlashCardTask.self, at: submit.taskIndex, for: session, on: conn).flatMap { task in
 
             FlashCardTask.DatabaseRepository
@@ -394,9 +390,9 @@ extension PracticeSession.DatabaseRepository {
                                     .compress(score: submit.knowledge, range: 0...4)
 
                                 let result = TaskSessionResult(
-                                    result:     submit,
-                                    score:      score,
-                                    progress:   0
+                                    result: submit,
+                                    score: score,
+                                    progress: 0
                                 )
 
                                 let submitResult = try TaskSubmitResult(
@@ -426,8 +422,8 @@ extension PracticeSession.DatabaseRepository {
             .filter(\TaskResult.sessionID                   == session.requireID())
             .filter(\PracticeSession.Pivot.Task.sessionID   == session.requireID())
             .filter(\PracticeSession.Pivot.Task.index       == submit.taskIndex)
-            .join(\TaskResult.taskID,   to: \PracticeSession.Pivot.Task.taskID)
-            .join(\FlashCardTask.id,    to: \TaskResult.taskID)
+            .join(\TaskResult.taskID, to: \PracticeSession.Pivot.Task.taskID)
+            .join(\FlashCardTask.id, to: \TaskResult.taskID)
             .decode(TaskResult.self)
             .first()
             .unwrap(or: Abort(.badRequest))
@@ -445,7 +441,7 @@ extension PracticeSession.DatabaseRepository {
         for session: PracticeSessionRepresentable,
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<T> {
-        
+
         return try PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\PracticeSession.Pivot.Task.sessionID == session.requireID())
@@ -517,7 +513,7 @@ extension PracticeSession.DatabaseRepository {
         for sessionId: PracticeSession.ID,
         on conn: DatabaseConnectable
     ) throws -> EventLoopFuture<Int> {
-        
+
         return PracticeSession.Pivot.Task
             .query(on: conn)
             .filter(\PracticeSession.Pivot.Task.sessionID == sessionId)
@@ -538,15 +534,15 @@ extension PracticeSession.DatabaseRepository {
             .flatMap { conn in
 
                 conn.select()
-                    .column(\Topic.name,                        as: "topicName")
-                    .column(\Topic.id,                          as: "topicID")
-                    .column(\PracticeSession.Pivot.Task.index,  as: "taskIndex")
-                    .column(\TaskResult.createdAt,              as: "date")
-                    .column(\Task.question,                     as: "question")
-                    .column(\TaskResult.resultScore,            as: "score")
-                    .column(\TaskResult.timeUsed,               as: "timeUsed")
-                    .column(\TaskResult.revisitDate,            as: "revisitDate")
-                    .column(\TaskResult.isSetManually,          as: "isSetManually")
+                    .column(\Topic.name, as: "topicName")
+                    .column(\Topic.id, as: "topicID")
+                    .column(\PracticeSession.Pivot.Task.index, as: "taskIndex")
+                    .column(\TaskResult.createdAt, as: "date")
+                    .column(\Task.question, as: "question")
+                    .column(\TaskResult.resultScore, as: "score")
+                    .column(\TaskResult.timeUsed, as: "timeUsed")
+                    .column(\TaskResult.revisitDate, as: "revisitDate")
+                    .column(\TaskResult.isSetManually, as: "isSetManually")
                     .from(PracticeSession.Pivot.Task.self)
                     .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
                     .join(\Task.subtopicID, to: \Subtopic.id)
@@ -610,17 +606,17 @@ extension PracticeSession.DatabaseRepository {
             .flatMap { conn in
 
                 try conn.select()
-                    .column(\Subject.name,              as: "subjectName")
-                    .column(\Subject.id,                as: "subjectID")
-                    .column(\PracticeSession.id,        as: "id")
+                    .column(\Subject.name, as: "subjectName")
+                    .column(\Subject.id, as: "subjectID")
+                    .column(\PracticeSession.id, as: "id")
                     .column(\PracticeSession.createdAt, as: "createdAt")
-                    .column(\PracticeSession.endedAt,   as: "endedAt")
+                    .column(\PracticeSession.endedAt, as: "endedAt")
                     .from(PracticeSession.self)
-                    .join(\PracticeSession.id,      to: \TaskSession.id)
-                    .join(\PracticeSession.id,      to: \PracticeSession.Pivot.Subtopic.sessionID)
+                    .join(\PracticeSession.id, to: \TaskSession.id)
+                    .join(\PracticeSession.id, to: \PracticeSession.Pivot.Subtopic.sessionID)
                     .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.id)
-                    .join(\Subtopic.topicId,        to: \Topic.id)
-                    .join(\Topic.subjectId,         to: \Subject.id)
+                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .join(\Topic.subjectId, to: \Subject.id)
                     .where(\PracticeSession.endedAt != nil)
                     .where(\TaskSession.userID == user.requireID())
                     .orderBy(\PracticeSession.createdAt, .descending)
@@ -653,7 +649,6 @@ extension PracticeSession.DatabaseRepository {
         }
     }
 
-
     public static func cleanSessions(on conn: DatabaseConnectable) -> EventLoopFuture<Void> {
 
         return PracticeSession.query(on: conn)
@@ -676,7 +671,6 @@ extension PracticeSession.DatabaseRepository {
                 }.flatten(on: conn)
         }
     }
-
 
     public static func getLatestUnfinnishedSessionPath(
         for user: User,

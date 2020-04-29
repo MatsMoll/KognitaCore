@@ -1,4 +1,3 @@
-
 extension MultipleChoiseTask {
 
     public struct ModifyContent {

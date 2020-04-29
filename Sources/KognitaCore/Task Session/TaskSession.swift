@@ -18,7 +18,6 @@ public final class TaskSession: PostgreSQLModel, Migration {
     public static var createdAtKey: WritableKeyPath<TaskSession, Date?>? = \.createdAt
 }
 
-
 extension TaskSession {
 
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
@@ -38,21 +37,18 @@ extension TaskSession {
     }
 }
 
-
-
 extension TaskSession {
     public struct PracticeParameter: ModelParameterRepresentable, Content, PracticeSessionRepresentable {
-
 
         let session: TaskSession
         let practiceSession: PracticeSession
 
-        public var id: Int?                     { session.id }
-        public var userID: User.ID              { session.userID }
-        public var createdAt: Date?             { session.createdAt }
-        public var endedAt: Date?               { practiceSession.endedAt }
-        public var numberOfTaskGoal: Int        { practiceSession.numberOfTaskGoal }
-        public func requireID() throws -> Int   { try session.requireID() }
+        public var id: Int? { session.id }
+        public var userID: User.ID { session.userID }
+        public var createdAt: Date? { session.createdAt }
+        public var endedAt: Date? { practiceSession.endedAt }
+        public var numberOfTaskGoal: Int { practiceSession.numberOfTaskGoal }
+        public func requireID() throws -> Int { try session.requireID() }
 
         public typealias ParameterModel = PracticeParameter
         public typealias ResolvedParameter = EventLoopFuture<PracticeParameter>
@@ -80,7 +76,7 @@ extension TaskSession {
             practiceSession.endedAt = .now
             return practiceSession.save(on: conn)
                 .map { practiceSession in
-                    
+
                     TaskSession.PracticeParameter(
                         session: session,
                         practiceSession: practiceSession

@@ -16,7 +16,6 @@ enum TaskSolutionRepositoryError: String, Debuggable {
     case toFewSolutions
 }
 
-
 extension TaskSolution {
 
     public final class DatabaseRepository: TaskSolutionRepositoring {

@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Subject : KognitaCRUDModel, KognitaModelUpdatable {
+public final class Subject: KognitaCRUDModel, KognitaModelUpdatable {
 
     public enum ColorClass: String, PostgreSQLEnum, PostgreSQLMigration {
         case primary
@@ -76,7 +76,7 @@ public final class Subject : KognitaCRUDModel, KognitaModelUpdatable {
             }
         }
     }
-    
+
     /// Validates the subjects information
     ///
     /// - Throws:

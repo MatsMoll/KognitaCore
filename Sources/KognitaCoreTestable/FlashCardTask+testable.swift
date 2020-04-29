@@ -10,17 +10,19 @@ import FluentPostgreSQL
 @testable import KognitaCore
 
 extension FlashCardTask {
-    
-    public static func create(creator:             User?       = nil,
-                       subtopic:            Subtopic?      = nil,
-                       task:                Task?       = nil,
-                       on conn:             PostgreSQLConnection) throws -> FlashCardTask {
-        
+
+    public static func create(
+        creator: User? = nil,
+        subtopic: Subtopic? = nil,
+        task: Task? = nil,
+        on conn: PostgreSQLConnection
+    ) throws -> FlashCardTask {
+
         let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, on: conn)
-        
+
         return try create(task: usedTask, on: conn)
     }
-    
+
     public static func create(task: Task, on conn: PostgreSQLConnection) throws -> FlashCardTask {
         return try FlashCardTask(task: task)
             .create(on: conn)

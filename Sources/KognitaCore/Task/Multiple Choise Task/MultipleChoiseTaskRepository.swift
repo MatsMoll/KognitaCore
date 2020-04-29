@@ -9,8 +9,7 @@ import FluentSQL
 import FluentPostgreSQL
 import Vapor
 
-public protocol MultipleChoiseTaskRepository:
-    CreateModelRepository,
+public protocol MultipleChoiseTaskRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
@@ -18,8 +17,7 @@ public protocol MultipleChoiseTaskRepository:
     CreateData      == MultipleChoiseTask.Create.Data,
     CreateResponse  == MultipleChoiseTask.Create.Response,
     UpdateData      == MultipleChoiseTask.Edit.Data,
-    UpdateResponse  == MultipleChoiseTask.Edit.Response
-{
+    UpdateResponse  == MultipleChoiseTask.Edit.Response {
     static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiseTask.ModifyContent>
 }
 
@@ -27,9 +25,8 @@ extension MultipleChoiseTask {
     public final class DatabaseRepository: MultipleChoiseTaskRepository {}
 }
 
-
 extension MultipleChoiseTask.DatabaseRepository {
-    
+
     public static func create(
         from content: MultipleChoiseTask.Create.Data,
         by user: User?,
@@ -314,7 +311,7 @@ extension MultipleChoiseTask.DatabaseRepository {
         sessionID: TaskSession.ID,
         on conn: DatabaseConnectable
     ) -> EventLoopFuture<[TaskAnswer]> {
-        
+
         submit.choises.map { choise in
             createAnswer(choiseID: choise, sessionID: sessionID, on: conn)
         }
@@ -402,7 +399,6 @@ extension MultipleChoiseTask.DatabaseRepository {
             .all()
     }
 }
-
 
 public struct TaskPreviewContent {
     public let subject: Subject

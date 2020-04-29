@@ -21,7 +21,7 @@ public struct CreatorTaskContent {
     public let topic: Topic
     public let creator: User
     public let isMultipleChoise: Bool
-    
+
     public var taskTypePath: String {
         if isMultipleChoise {
             return "tasks/multiple-choise"

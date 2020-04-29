@@ -10,8 +10,16 @@ import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
 
-
 extension TaskResult {
+    /// Creates a `TaskResult`for testing
+    /// - Parameters:
+    ///   - task: The task to create the result for
+    ///   - sessionID: The session ID the result is associated with
+    ///   - user: The user the result is associated with
+    ///   - score: The score fo the result
+    ///   - conn: The database connection
+    /// - Throws: If the database query fails
+    /// - Returns: A `TaskResult`
     public static func create(task: Task, sessionID: TaskSession.ID, user: User, score: Double = 1, on conn: PostgreSQLConnection) throws -> TaskResult {
         let practiceResult = TaskSessionResult(
             result: "",

@@ -17,7 +17,6 @@ public protocol TaskSubmitResultable {
     var score: Double { get }
 }
 
-
 /// A Result from a executed task
 public final class TaskResult: PostgreSQLModel, Codable {
 
@@ -46,7 +45,6 @@ public final class TaskResult: PostgreSQLModel, Codable {
 
     /// If the result value is set manually
     public var isSetManually: Bool
-
 
     init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.ID? = nil) {
         self.taskID = result.taskID

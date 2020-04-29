@@ -1,8 +1,6 @@
 import Vapor
 
-
-public protocol TaskSolutionRepositoring:
-    CreateModelRepository,
+public protocol TaskSolutionRepositoring: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
@@ -10,8 +8,7 @@ public protocol TaskSolutionRepositoring:
     CreateData      == TaskSolution.Create.Data,
     CreateResponse  == TaskSolution.Create.Response,
     UpdateData      == TaskSolution.Update.Data,
-    UpdateResponse  == TaskSolution.Update.Response
-{
+    UpdateResponse  == TaskSolution.Update.Response {
     static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]>
 
     /// Upvote a solution

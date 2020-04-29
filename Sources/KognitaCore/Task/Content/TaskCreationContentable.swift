@@ -7,7 +7,6 @@
 
 import Vapor
 
-
 public protocol TaskCreationContentable {
     var description: String? { get }
     var question: String { get }

@@ -77,7 +77,6 @@ extension SubjectTest {
         }
     }
 
-
     public struct ListReponse: Content {
         public let subject: Subject
 
@@ -111,4 +110,3 @@ extension SubjectTest {
         }
     }
 }
-

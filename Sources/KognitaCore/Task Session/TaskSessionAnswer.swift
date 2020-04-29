@@ -26,14 +26,13 @@ public final class TaskSessionAnswer: KognitaPersistenceModel {
     }
 }
 
-
 extension TaskSessionAnswer {
 
     public class DatabaseRepository {
         public static func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
             MultipleChoiseTaskAnswer.query(on: conn, withSoftDeleted: true)
-                .join(\TaskSessionAnswer.taskAnswerID,  to: \MultipleChoiseTaskAnswer.id)
-                .join(\MultipleChoiseTaskChoise.id,     to: \MultipleChoiseTaskAnswer.choiseID)
+                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
+                .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
                 .filter(\TaskSessionAnswer.sessionID == sessionID)
                 .filter(\MultipleChoiseTaskChoise.taskId == taskID)
                 .all()

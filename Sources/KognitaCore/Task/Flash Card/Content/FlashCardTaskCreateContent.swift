@@ -8,9 +8,9 @@
 import Vapor
 
 extension FlashCardTask {
-    
+
     public struct Create: Content {
-        
+
         public struct Data: Content, TaskCreationContentable {
 
             public let subtopicId: Subtopic.ID
@@ -37,9 +37,9 @@ extension FlashCardTask {
                 isTestable = false
             }
         }
-        
+
         public typealias Response = Task
     }
-    
+
     public typealias Edit = Create
 }

@@ -6,7 +6,6 @@ public protocol VerifyEmailSendable {
     func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) throws -> EventLoopFuture<Void>
 }
 
-
 extension User {
     public enum VerifyEmail {
         public final class Token: PostgreSQLModel {
@@ -50,14 +49,12 @@ extension User {
     }
 }
 
-
 extension User.VerifyEmail.Token {
 
     public func content(with email: String) -> User.VerifyEmail.EmailContent {
         .init(token: token, userID: userID, email: email)
     }
 }
-
 
 /// Allows `UserToken` to be used as a Fluent migration.
 extension User.VerifyEmail.Token: Migration {

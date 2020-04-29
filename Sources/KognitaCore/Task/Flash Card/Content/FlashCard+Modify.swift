@@ -1,4 +1,3 @@
-
 extension FlashCardTask {
     public struct ModifyContent {
         public let task: Task.ModifyContent?

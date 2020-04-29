@@ -9,8 +9,8 @@ import Vapor
 
 /// Public representation of user data.
 extension User {
-    
-    public struct Response : Content, UserContent {
+
+    public struct Response: Content, UserContent {
 
         /// User's unique identifier.
         /// Not optional since we only return users that exist in the DB.

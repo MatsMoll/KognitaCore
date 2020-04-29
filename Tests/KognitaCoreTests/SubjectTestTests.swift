@@ -3,7 +3,6 @@ import Foundation
 import KognitaCoreTestable
 import XCTest
 
-
 @available(OSX 10.15, *)
 class SubjectTestTests: VaporTestCase {
 
@@ -223,7 +222,6 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(userOneTaskContent.choises.count, 3)
             XCTAssertEqual(userOneTaskContent.choises.filter({ $0.isCorrect && $0.isSelected }).count, 1)
 
-
             XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
             XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
             XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
@@ -356,7 +354,7 @@ class SubjectTestTests: VaporTestCase {
             let choises: [MultipleChoiseTaskChoise.Create.Data] = [
                 .init(choise: "first", isCorrect: false),
                 .init(choise: "correct", isCorrect: true),
-                .init(choise: "yeah", isCorrect: true),
+                .init(choise: "yeah", isCorrect: true)
             ]
 
             let test = try setupTestWithTasks(choises: choises)
@@ -392,7 +390,6 @@ class SubjectTestTests: VaporTestCase {
             XCTFail(error.localizedDescription)
         }
     }
-
 
     func testTestResultHistogram() throws {
         do {
@@ -432,7 +429,6 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
-
     func testUserResults() {
         do {
             let test = try setupTestWithTasks()
@@ -468,7 +464,6 @@ class SubjectTestTests: VaporTestCase {
             XCTFail(error.localizedDescription)
         }
     }
-
 
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
         let sessionEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
@@ -523,12 +518,12 @@ class SubjectTestTests: VaporTestCase {
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
-            tasks:          taskIDs,
-            subjectID:      subjectID,
-            duration:       duration,
-            scheduledAt:    scheduledAt,
-            password:       "password",
-            title:          "Testing",
+            tasks: taskIDs,
+            subjectID: subjectID,
+            duration: duration,
+            scheduledAt: scheduledAt,
+            password: "password",
+            title: "Testing",
             isTeamBasedLearning: false
         )
 
@@ -555,12 +550,12 @@ class SubjectTestTests: VaporTestCase {
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
-            tasks:          taskIds,
-            subjectID:      topic.subjectId,
-            duration:       duration,
-            scheduledAt:    scheduledAt,
-            password:       "password",
-            title:          "Testing",
+            tasks: taskIds,
+            subjectID: topic.subjectId,
+            duration: duration,
+            scheduledAt: scheduledAt,
+            password: "password",
+            title: "Testing",
             isTeamBasedLearning: false
         )
 
@@ -577,19 +572,19 @@ class SubjectTestTests: VaporTestCase {
     }
 
     static let allTests = [
-        ("testCreateTest",                      testCreateTest),
-        ("testCreateTestUnauthorized",          testCreateTestUnauthorized),
-        ("testCreateTestUnprivileged",          testCreateTestUnprivileged),
-        ("testOpeningTestWhenUnprivileged",     testOpeningTestWhenUnprivileged),
-        ("testEnteringTestWhenClosed",          testEnteringTestWhenClosed),
-        ("testEnteringWithIncorrectPassword",   testEnteringWithIncorrectPassword),
-        ("testEnteringMultipleTimes",           testEnteringMultipleTimes),
-        ("testCompletionStatus",                testCompletionStatus),
-        ("testRetrivingTaskContent",            testRetrivingTaskContent),
-        ("testResultStatistics",                testResultStatistics),
-        ("testResultStatisticsTaskReuseBug",    testResultStatisticsTaskReuseBug),
-        ("testTestResultHistogram",             testTestResultHistogram),
-        ("testUserResults",                     testUserResults)
+        ("testCreateTest", testCreateTest),
+        ("testCreateTestUnauthorized", testCreateTestUnauthorized),
+        ("testCreateTestUnprivileged", testCreateTestUnprivileged),
+        ("testOpeningTestWhenUnprivileged", testOpeningTestWhenUnprivileged),
+        ("testEnteringTestWhenClosed", testEnteringTestWhenClosed),
+        ("testEnteringWithIncorrectPassword", testEnteringWithIncorrectPassword),
+        ("testEnteringMultipleTimes", testEnteringMultipleTimes),
+        ("testCompletionStatus", testCompletionStatus),
+        ("testRetrivingTaskContent", testRetrivingTaskContent),
+        ("testResultStatistics", testResultStatistics),
+        ("testResultStatisticsTaskReuseBug", testResultStatisticsTaskReuseBug),
+        ("testTestResultHistogram", testTestResultHistogram),
+        ("testUserResults", testUserResults)
     ]
 }
 

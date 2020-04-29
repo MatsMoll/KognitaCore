@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ETree
 import getpass
+from pbxproj import XcodeProject
+import sys
 
 file = "KognitaCore.xcodeproj/xcshareddata/xcschemes/KognitaCore-Package.xcscheme"
 
@@ -24,3 +26,15 @@ database_user.attrib["value"] = getpass.getuser()
 database_user.attrib["isEnabled"] = "YES"
 
 tree.write(file)
+
+# Adding swiftlint script
+project = XcodeProject.load("KognitaCore.xcodeproj/project.pbxproj")
+project.add_run_script("""
+if which swiftlint >/dev/null; then
+  swiftlint
+  swiftlint autocorrect
+else
+  echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+fi
+""", target_name="KognitaCore")
+project.save()

@@ -73,19 +73,18 @@ class TaskResultRepoTests: VaporTestCase {
         let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
-        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
-        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7, on: conn)
 
-        _ = try TaskResult.create(task: taskTwo, sessionID: otherSession.requireID(), user: secondUser, score: 0.2,  on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: otherSession.requireID(), user: secondUser, score: 0.2, on: conn)
 
         let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
-        
+
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
-
-        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
-        _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: conn)
+        _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2, on: conn)
 
         let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
@@ -108,10 +107,10 @@ class TaskResultRepoTests: VaporTestCase {
         let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
-        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
-        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7, on: conn)
 
-        _ = try TaskResult.create(task: deletedTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+        _ = try TaskResult.create(task: deletedTask, sessionID: lastSession.requireID(), user: user, score: 0.2, on: conn)
 
         try deletedTask.delete(on: conn).wait()
 
@@ -120,7 +119,7 @@ class TaskResultRepoTests: VaporTestCase {
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
-        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: conn)
 
         let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
@@ -143,17 +142,17 @@ class TaskResultRepoTests: VaporTestCase {
         let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
         XCTAssertNil(taskType)
 
-        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
-        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7,  on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: conn)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.7, on: conn)
 
-        _ = try TaskResult.create(task: testTask, sessionID: lastSession.requireID(), user: user, score: 0.2,  on: conn)
+        _ = try TaskResult.create(task: testTask, sessionID: lastSession.requireID(), user: user, score: 0.2, on: conn)
 
         let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
-        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6,    on: conn)
+        _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: conn)
 
         let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: conn).wait()
 
@@ -179,9 +178,9 @@ class TaskResultRepoTests: VaporTestCase {
             let lastSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
             let newSession = try PracticeSession.create(in: [subtopic.requireID()], for: user, on: conn)
 
-            _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4,  on: conn)
-            _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6,  on: conn)
-            _ = try TaskResult.create(task: testableTask, sessionID: lastSession.requireID(), user: user, score: 1,  on: conn)
+            _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: conn)
+            _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6, on: conn)
+            _ = try TaskResult.create(task: testableTask, sessionID: lastSession.requireID(), user: user, score: 1, on: conn)
 
             let subjectProgress = try TaskResult.DatabaseRepository.getUserLevel(in: subject, userId: user.requireID(), on: conn).wait()
             let topicProgress = try TaskResult.DatabaseRepository.getUserLevel(for: user.requireID(), in: [topic.requireID(), secondTopic.requireID()], on: conn).wait()
@@ -199,7 +198,7 @@ class TaskResultRepoTests: VaporTestCase {
                 }
             }
 
-            _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5,    on: conn)
+            _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5, on: conn)
         } catch {
             XCTFail(error.localizedDescription)
         }
