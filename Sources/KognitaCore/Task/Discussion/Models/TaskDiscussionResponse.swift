@@ -12,7 +12,6 @@ extension TaskDiscussion {
     public enum Pivot {}
 }
 
-
 extension TaskDiscussion.Pivot {
 
     public final class Response: KognitaPersistenceModel, Validatable {
@@ -45,7 +44,6 @@ extension TaskDiscussion.Pivot {
         }
     }
 }
-
 
 extension TaskDiscussion.Pivot.Response {
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {

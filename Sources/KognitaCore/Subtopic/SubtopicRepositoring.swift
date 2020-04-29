@@ -8,8 +8,7 @@
 import Vapor
 import FluentPostgreSQL
 
-public protocol SubtopicRepositoring:
-    CreateModelRepository,
+public protocol SubtopicRepositoring: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository,
     RetriveModelRepository
@@ -18,8 +17,7 @@ public protocol SubtopicRepositoring:
     CreateData      == Subtopic.Create.Data,
     CreateResponse  == Subtopic.Create.Response,
     UpdateData      == Subtopic.Edit.Data,
-    UpdateResponse  == Subtopic.Edit.Response
-{
+    UpdateResponse  == Subtopic.Edit.Response {
     static func find(_ id: Subtopic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subtopic?>
     static func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> EventLoopFuture<[Subtopic]>
 }

@@ -9,8 +9,14 @@ import Vapor
 import FluentPostgreSQL
 @testable import KognitaCore
 
-
 extension Subtopic {
+    /// Creates a Subtopic for testing
+    /// - Parameters:
+    ///   - name: The name of the subtopic
+    ///   - topic: The topic the subtopic is connected to
+    ///   - conn: The database connection
+    /// - Throws: If duplicates
+    /// - Returns: The created `Subtopic`
     public static func create(name: String = "Topic", topic: Topic? = nil, on conn: PostgreSQLConnection) throws -> Subtopic {
 
         let usedTopic = try topic ?? Topic.create(on: conn)
@@ -18,6 +24,13 @@ extension Subtopic {
         return try Subtopic.create(name: name, topicId: usedTopic.requireID(), on: conn)
     }
 
+    /// Creates a Subtopic for testing
+    /// - Parameters:
+    ///   - name: The name of the subtopic
+    ///   - topicId: The id of the topic the subtopic is connected to
+    ///   - conn: The database connection
+    /// - Throws: If duplicates
+    /// - Returns: The created `Subtopic`
     public static func create(name: String = "Topic", topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
 
         return try Subtopic(name: name, topicId: topicId)
@@ -25,4 +38,3 @@ extension Subtopic {
             .wait()
     }
 }
-

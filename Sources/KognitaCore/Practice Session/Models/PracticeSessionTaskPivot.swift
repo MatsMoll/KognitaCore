@@ -9,11 +9,11 @@ import Vapor
 import FluentPostgreSQL
 
 extension PracticeSession.Pivot {
-    
+
     public final class Task: PostgreSQLPivot {
 
         public typealias Database = PostgreSQLDatabase
-        
+
         public var id: Int?
 
         var sessionID: PracticeSession.ID
@@ -23,13 +23,12 @@ extension PracticeSession.Pivot {
         public var createdAt: Date?
 
         var isCompleted: Bool = false
-        
+
         /// The index of the task
         /// The first exicuted task will be 1, then 2, and so on
         var index: Int
 
         var score: Double?
-
 
         public typealias Left = PracticeSession
         public typealias Right = KognitaCore.Task
@@ -39,7 +38,6 @@ extension PracticeSession.Pivot {
 
         public static var createdAtKey: TimestampKey? = \.createdAt
 
-
         init(sessionID: PracticeSession.ID, taskID: KognitaCore.Task.ID, index: Int) {
             self.sessionID = sessionID
             self.taskID = taskID
@@ -48,7 +46,7 @@ extension PracticeSession.Pivot {
 
         static func create(session: PracticeSessionRepresentable, task: KognitaCore.Task, index: Int, on conn: DatabaseConnectable)
             throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
-                
+
             return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: task.requireID(), index: index)
                 .create(on: conn)
         }

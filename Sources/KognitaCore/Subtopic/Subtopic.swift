@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
+public final class Subtopic: KognitaCRUDModel, KognitaModelUpdatable {
 
     public var id: Int?
 
@@ -19,7 +19,6 @@ public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
     public var createdAt: Date?
 
     public var updatedAt: Date?
-
 
     init(name: String, topicId: Topic.ID) {
         self.name = name
@@ -35,7 +34,7 @@ public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
         self.name = content.name
         self.topicId = content.topicId
     }
-    
+
     public static func addTableConstraints(to builder: SchemaCreator<Subtopic>) {
         builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
     }
@@ -44,18 +43,17 @@ public final class Subtopic : KognitaCRUDModel, KognitaModelUpdatable {
 extension Subtopic: Content { }
 extension Subtopic: ModelParameterRepresentable { }
 
-
 extension Subtopic {
 
     public enum Create {
-        
-        public struct Data : Content {
+
+        public struct Data: Content {
 
             public let name: String
 
             public var topicId: Topic.ID
         }
-        
+
         public typealias Response = Subtopic
     }
 
@@ -64,7 +62,7 @@ extension Subtopic {
 
 extension Subtopic {
     public struct Overview: Content {
-        
+
         public let id: Int
         public let name: String
         public let topicID: Topic.ID

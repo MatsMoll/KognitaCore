@@ -2,7 +2,6 @@ import Vapor
 import FluentPostgreSQL
 @testable import KognitaCore
 
-
 extension TaskDiscussion {
     public static func create(description: String = "Some description", userID: User.ID? = nil, taskID: Task.ID? = nil, on conn: PostgreSQLConnection) throws -> TaskDiscussion {
 

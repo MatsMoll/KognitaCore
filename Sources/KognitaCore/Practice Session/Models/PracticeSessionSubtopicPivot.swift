@@ -39,7 +39,7 @@ extension PracticeSession.Pivot {
 }
 
 extension PracticeSession.Pivot.Subtopic {
-    
+
     func create(on conn: DatabaseConnectable, subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession) throws -> Future<PracticeSession.Pivot.Subtopic> {
         return try PracticeSession.Pivot.Subtopic(subtopicID: subtopicID, session: session)
             .create(on: conn)

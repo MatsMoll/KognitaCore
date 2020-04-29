@@ -44,7 +44,6 @@ extension Topic.Pivot {
     }
 }
 
-
 extension Topic.Pivot.Preknowleged: Migration {
 
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {

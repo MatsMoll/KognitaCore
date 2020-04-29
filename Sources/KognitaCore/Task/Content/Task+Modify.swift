@@ -34,7 +34,6 @@ extension Task {
 
         public var isDeleted: Bool { deletedAt != nil }
 
-
         init(task: Task, solution: TaskSolution) {
             self.id = task.id ?? 0
             self.subtopicID = task.subtopicID

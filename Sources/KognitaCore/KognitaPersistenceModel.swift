@@ -8,7 +8,6 @@
 import Vapor
 import FluentPostgreSQL
 
-
 //extension KognitaRepositoryDeletable {
 //    static public func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void> {
 //        guard let user = user,
@@ -17,7 +16,7 @@ import FluentPostgreSQL
 //    }
 //}
 //
-public protocol KognitaModelUpdatable : KognitaCRUDModel {
+public protocol KognitaModelUpdatable: KognitaCRUDModel {
 
     associatedtype EditData
 
@@ -45,7 +44,7 @@ public protocol KognitaModelUpdatable : KognitaCRUDModel {
 //}
 //
 /// A protocol that defines a Model to be used in Kognita
-public protocol KognitaPersistenceModel : PostgreSQLModel, Migration {
+public protocol KognitaPersistenceModel: PostgreSQLModel, Migration {
 
     /// Creation at data
     var createdAt: Date? { get set }
@@ -80,11 +79,11 @@ extension KognitaPersistenceModel {
 //
 //public typealias KognitaCRUDRepository = KognitaRepositoryDeletable & KognitaRepositoryEditable
 //
-public protocol KognitaCRUDModel : KognitaPersistenceModel {
-    
+public protocol KognitaCRUDModel: KognitaPersistenceModel {
+
 }
 
-public protocol SoftDeleatableModel : KognitaPersistenceModel {
+public protocol SoftDeleatableModel: KognitaPersistenceModel {
 
     /// The date a modal was deleted at
     var deletedAt: Date? { get set }

@@ -72,7 +72,6 @@ public enum TestSessionRepositoringError: Error {
     case testIsNotFinnished
 }
 
-
 extension TestSession {
     public class DatabaseRepository: TestSessionRepositoring {
 
@@ -96,22 +95,22 @@ extension TestSession {
 
                     return conn.select()
                         .all(table: SubjectTest.self)
-                        .column(\Task.id,                       as: "taskID")
-                        .column(\Task.question,                 as: "question")
-                        .column(\SubjectTest.Pivot.Task.id,     as: "testTaskID")
+                        .column(\Task.id, as: "taskID")
+                        .column(\Task.question, as: "question")
+                        .column(\SubjectTest.Pivot.Task.id, as: "testTaskID")
                         .from(SubjectTest.Pivot.Task.self)
-                        .join(\SubjectTest.Pivot.Task.taskID,       to: \Task.id)
-                        .join(\SubjectTest.Pivot.Task.testID,       to: \SubjectTest.id)
+                        .join(\SubjectTest.Pivot.Task.taskID, to: \Task.id)
+                        .join(\SubjectTest.Pivot.Task.testID, to: \SubjectTest.id)
                         .where(\SubjectTest.id == session.testID)
                         .all(decoding: OverviewQuery.self, SubjectTest.self)
                         .flatMap { tasks in
 
                             try conn.select()
-                                .column(\MultipleChoiseTaskChoise.taskId,       as: "taskID")
+                                .column(\MultipleChoiseTaskChoise.taskId, as: "taskID")
                                 .from(TestSession.self)
-                                .join(\TestSession.id,                      to: \TaskSessionAnswer.sessionID)
-                                .join(\TaskSessionAnswer.taskAnswerID,      to: \MultipleChoiseTaskAnswer.id)
-                                .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
+                                .join(\TestSession.id, to: \TaskSessionAnswer.sessionID)
+                                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
+                                .join(\MultipleChoiseTaskAnswer.choiseID, to: \MultipleChoiseTaskChoise.id)
                                 .where(\TestSession.id == session.requireID())
                                 .all(decoding: TaskAnswerTaskIDQuery.self)
                                 .map { taskIDs in
@@ -135,7 +134,6 @@ extension TestSession {
                     }
             }
         }
-
 
         public static func submit(content: FlashCardTask.Submit, for session: TestSessionRepresentable, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
             guard user.id == session.userID else {
@@ -208,11 +206,11 @@ extension TestSession {
                         .all(table: MultipleChoiseTaskAnswer.self)
                         .all(table: TaskAnswer.self)
                         .from(TestSession.self)
-                        .join(\TestSession.id,                      to: \TaskSessionAnswer.sessionID)
-                        .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
-                        .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
-                        .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
-                        .join(\MultipleChoiseTaskChoise.taskId,     to: \SubjectTest.Pivot.Task.taskID)
+                        .join(\TestSession.id, to: \TaskSessionAnswer.sessionID)
+                        .join(\TaskSessionAnswer.taskAnswerID, to: \TaskAnswer.id)
+                        .join(\TaskAnswer.id, to: \MultipleChoiseTaskAnswer.id)
+                        .join(\MultipleChoiseTaskAnswer.choiseID, to: \MultipleChoiseTaskChoise.id)
+                        .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
                         .where(\TestSession.id == session.requireID())
                         .where(\SubjectTest.Pivot.Task.id == content.taskIndex)
                         .all(decoding: MultipleChoiseTaskAnswer.self, TaskAnswer.self)
@@ -246,11 +244,11 @@ extension TestSession {
                     return try psqlConn.select()
                         .all(table: FlashCardAnswer.self)
                         .from(SubjectTest.Pivot.Task.self)
-                        .join(\SubjectTest.Pivot.Task.taskID,   to: \SubjectTest.id)
-                        .join(\SubjectTest.id,                  to: \TestSession.testID)
-                        .join(\TestSession.id,                  to: \TaskSession.id)
-                        .join(\TestSession.id,                  to: \TaskSessionAnswer.sessionID,   method: .left)
-                        .join(\TaskSessionAnswer.taskAnswerID,  to: \FlashCardAnswer.id,            method: .left)
+                        .join(\SubjectTest.Pivot.Task.taskID, to: \SubjectTest.id)
+                        .join(\SubjectTest.id, to: \TestSession.testID)
+                        .join(\TestSession.id, to: \TaskSession.id)
+                        .join(\TestSession.id, to: \TaskSessionAnswer.sessionID, method: .left)
+                        .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id, method: .left)
                         .where(\TaskSession.userID == user.requireID())
                         .orderBy(\SubjectTest.Pivot.Task.createdAt, .ascending)
                         .where(\SubjectTest.Pivot.Task.id == content.taskIndex)
@@ -317,9 +315,9 @@ extension TestSession {
                             try psqlConn.select()
                                 .all(table: MultipleChoiseTaskChoise.self)
                                 .from(TaskSessionAnswer.self)
-                                .join(\TaskSessionAnswer.taskAnswerID,      to: \TaskAnswer.id)
-                                .join(\TaskAnswer.id,                       to: \MultipleChoiseTaskAnswer.id)
-                                .join(\MultipleChoiseTaskAnswer.choiseID,   to: \MultipleChoiseTaskChoise.id)
+                                .join(\TaskSessionAnswer.taskAnswerID, to: \TaskAnswer.id)
+                                .join(\TaskAnswer.id, to: \MultipleChoiseTaskAnswer.id)
+                                .join(\MultipleChoiseTaskAnswer.choiseID, to: \MultipleChoiseTaskChoise.id)
                                 .where(\TaskSessionAnswer.sessionID == session.requireID())
                                 .all(decoding: MultipleChoiseTaskChoise.self)
                                 .flatMap { choises in
@@ -348,7 +346,6 @@ extension TestSession {
                     }
             }
         }
-
 
         public static func results(in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Results> {
 
@@ -385,7 +382,7 @@ extension TestSession {
 
                             // Registrating the score for a given task
                             let taskResults = results.reduce(
-                                into: [Task.ID : Double]()
+                                into: [Task.ID: Double]()
                             ) { taskResults, result in
                                 taskResults[result.1.taskID] = result.1.resultScore
                             }
@@ -442,16 +439,16 @@ extension TestSession {
                 .flatMap { conn in
 
                     return try conn.select()
-                        .column(\Subject.name,              as: "subjectName")
-                        .column(\Subject.id,                as: "subjectID")
-                        .column(\TestSession.id,            as: "id")
-                        .column(\TestSession.createdAt,     as: "createdAt")
-                        .column(\TestSession.submittedAt,   as: "endedAt")
-                        .column(\SubjectTest.title,         as: "testTitle")
+                        .column(\Subject.name, as: "subjectName")
+                        .column(\Subject.id, as: "subjectID")
+                        .column(\TestSession.id, as: "id")
+                        .column(\TestSession.createdAt, as: "createdAt")
+                        .column(\TestSession.submittedAt, as: "endedAt")
+                        .column(\SubjectTest.title, as: "testTitle")
                         .from(TestSession.self)
-                        .join(\TestSession.id,          to: \TaskSession.id)
-                        .join(\TestSession.testID,      to: \SubjectTest.id)
-                        .join(\SubjectTest.subjectID,   to: \Subject.id)
+                        .join(\TestSession.id, to: \TaskSession.id)
+                        .join(\TestSession.testID, to: \SubjectTest.id)
+                        .join(\SubjectTest.subjectID, to: \Subject.id)
                         .where(\TestSession.submittedAt != nil)
                         .where(\TaskSession.userID == user.requireID())
                         .all(decoding: TestSession.HighOverview.self)

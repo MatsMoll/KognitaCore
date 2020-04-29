@@ -8,9 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-
-public protocol FlashCardTaskRepository:
-    CreateModelRepository,
+public protocol FlashCardTaskRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
@@ -18,8 +16,7 @@ public protocol FlashCardTaskRepository:
     CreateData      == FlashCardTask.Create.Data,
     CreateResponse  == FlashCardTask.Create.Response,
     UpdateData      == FlashCardTask.Edit.Data,
-    UpdateResponse  == FlashCardTask.Edit.Response
-{
+    UpdateResponse  == FlashCardTask.Edit.Response {
     static func importTask(
         from task: Task.BetaFormat,
         in subtopic: Subtopic,
@@ -29,16 +26,15 @@ public protocol FlashCardTaskRepository:
     static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
 }
 
-
 extension FlashCardTask {
-    
+
     public final class DatabaseRepository: FlashCardTaskRepository {}
 }
 
 extension FlashCardTask.DatabaseRepository {
-    
+
     public static func create(from content: FlashCardTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
-        
+
         guard let user = user else {
             throw Abort(.unauthorized)
         }
@@ -69,7 +65,7 @@ extension FlashCardTask.DatabaseRepository {
                 }
         }
     }
-    
+
     public static func update(model flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
         guard let task = flashCard.task else {
@@ -128,7 +124,7 @@ extension FlashCardTask.DatabaseRepository {
                 }
                 return task.get(on: conn)
                     .flatMap { task in
-                        
+
                         guard isModerator || task.creatorID == user.id else {
                             throw Abort(.forbidden)
                         }
@@ -184,7 +180,6 @@ extension FlashCardTask.DatabaseRepository {
             .decode(Task.self)
             .all()
     }
-
 
     public static func content(for flashCard: FlashCardTask, on conn: DatabaseConnectable) -> EventLoopFuture<TaskPreviewContent> {
 

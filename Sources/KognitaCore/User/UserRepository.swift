@@ -9,22 +9,20 @@ import Crypto
 import FluentPostgreSQL
 import Vapor
 
-public protocol UserRepository:
-    CreateModelRepository,
+public protocol UserRepository: CreateModelRepository,
     RetriveModelRepository
     where
     CreateData      == User.Create.Data,
     CreateResponse  == User.Response,
-    Model           == User
-{
+    Model           == User {
     static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?>
 
-    static func isModerator(user: User, subjectID: Subject.ID,      on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, subtopicID: Subtopic.ID,    on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, taskID: Task.ID,            on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, topicID: Topic.ID,          on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 
-    static func canPractice(user: User, subjectID: Subject.ID,      on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
 
     static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
     static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token>
@@ -46,7 +44,6 @@ extension String {
 }
 
 extension User.DatabaseRepository: UserRepository {
-
 
     public enum Errors: LocalizedError {
         case passwordMismatch
@@ -79,7 +76,7 @@ extension User.DatabaseRepository: UserRepository {
     }
 
     static public func create(from content: User.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
-        
+
         guard content.acceptedTerms else {
             throw Errors.missingInput
         }
@@ -213,7 +210,7 @@ extension User.DatabaseRepository: UserRepository {
             .filter(\.userID == user.requireID())
             .first()
             .unwrap(or: Abort(.badRequest))
-            .flatMap { token in
+            .flatMap { _ in
                 user.isEmailVerified = true
                 return user.save(on: conn)
                     .transform(to: ())

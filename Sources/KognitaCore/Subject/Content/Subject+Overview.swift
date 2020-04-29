@@ -1,4 +1,3 @@
-
 extension Subject {
     public struct Overview: Codable {
         public let id: Subject.ID

@@ -1,4 +1,3 @@
-
 import Vapor
 
 extension TestSession {

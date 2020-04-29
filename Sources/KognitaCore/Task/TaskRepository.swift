@@ -10,7 +10,7 @@ import FluentSQL
 import Vapor
 
 extension Task {
-    
+
     public enum Create {
         public struct Data {
             let content: TaskCreationContentable
@@ -19,25 +19,25 @@ extension Task {
         }
         public typealias Response = Task
 
-        public enum Errors : Error {
+        public enum Errors: Error {
             case invalidTopic
         }
     }
-    
+
     public final class Repository: RetriveAllModelsRepository {
         public typealias Model = Task
         public typealias ResponseModel = Task
-        
+
         public static let shared = Repository()
     }
 }
 
 extension Task.Repository {
-    
+
     public static func create(from content: Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
 
         guard let user = user else { throw Abort(.unauthorized) }
-        
+
         return try Task(
             content: content.content,
             subtopicID: content.subtopicID,
@@ -168,7 +168,6 @@ extension Task.Repository {
         }
     }
 
-    
     struct NumberInputTaskKey: Content {
         let correctAnswer: Double?  // NumberInputTask
     }
@@ -176,7 +175,7 @@ extension Task.Repository {
     struct MultipleChoiseTaskKey: Content {
         let isMultipleSelect: Bool?  // MultipleChoiseTask
     }
-    
+
     public static func getTaskTypePath(for id: Task.ID, conn: DatabaseConnectable) throws -> EventLoopFuture<String> {
 
         return Task.query(on: conn, withSoftDeleted: true)
@@ -212,9 +211,9 @@ extension Task.Repository {
             .groupBy(\User.id)
             .all(decoding: TaskCreators.self)
     }
-    
+
     public static func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> EventLoopFuture<(Task, MultipleChoiseTask?)?> {
-        
+
         return conn.select()
             .all(table: Task.self)
             .all(table: MultipleChoiseTask.self)
@@ -250,7 +249,6 @@ extension Task.Repository {
             .all()
     }
 }
-
 
 public struct TaskCreators: Content {
 

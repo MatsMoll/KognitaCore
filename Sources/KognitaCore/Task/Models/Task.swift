@@ -62,7 +62,6 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
     /// The id of the new edited task if there exists one
     public var editedTaskID: Task.ID?
 
-
     init(
         subtopicID: Subtopic.ID,
         description: String?,
@@ -183,7 +182,6 @@ extension Task {
 
 extension Task: Content { }
 extension Task: ModelParameterRepresentable { }
-
 
 extension Task {
     public struct BetaFormat: Content {

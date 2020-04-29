@@ -2,7 +2,6 @@ import Authentication
 import FluentPostgreSQL
 import Vapor
 
-
 public protocol UserContent {
     var userId: Int { get }
     var username: String { get }
@@ -53,12 +52,12 @@ public final class User: KognitaCRUDModel {
         self.isAdmin = isAdmin
         self.isEmailVerified = isEmailVerified
     }
-    
+
     public static func addTableConstraints(to builder: SchemaCreator<User>) {
         builder.unique(on: \.email)
         builder.unique(on: \.username)
     }
-    
+
     public func update(password: String) throws {
         passwordHash = try BCrypt.hash(password)
     }
@@ -85,15 +84,14 @@ extension User: SessionAuthenticatable { }
 /// Allows `User` to be used as a dynamic parameter in route definitions.
 extension User: ModelParameterRepresentable { }
 
-
 extension User {
-    
+
     public func content() throws -> User.Response {
         try User.Response(
-            userId:             requireID(),
-            username:           username,
-            email:              email,
-            registrationDate:   createdAt ?? Date()
+            userId: requireID(),
+            username: username,
+            email: email,
+            registrationDate: createdAt ?? Date()
         )
     }
 }

@@ -9,34 +9,31 @@ import SQL
 import PostgreSQL
 
 extension SQLQueryFetcher {
-    
+
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<D>(decoding type: Optional<D>.Type) -> EventLoopFuture<D?>
-        where D: Decodable
-    {
+        where D: Decodable {
         return self.all(decoding: type).map { $0.first }
     }
-    
+
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<A, B>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type) -> EventLoopFuture<(A?, B?)?>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         return self.all(decoding: typeA, typeB).map { $0.first }
     }
-    
+
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> EventLoopFuture<(A, B?)?>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         return self.all(decoding: typeA, typeB).map { $0.first }
     }
 
@@ -45,38 +42,34 @@ extension SQLQueryFetcher {
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<A, B, C>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<(A?, B?, C?)?>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
-    
+
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<A, B, C>(decoding typeA: A.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<(A, B?, C?)?>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
-    
+
     /// Collects the first decoded output and returns it.
     ///
     ///     builder.first(decoding: Planet.self)
     ///
     public func first<A, B, C>(decoding typeA: A.Type, _ typeB: B.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<(A, B, C?)?>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return self.all(decoding: typeA, typeB, typeC).map { $0.first }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A>(decoding type: Optional<A>.Type) -> EventLoopFuture<[A]>
-        where A: Decodable
-    {
+        where A: Decodable {
         var all: [A] = []
         return run(decoding: type) {
             if let element = $0 {
@@ -84,14 +77,13 @@ extension SQLQueryFetcher {
             }
         }.map { all }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type) -> EventLoopFuture<[(A?, B?)]>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         var all: [(A?, B?)] = []
         return run(decoding: typeA, typeB) { aValue, bValue in
             if aValue != nil || bValue != nil {
@@ -99,25 +91,23 @@ extension SQLQueryFetcher {
             }
         }.map { all }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B>(decoding typeA: A.Type, _ typeB: Optional<B>.Type) -> EventLoopFuture<[(A, B?)]>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         var all: [(A, B?)] = []
         return run(decoding: typeA, typeB) { aValue, bValue in all.append((aValue, bValue)) }.map { all }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B, C>(decoding typeA: Optional<A>.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<[(A?, B?, C?)]>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         var all: [(A?, B?, C?)] = []
         return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in
             if aValue != nil || bValue != nil || cValue != nil {
@@ -125,25 +115,23 @@ extension SQLQueryFetcher {
             }
         }.map { all }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B, C>(decoding typeA: A.Type, _ typeB: Optional<B>.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<[(A, B?, C?)]>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         var all: [(A, B?, C?)] = []
         return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in all.append((aValue, bValue, cValue)) }.map { all }
     }
-    
+
     /// Collects all decoded output into an array and returns it.
     ///
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B, C>(decoding typeA: A.Type, _ typeB: B.Type, _ typeC: Optional<C>.Type) -> EventLoopFuture<[(A, B, C?)]>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         var all: [(A, B, C?)] = []
         return run(decoding: typeA, typeB, typeC) { aValue, bValue, cValue in all.append((aValue, bValue, cValue)) }.map { all }
     }
@@ -153,12 +141,11 @@ extension SQLQueryFetcher {
     ///     builder.all(decoding: Planet.self)
     ///
     public func all<A, B, C, D>(decoding typeA: A.Type, _ typeB: B.Type, _ typeC: C.Type, _ typeD: D.Type) -> EventLoopFuture<[(A, B, C, D)]>
-        where A: Decodable, B: Decodable, C: Decodable, D: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable, D: Decodable {
         var all: [(A, B, C, D)] = []
         return run(decoding: typeA, typeB, typeC, typeD) { aValue, bValue, cValue, dValue in all.append((aValue, bValue, cValue, dValue)) }.map { all }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self) { planet in
@@ -168,10 +155,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A>(
         decoding type: Optional<A>.Type,
-        into handler: @escaping (A?) throws -> ()
+        into handler: @escaping (A?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable
-    {
+        where A: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifier = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -180,7 +166,7 @@ extension SQLQueryFetcher {
             }
         }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self, Galaxy.self, SolarSystem.self) { planet, galaxy, solarSystem in
@@ -190,10 +176,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B>(
         decoding aType: Optional<A>.Type, _ bType: Optional<B>.Type,
-        into handler: @escaping (A?, B?) throws -> ()
+        into handler: @escaping (A?, B?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -204,7 +189,7 @@ extension SQLQueryFetcher {
             }
         }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self, Galaxy.self, SolarSystem.self) { planet, galaxy, solarSystem in
@@ -214,10 +199,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B>(
         decoding aType: A.Type, _ bType: Optional<B>.Type,
-        into handler: @escaping (A, B?) throws -> ()
+        into handler: @escaping (A, B?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable
-    {
+        where A: Decodable, B: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -228,7 +212,7 @@ extension SQLQueryFetcher {
             }
         }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self, Galaxy.self, SolarSystem.self) { planet, galaxy, solarSystem in
@@ -238,10 +222,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B, C>(
         decoding aType: Optional<A>.Type, _ bType: Optional<B>.Type, _ cType: Optional<C>.Type,
-        into handler: @escaping (A?, B?, C?) throws -> ()
+        into handler: @escaping (A?, B?, C?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -254,7 +237,7 @@ extension SQLQueryFetcher {
             }
         }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self, Galaxy.self, SolarSystem.self) { planet, galaxy, solarSystem in
@@ -264,10 +247,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B, C>(
         decoding aType: A.Type, _ bType: Optional<B>.Type, _ cType: Optional<C>.Type,
-        into handler: @escaping (A, B?, C?) throws -> ()
+        into handler: @escaping (A, B?, C?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -280,7 +262,7 @@ extension SQLQueryFetcher {
             }
         }
     }
-    
+
     /// Runs the query, passing decoded output to the supplied closure as it is recieved.
     ///
     ///     builder.run(decoding: Planet.self, Galaxy.self, SolarSystem.self) { planet, galaxy, solarSystem in
@@ -290,10 +272,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B, C>(
         decoding aType: A.Type, _ bType: B.Type, _ cType: Optional<C>.Type,
-        into handler: @escaping (A, B, C?) throws -> ()
+        into handler: @escaping (A, B, C?) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable, C: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -316,10 +297,9 @@ extension SQLQueryFetcher {
     /// The returned future will signal completion of the query.
     public func run<A, B, C, D>(
         decoding aType: A.Type, _ bType: B.Type, _ cType: C.Type, _ dType: D.Type,
-        into handler: @escaping (A, B, C, D) throws -> ()
+        into handler: @escaping (A, B, C, D) throws -> Void
     ) -> EventLoopFuture<Void>
-        where A: Decodable, B: Decodable, C: Decodable, D: Decodable
-    {
+        where A: Decodable, B: Decodable, C: Decodable, D: Decodable {
         return connectable.withSQLConnection { conn in
             return conn.query(self.query) { row in
                 let identifierA = Connectable.Connection.Query.Select.TableIdentifier.table(any: A.self)
@@ -341,7 +321,7 @@ extension SQLSelectBuilder {
     func column<M, V>(
         _ keyPath: KeyPath<M, V>,
         as alias: Connectable.Connection.Query.Select.SelectExpression.Identifier? = nil
-    ) -> Self where M : SQLTable {
+    ) -> Self where M: SQLTable {
         return column(.column(keyPath), as: alias)
     }
 }

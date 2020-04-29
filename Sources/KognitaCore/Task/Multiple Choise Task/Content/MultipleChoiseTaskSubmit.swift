@@ -7,9 +7,8 @@
 
 import Vapor
 
-
 extension MultipleChoiseTask {
-    
+
     /// The content needed to submit a answer to a `MultipleChoiseTask`
     public struct Submit: Content, TaskSubmitable {
 

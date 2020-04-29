@@ -37,7 +37,6 @@ public final class SubjectTest: KognitaPersistenceModel {
     /// A bool represening if is in team based learning mode
     public var isTeamBasedLearning: Bool
 
-
     public var isOpen: Bool {
         guard
             let openedAt = openedAt,
@@ -47,7 +46,6 @@ public final class SubjectTest: KognitaPersistenceModel {
         }
         return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
     }
-
 
     init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID, isTeamBasedLearning: Bool) {
         self.scheduledAt            = scheduledAt
@@ -60,12 +58,12 @@ public final class SubjectTest: KognitaPersistenceModel {
 
     convenience init(data: SubjectTest.Create.Data) {
         self.init(
-            scheduledAt:            data.scheduledAt,
-            duration:               data.duration,
-            password:               data.password,
-            title:                  data.title,
-            subjectID:              data.subjectID,
-            isTeamBasedLearning:    data.isTeamBasedLearning
+            scheduledAt: data.scheduledAt,
+            duration: data.duration,
+            password: data.password,
+            title: data.title,
+            subjectID: data.subjectID,
+            isTeamBasedLearning: data.isTeamBasedLearning
         )
     }
 

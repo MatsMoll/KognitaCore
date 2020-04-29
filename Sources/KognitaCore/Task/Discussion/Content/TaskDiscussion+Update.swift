@@ -1,7 +1,7 @@
 import Vapor
 
 extension TaskDiscussion {
-    
+
     public enum Update {
 
         public struct Data: Content {
