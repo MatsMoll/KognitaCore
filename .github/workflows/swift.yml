@@ -34,7 +34,7 @@ jobs:
         DATABASE_USER: postgres
         DATABASE_PASSWORD: postgres
         DATABASE_DB: postgres
-        DATABASE_HOSTNAME: postgres
+        DATABASE_HOSTNAME: localhost
     - name: Release new version
       uses: MatsMoll/action-finch@master
       if: github.ref == 'refs/heads/master'
