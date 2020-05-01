@@ -14,13 +14,6 @@ on:
 
 jobs:
   bionic-job:
-    container: 
-      image: swift:5.2-bionic
-      env:
-        DATABASE_USER: postgres
-        DATABASE_PASSWORD: postgres
-        DATABASE_DB: postgres
-        DATABASE_HOSTNAME: postgres
     services:
       postgres:
         image: postgres
@@ -33,17 +26,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1.2.0
+    - name: GitHub Action for SwiftLint
+      uses: norio-nomura/action-swiftlint@3.1.0
     - name: Run unit tests
-      run: |
-        apt-get -qq update && apt-get install -y \
-          libssl-dev zlib1g-dev \
-          && rm -r /var/lib/apt/lists/*
-        swift test
+      run: swift test
+      env:
+        DATABASE_USER: postgres
+        DATABASE_PASSWORD: postgres
+        DATABASE_DB: postgres
+        DATABASE_HOSTNAME: localhost
     - name: Release new version
-      run: |
-        apt-get -qq update && apt-get install -y jq curl
-        bash ./CI/install-finch.sh
-        bash ./CI/release-version.sh
+      uses: MatsMoll/action-finch@master
       if: github.ref == 'refs/heads/master'
-      env: 
+      env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ secrets.GITHUB_REPOSITORY }}
+        GITHUB_SHA: ${{ secrets.GITHUB_SHA }}
+        FINCH_CONFIG: CI/finch-config.yml
