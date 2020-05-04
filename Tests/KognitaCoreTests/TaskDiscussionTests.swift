@@ -71,7 +71,6 @@ final class TaskDiscussionTests: VaporTestCase {
         }
     }
 
-
     func testCreateDiscussionResponseWithoutDescription() {
         do {
             let user = try User.create(on: conn)
@@ -143,7 +142,6 @@ final class TaskDiscussionTests: VaporTestCase {
 
             XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: insufficientData, by: user, on: conn))
             XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: noResponse, by: user, on: conn))
-
 
         } catch {
             XCTFail(error.localizedDescription)

@@ -11,28 +11,32 @@ import XCTest
 @testable import KognitaCore
 
 extension MultipleChoiseTask {
-    
-    public static func create(creator:              User?       = nil,
-                              subtopic:             Subtopic?   = nil,
-                              task:                 Task?       = nil,
-                              isMultipleSelect:     Bool        = true,
-                              choises:              [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
-                              isTestable:           Bool        = false,
-                              on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
-        
+
+    public static func create(
+        creator: User?       = nil,
+        subtopic: Subtopic?   = nil,
+        task: Task?       = nil,
+        isMultipleSelect: Bool        = true,
+        choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
+        isTestable: Bool        = false,
+        on conn: PostgreSQLConnection
+    ) throws -> MultipleChoiseTask {
+
         let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, isTestable: isTestable, on: conn)
-        
+
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
                           choises: choises,
                           on: conn)
     }
-    
-    public static func create(taskId:              Task.ID,
-                       isMultipleSelect:    Bool        = true,
-                       choises:             [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
-                       on conn:             PostgreSQLConnection) throws -> MultipleChoiseTask {
-        
+
+    public static func create(
+        taskId: Task.ID,
+        isMultipleSelect: Bool        = true,
+        choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
+        on conn: PostgreSQLConnection
+    ) throws -> MultipleChoiseTask {
+
         return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
             .create(on: conn)
             .flatMap { task in

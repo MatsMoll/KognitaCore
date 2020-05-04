@@ -8,9 +8,9 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
-    
-    public struct Response : Content {
+public final class Topic: KognitaCRUDModel, KognitaModelUpdatable {
+
+    public struct Response: Content {
         public let topic: Topic.Overview
         public let subtopics: [Subtopic.Overview]
     }
@@ -28,7 +28,7 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
             self.chapter = topic.chapter
         }
     }
-    
+
     public var id: Int?
 
     /// The subject the topic is assigned to
@@ -39,11 +39,10 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
 
     /// The chapther number in a subject
     public private(set) var chapter: Int
-    
+
     public var createdAt: Date?
     public var updatedAt: Date?
-    
-    
+
     public init(name: String, chapter: Int, subjectId: Subject.ID) throws {
         self.name           = name
         self.chapter        = chapter
@@ -60,10 +59,9 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
         name        = content.name
         chapter     = content.chapter
     }
-    
-    
+
     public static func addTableConstraints(to builder: SchemaCreator<Topic>) {
-        
+
         builder.unique(on: \.chapter, \.subjectId)
 
         builder.reference(from: \.subjectId, to: \Subject.id, onUpdate: .cascade, onDelete: .cascade)
@@ -71,11 +69,11 @@ public final class Topic : KognitaCRUDModel, KognitaModelUpdatable {
 }
 
 extension Topic {
-    
+
     public enum Create {
-        
-        public struct Data : Content {
-            
+
+        public struct Data: Content {
+
             /// This subject id
             public let subjectId: Subject.ID
 
@@ -85,10 +83,10 @@ extension Topic {
             /// The chapther number in a subject
             public let chapter: Int
         }
-        
+
         public typealias Response = Topic
     }
-    
+
     public typealias Edit = Create
 }
 

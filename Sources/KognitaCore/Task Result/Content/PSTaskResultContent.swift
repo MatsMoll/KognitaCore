@@ -18,6 +18,7 @@ public protocol TaskResultable {
     var timeUsed: TimeInterval { get }
     var date: Date? { get }
     var revisitDate: Date? { get }
+    var isSetManually: Bool { get }
 }
 
 extension PracticeSession {
@@ -30,7 +31,7 @@ extension PracticeSession {
         public var taskIndex: Int
 
         public var question: String
-        
+
         public var revisitTime: Int { 0 }
 
         public var resultDescription: String { "" }
@@ -44,43 +45,7 @@ extension PracticeSession {
         public var date: Date?
 
         public var revisitDate: Date?
-    }
-}
 
-public struct PSTaskResult: TaskResultable {
-    public var topicID: Topic.ID { topic.id ?? 0 }
-
-    public let task: Task
-    public let topic: Topic
-    public let result: TaskResult
-    public let taskIndex: Int
-
-    public var topicName: String { return topic.name }
-
-    public var question: String { return task.question }
-
-    public var resultDescription: String {
-        if result.resultScore.remainder(dividingBy: 1) == 0 {
-            return "\(Int(result.resultScore)) poeng"
-        } else {
-            return "\((100 * result.resultScore).rounded() / 100) poeng"
-        }
-    }
-
-    public var resultScore: Double {
-        return result.resultScore * 100
-    }
-
-    public var timeUsed: TimeInterval { return 0 }
-
-    public var date: Date? { return nil }
-
-    public var revisitTime: Int {
-        return ScoreEvaluater.shared
-            .daysUntillReview(score: result.resultScore)
-    }
-
-    public var revisitDate: Date? {
-        return result.revisitDate
+        public var isSetManually: Bool
     }
 }

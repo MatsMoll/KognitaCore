@@ -33,7 +33,6 @@ public final class TaskSessionResult<T: Content>: Content, TaskSubmitResultable 
 
     public let result: T
 
-
     init(
         result: T,
         score: Double,
@@ -41,7 +40,7 @@ public final class TaskSessionResult<T: Content>: Content, TaskSubmitResultable 
     ) {
         self.result = result
         self.score = score
-        self.progress = progress        
+        self.progress = progress
     }
 
     public struct Representable: TaskSubmitResultRepresentable {

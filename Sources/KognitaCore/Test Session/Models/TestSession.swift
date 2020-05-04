@@ -35,7 +35,6 @@ public final class TestSession: KognitaPersistenceModel {
 
 extension TestSession: Content {}
 
-
 extension TaskSession {
 
     public struct TestParameter: ModelParameterRepresentable, Codable, TestSessionRepresentable {
@@ -43,12 +42,13 @@ extension TaskSession {
         let session: TaskSession
         let testSession: TestSession
 
-        public var userID: User.ID              { session.userID }
-        public var createdAt: Date?             { session.createdAt }
-        public var testID: SubjectTest.ID       { testSession.testID }
-        public var submittedAt: Date?           { testSession.submittedAt }
+        public var userID: User.ID { session.userID }
+        public var createdAt: Date? { session.createdAt }
+        public var testID: SubjectTest.ID { testSession.testID }
+        public var submittedAt: Date? { testSession.submittedAt }
+        public var executedAt: Date? { testSession.createdAt }
 
-        public func requireID() throws -> Int   { try session.requireID() }
+        public func requireID() throws -> Int { try session.requireID() }
 
         public func submit(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable> {
             guard submittedAt == nil else {
@@ -58,7 +58,6 @@ extension TaskSession {
             return testSession.save(on: conn)
                 .transform(to: self)
         }
-
 
         public typealias ResolvedParameter = EventLoopFuture<TestParameter>
         public typealias ParameterModel = TestParameter
@@ -124,6 +123,7 @@ extension TestSession {
         public let testTitle: String
         public let testIsOpen: Bool
         public let executedAt: Date
+        public let endedAt: Date
         public let shouldPresentDetails: Bool
         public let topicResults: [Topic]
         public let subjectID: Subject.ID
@@ -137,10 +137,11 @@ extension TestSession {
             return score / maximumScore
         }
 
-        init(testTitle: String, testIsOpen: Bool, executedAt: Date, shouldPresentDetails: Bool, subjectID: Subject.ID, canPractice: Bool, topicResults: [Topic]) {
+        init(testTitle: String, endedAt: Date, testIsOpen: Bool, executedAt: Date, shouldPresentDetails: Bool, subjectID: Subject.ID, canPractice: Bool, topicResults: [Topic]) {
             self.testTitle = testTitle
             self.testIsOpen = testIsOpen
             self.executedAt = executedAt
+            self.endedAt = endedAt
             self.shouldPresentDetails = shouldPresentDetails
             self.subjectID = subjectID
             self.canPractice = canPractice

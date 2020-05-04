@@ -10,19 +10,21 @@ import FluentPostgreSQL
 @testable import KognitaCore
 
 extension Task {
-    
-    public static func create(creator:         User?           = nil,
-                       subtopic:        Subtopic?       = nil,
-                       description:     String?         = nil,
-                       question:        String          = "Some question",
-                       explenation:     String          = "Some explenation",
-                       createSolution:  Bool            = true,
-                       isTestable:      Bool            = false,
-                       on conn:         PostgreSQLConnection) throws -> Task {
+
+    public static func create(
+        creator: User?           = nil,
+        subtopic: Subtopic?       = nil,
+        description: String?         = nil,
+        question: String          = "Some question",
+        explenation: String          = "Some explenation",
+        createSolution: Bool            = true,
+        isTestable: Bool            = false,
+        on conn: PostgreSQLConnection
+    ) throws -> Task {
 
         let usedCreator = try creator ?? User.create(on: conn)
         let usedSubtopic = try subtopic ?? Subtopic.create(on: conn)
-        
+
         return try create(creator: usedCreator,
                           subtopicId: usedSubtopic.requireID(),
                           description: description,
@@ -32,22 +34,24 @@ extension Task {
                           isTestable: isTestable,
                           on: conn)
     }
-    
-    public static func create(creator:       User,
-                       subtopicId:      Subtopic.ID,
-                       description:     String?         = nil,
-                       question:        String          = "Some question",
-                       explenation:     String          = "Some explenation",
-                       createSolution:  Bool            = true,
-                       isTestable:      Bool            = false,
-                       on conn:         PostgreSQLConnection) throws -> Task {
 
-        return try Task(subtopicID:     subtopicId,
-                        description:    description,
-                        question:       question,
-                        creatorID:      creator.requireID(),
-                        isTestable:     isTestable)
-            
+    public static func create(
+        creator: User,
+        subtopicId: Subtopic.ID,
+        description: String?         = nil,
+        question: String          = "Some question",
+        explenation: String          = "Some explenation",
+        createSolution: Bool            = true,
+        isTestable: Bool            = false,
+        on conn: PostgreSQLConnection
+    ) throws -> Task {
+
+        return try Task(subtopicID: subtopicId,
+                        description: description,
+                        question: question,
+                        creatorID: creator.requireID(),
+                        isTestable: isTestable)
+
             .save(on: conn)
             .flatMap { task in
                 if createSolution {

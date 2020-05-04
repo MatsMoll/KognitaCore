@@ -8,7 +8,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class TaskDiscussion : KognitaCRUDModel, Validatable {
+public final class TaskDiscussion: KognitaCRUDModel, Validatable {
 
     public var id: Int?
 
@@ -48,7 +48,6 @@ public final class TaskDiscussion : KognitaCRUDModel, Validatable {
             }
         }
     }
-
 
     public static func validations() throws -> Validations<TaskDiscussion> {
         var validations = Validations(TaskDiscussion.self)

@@ -15,7 +15,6 @@ final class ProductionJobQueue: JobQueueable {
         self.container = container
     }
 
-
     func scheduleFutureJob(after delay: TimeAmount, job: @escaping (Container, DatabaseConnectable) throws -> EventLoopFuture<Void>) {
         eventLoop.scheduleTask(in: delay) {
             self.container.requestCachedConnection(to: .psql)
@@ -26,7 +25,6 @@ final class ProductionJobQueue: JobQueueable {
     }
 }
 
-
 extension ProductionJobQueue: ServiceType {
     static var serviceSupports: [Any.Type] {
         return [JobQueueable.self]
@@ -36,7 +34,6 @@ extension ProductionJobQueue: ServiceType {
         return ProductionJobQueue(eventLoop: worker.eventLoop, container: worker)
     }
 }
-
 
 public func config(enviroment: Environment, in services: inout Services) {
     services.register(

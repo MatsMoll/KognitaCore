@@ -1,4 +1,3 @@
-
 import FluentPostgreSQL
 
 extension User {
@@ -32,4 +31,3 @@ extension User.ModeratorPrivilege {
         }
     }
 }
-

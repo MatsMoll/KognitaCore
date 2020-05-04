@@ -4,33 +4,32 @@
 //
 //  Created by Mats Mollestad on 08/11/2018.
 //
+// swiftlint:disable force_try
 
 import Vapor
 import XCTest
 import FluentPostgreSQL
 
-
 /// A class that setups a application in a testable enviroment and creates a connection to the database
 class VaporTestCase: XCTestCase {
-    
+
     enum Errors: Error {
         case badTest
     }
 
     var conn: PostgreSQLConnection!
-    
+
     var envArgs: [String]?
 
     var app: Application!
-    
-    
+
     override func setUp() {
         super.setUp()
         try! Application.reset()
         app = try! Application.testable()
         conn = try! app.newConnection(to: .psql).wait()
     }
-    
+
     override func tearDown() {
         super.tearDown()
         app.shutdownGracefully { (error) in
@@ -60,7 +59,6 @@ class VaporTestCase: XCTestCase {
         }
     }
 }
-
 
 extension Response {
     func has(statusCode: HTTPResponseStatus) {

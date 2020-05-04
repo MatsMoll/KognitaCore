@@ -37,4 +37,3 @@ extension MultipleChoiseTaskAnswer: Migration {
         return PostgreSQLDatabase.delete(MultipleChoiseTaskAnswer.self, on: connection)
     }
 }
-

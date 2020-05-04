@@ -8,7 +8,7 @@
 import Vapor
 
 extension MultipleChoiseTask {
-    
+
     public struct Data: Content {
 
         public let task: Task
@@ -31,9 +31,9 @@ extension MultipleChoiseTask {
             )
         }
     }
-    
+
     public struct Create {
-        
+
         public struct Data: Content, TaskCreationContentable {
 
             public let subtopicId: Topic.ID
@@ -67,10 +67,10 @@ extension MultipleChoiseTask {
                 }
             }
         }
-        
+
         public typealias Response = MultipleChoiseTask
     }
-    
+
     public typealias Edit = Create
 }
 

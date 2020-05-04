@@ -14,9 +14,9 @@ public final class MultipleChoiseTask: KognitaCRUDModel {
 
     /// A bool indicating if the user should be able to select one or more choises
     public var isMultipleSelect: Bool
-    
+
     public var createdAt: Date?
-    
+
     public var updatedAt: Date?
 
     public convenience init(isMultipleSelect: Bool, task: Task) throws {
@@ -25,14 +25,14 @@ public final class MultipleChoiseTask: KognitaCRUDModel {
     }
 
     public var actionDescription: String {
-        return isMultipleSelect ? "Velg et eller flere alternativ" : "Velg et alternativ"
+        return isMultipleSelect ? "Velg ett eller flere alternativer" : "Velg ett alternativ"
     }
 
     public init(isMultipleSelect: Bool, taskID: Task.ID) {
         self.isMultipleSelect = isMultipleSelect
         self.id = taskID
     }
-    
+
     public static func addTableConstraints(to builder: SchemaCreator<MultipleChoiseTask>) {
         builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
     }
@@ -82,7 +82,6 @@ extension MultipleChoiseTask {
 //    }
 }
 
-
 extension MultipleChoiseTask {
 
     var choises: Children<MultipleChoiseTask, MultipleChoiseTaskChoise> {
@@ -113,4 +112,3 @@ extension MultipleChoiseTask {
 
 extension MultipleChoiseTask: ModelParameterRepresentable { }
 extension MultipleChoiseTask: Content { }
-

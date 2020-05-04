@@ -1,8 +1,7 @@
 import FluentSQL
 import Vapor
 
-public protocol SubjectTestRepositoring:
-    CreateModelRepository,
+public protocol SubjectTestRepositoring: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
@@ -10,8 +9,7 @@ public protocol SubjectTestRepositoring:
     CreateResponse  == SubjectTest.Create.Response,
     UpdateData      == SubjectTest.Update.Data,
     UpdateResponse  == SubjectTest.Update.Response,
-    Model           == SubjectTest
-{
+    Model           == SubjectTest {
     /// Opens a test so users can enter
     /// - Parameters:
     ///   - test: The test to open
@@ -19,7 +17,6 @@ public protocol SubjectTestRepositoring:
     ///   - conn: The database connection
     /// - Returns: A future that contains the opend test
     static func open(test: SubjectTest, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest>
-
 
     /// A user enters a test in order to submit answers etc
     /// - Parameters:
@@ -82,11 +79,10 @@ public protocol SubjectTestRepositoring:
     static func currentlyOpenTest(in subject: Subject, user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.OverviewResponse?>
 }
 
-
 extension SubjectTest {
 
+    //swiftlint:disable type_body_length
     public struct DatabaseRepository: SubjectTestRepositoring {
-
         public enum Errors: Error {
             case testIsClosed
             case alreadyEntered(sessionID: TaskSession.ID)
@@ -226,7 +222,6 @@ extension SubjectTest {
             }
         }
 
-
         public static func taskWith(id: SubjectTest.Pivot.Task.ID, in session: TestSessionRepresentable, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
 
             guard try session.userID == user.requireID() else {
@@ -235,8 +230,8 @@ extension SubjectTest {
 
             return SubjectTest.Pivot.Task
                 .query(on: conn)
-                .join(\Task.id,                         to: \SubjectTest.Pivot.Task.taskID)
-                .join(\MultipleChoiseTask.id,           to: \Task.id)
+                .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
+                .join(\MultipleChoiseTask.id, to: \Task.id)
                 .join(\MultipleChoiseTaskChoise.taskId, to: \MultipleChoiseTask.id)
                 .filter(\SubjectTest.Pivot.Task.testID == session.testID)
                 .filter(\SubjectTest.Pivot.Task.id == id)
@@ -319,7 +314,7 @@ extension SubjectTest {
                                         .all(table: Task.self)
                                         .all(table: MultipleChoiseTaskChoise.self)
                                         .from(SubjectTest.Pivot.Task.self)
-                                        .join(\SubjectTest.Pivot.Task.taskID,   to: \Task.id)
+                                        .join(\SubjectTest.Pivot.Task.taskID, to: \Task.id)
                                         .join(\Task.id, to: \MultipleChoiseTaskChoise.taskId)
                                         .where(\SubjectTest.Pivot.Task.testID == test.requireID())
                                         .all(decoding: Task.self, MultipleChoiseTaskChoise.self)
@@ -351,7 +346,7 @@ extension SubjectTest {
 
             var numberOfCorrectAnswers: Double = 0
 
-            let grupedChoiseCount = choiseCount.reduce(into: [MultipleChoiseTaskChoise.ID : Int]()) { dict, choiseCount in
+            let grupedChoiseCount = choiseCount.reduce(into: [MultipleChoiseTaskChoise.ID: Int]()) { dict, choiseCount in
                 dict[choiseCount.choiseID] = choiseCount.numberOfAnswers
             }
 
@@ -424,8 +419,8 @@ extension SubjectTest {
                         .all(table: SubjectTest.self)
                         .all(table: Subject.self)
                         .from(SubjectTest.self)
-                        .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
-                        .join(\SubjectTest.subjectID,   to: \Subject.id)
+                        .join(\SubjectTest.subjectID, to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.subjectID, to: \Subject.id)
                         .where(\SubjectTest.openedAt != nil)
                         .where(\User.ActiveSubject.userID == user.requireID())
                         .all(decoding: SubjectTest.self, Subject.self)
@@ -463,8 +458,8 @@ extension SubjectTest {
                         .all(table: SubjectTest.self)
                         .all(table: Subject.self)
                         .from(SubjectTest.self)
-                        .join(\SubjectTest.subjectID,   to: \User.ActiveSubject.subjectID)
-                        .join(\SubjectTest.subjectID,   to: \Subject.id)
+                        .join(\SubjectTest.subjectID, to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.subjectID, to: \Subject.id)
                         .where(\SubjectTest.openedAt != nil)
                         .where(\User.ActiveSubject.userID == user.requireID())
                         .where(\SubjectTest.subjectID == subject.requireID())
@@ -537,7 +532,7 @@ extension SubjectTest {
             else {
                 throw Errors.alreadyEnded
             }
-            
+
             return try User.DatabaseRepository
                 .isModerator(user: user, subjectID: test.subjectID, on: conn)
                 .flatMap {
@@ -602,8 +597,8 @@ extension SubjectTest {
                                 .flatMap { count in
 
                                     try conn.select()
-                                        .column(\TaskResult.resultScore,    as: "score")
-                                        .column(\TestSession.id,            as: "sessionID")
+                                        .column(\TaskResult.resultScore, as: "score")
+                                        .column(\TestSession.id, as: "sessionID")
                                         .from(TestSession.self)
                                         .join(\TestSession.id, to: \TaskResult.sessionID)
                                         .where(\TestSession.testID == test.requireID())
@@ -658,9 +653,9 @@ extension SubjectTest {
                         .flatMap { conn in
 
                             try conn.select()
-                                .column(\User.email,                as: "userEmail")
-                                .column(\User.id,                   as: "userID")
-                                .column(\TaskResult.resultScore,    as: "score")
+                                .column(\User.email, as: "userEmail")
+                                .column(\User.id, as: "userID")
+                                .column(\TaskResult.resultScore, as: "score")
                                 .from(TaskResult.self)
                                 .join(\TaskResult.sessionID, to: \TaskSession.id)
                                 .join(\TaskSession.userID, to: \User.id)
@@ -692,5 +687,106 @@ extension SubjectTest {
                 .unwrap(or: Abort(.badRequest))
                 .map { $0.isOpen }
         }
+
+        public static func stats(for subject: Subject, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest.DetailedResult]> {
+            return try SubjectTest.query(on: conn)
+                .filter(\.subjectID == subject.requireID())
+                .filter(\.endedAt != nil)
+                .sort(\.openedAt, .ascending)
+                .all()
+                .flatMap { tests in
+
+                    var lastTest: SubjectTest?
+
+                    return try tests.map { test in
+                        defer { lastTest = test }
+                        return try results(for: test, lastTest: lastTest, on: conn)
+                    }
+                    .flatten(on: conn)
+            }
+        }
+
+        static func results(for test: SubjectTest, lastTest: SubjectTest? = nil, on conn: DatabaseConnectable) throws -> EventLoopFuture<SubjectTest.DetailedResult> {
+
+            try SubjectTest.Pivot.Task.query(on: conn)
+                .filter(\.testID == test.requireID())
+                .count()
+                .flatMap { numberOfTasks in
+
+                    try TestSession.query(on: conn)
+                        .join(\TaskResult.sessionID, to: \TestSession.id)
+                        .filter(\.testID == test.requireID())
+                        .decode(TaskResult.self)
+                        .all()
+                        .flatMap { testResults in
+
+                            guard let endedAt = test.endedAt else { throw Abort(.badRequest) }
+
+                            var query = PracticeSession.Pivot.Task.query(on: conn, withSoftDeleted: true)
+                                .join(\TaskResult.sessionID, to: \PracticeSession.Pivot.Task.sessionID)
+                                .join(\Task.id, to: \TaskResult.taskID)
+                                .join(\Subtopic.id, to: \Task.subtopicID)
+                                .join(\Topic.id, to: \Subtopic.topicId)
+                                .filter(\PracticeSession.Pivot.Task.isCompleted == true)
+                                .filter(\Topic.subjectId == test.subjectID)
+                                .filter(\PracticeSession.Pivot.Task.createdAt < endedAt)
+                                .decode(TaskResult.self)
+
+                            if let lastTest = lastTest, let lastEndedAt = lastTest.endedAt {
+                                query = query.filter(\PracticeSession.Pivot.Task.createdAt > lastEndedAt)
+                            }
+
+                            return query.all()
+                                .map { practiceResults in
+                                    DetailedResult(
+                                        testID: test.id ?? 0,
+                                        testTitle: test.title,
+                                        maxScore: Double(numberOfTasks),
+                                        results: calculateStats(testResults: testResults, practiceResults: practiceResults)
+                                    )
+                            }
+                    }
+            }
+        }
+
+        static func calculateStats(testResults: [TaskResult], practiceResults: [TaskResult]) -> [SubjectTest.UserStats] {
+
+            let groupedTestResults = testResults.group(by: \.userID.unsafelyUnwrapped)
+            let groupedPracticeResults = practiceResults.group(by: \.userID.unsafelyUnwrapped)
+                .mapValues { results in results.sorted(by: \TaskResult.timeUsed.unsafelyUnwrapped) }
+
+            let testScores = groupedTestResults.mapValues { $0.reduce(0) { $0 + $1.resultScore } }
+            let timePracticed = groupedPracticeResults.mapValues { $0.reduce(0) { $0 + ($1.timeUsed ?? 0) } }
+            let medianTime: [User.ID: TimeInterval] = groupedPracticeResults.mapValues { results in
+                if results.count % 2 == 1 {
+                    return results[(results.count - 1)/2].timeUsed ?? 0
+                } else {
+                    return ((results[(results.count)/2].timeUsed ?? 0) + (results[(results.count)/2 + 1].timeUsed ?? 0)) / 2
+                }
+            }
+
+            return testScores.map { userID, testScore in
+
+                SubjectTest.UserStats(
+                    timePracticed: timePracticed[userID] ?? 0,
+                    medianTimePerTask: medianTime[userID] ?? 0,
+                    numberOfTaskExecuted: (groupedPracticeResults[userID] ?? []).count,
+                    testScore: testScore,
+                    userID: userID
+                )
+            }
+        }
+    }
+}
+
+enum SortDirection {
+    case acending
+    case decending
+}
+
+extension Array {
+    func sorted<T: Comparable>(by keyPath: KeyPath<Element, T>, direction: SortDirection = .acending) -> [Element] {
+        let sortFunction: (Element, Element) -> Bool = direction == .acending ? { $0[keyPath: keyPath] > $1[keyPath: keyPath] } : { $0[keyPath: keyPath] < $1[keyPath: keyPath] }
+        return sorted(by: sortFunction)
     }
 }

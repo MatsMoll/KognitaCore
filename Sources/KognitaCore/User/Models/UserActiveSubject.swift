@@ -34,4 +34,3 @@ extension User.ActiveSubject {
         }
     }
 }
-
