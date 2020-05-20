@@ -18,6 +18,7 @@ extension MultipleChoiseTask {
         /// The choise id's
         public let choises: [MultipleChoiseTaskChoise.ID]
 
+        // FIXME: Remove and replace by url parameter
         public internal(set) var taskIndex: Int
     }
 }

@@ -46,6 +46,11 @@ extension Subject.DatabaseRepository {
         }
     }
 
+    /// Fetches the subject for a given topic
+    /// - Parameters:
+    ///   - topicID: The topic id
+    ///   - conn: The database connection
+    /// - Returns: A future `Subject`
     public static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
         Topic.query(on: conn)
             .filter(\.id == topicID)
