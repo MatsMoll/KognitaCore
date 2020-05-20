@@ -125,7 +125,6 @@ extension User {
             conn.future()
         }
 
-
         static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
             PostgreSQLDatabase.update(User.self, on: conn) { builder in
                 builder.field(for: \User.viewedNotificationsAt)

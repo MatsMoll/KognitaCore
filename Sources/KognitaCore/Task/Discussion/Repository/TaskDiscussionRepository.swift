@@ -3,7 +3,7 @@ import FluentPostgreSQL
 
 extension TaskDiscussion {
     public class DatabaseRepository: TaskDiscussionRepositoring {
-        
+
         public static func getDiscussions(in taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
             TaskDiscussion.query(on: conn)
                 .filter(\TaskDiscussion.taskID == taskID)
@@ -11,9 +11,9 @@ extension TaskDiscussion {
                 .alsoDecode(User.self)
                 .all()
                 .map { discussions in
-                    
+
                     return discussions.map { (discussion, user) in
-                        
+
                         TaskDiscussion.Details(
                             id: discussion.id ?? 0,
                             description: discussion.description,
@@ -24,7 +24,7 @@ extension TaskDiscussion {
                     }
             }
         }
-        
+
         public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
             return conn.databaseConnection(to: .psql)
                 .flatMap { psqlConn in
@@ -112,7 +112,13 @@ extension TaskDiscussion {
                     .all()
                     .map { responses in
                         responses.map { response, user in
-                            let isNew = response.createdAt! > oldViewedDate!
+                            var isNew = true
+                            if
+                                let oldDate = oldViewedDate,
+                                let responseDate = response.createdAt
+                            {
+                                isNew = responseDate > oldDate
+                            }
 
                             return TaskDiscussion.Pivot.Response.Details(
                                 response: response.response,

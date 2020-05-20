@@ -107,7 +107,7 @@ final class TaskDiscussionTests: VaporTestCase {
             _ = try TaskDiscussion.DatabaseRepository.respond(with: firstDiscussionResponse, by: user, on: conn).wait()
             _ = try TaskDiscussion.DatabaseRepository.respond(with: secondDiscussionResponse, by: user, on: conn).wait()
 
-            let responses = try TaskDiscussion.DatabaseRepository.responses(to: discussion.requireID(), on: conn).wait()
+            let responses = try TaskDiscussion.DatabaseRepository.responses(to: discussion.requireID(), for: user, on: conn).wait()
 
             XCTAssertEqual(responses.count, 2)
 
