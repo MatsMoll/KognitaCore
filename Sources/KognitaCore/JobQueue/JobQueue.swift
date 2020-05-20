@@ -3,6 +3,10 @@ import Foundation
 import FluentPostgreSQL
 
 public protocol JobQueueable: Service {
+    /// Schedule a job in the future
+    /// - Parameters:
+    ///   - delay: The dalay of the job
+    ///   - job: The job to execute
     func scheduleFutureJob(after delay: TimeAmount, job: @escaping (Container, DatabaseConnectable) throws -> EventLoopFuture<Void>)
 }
 
