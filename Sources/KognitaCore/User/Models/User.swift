@@ -38,6 +38,9 @@ public final class User: KognitaCRUDModel {
     /// Can be `nil` if the user has not been saved yet.
     public var updatedAt: Date?
 
+    /// Date of last date visiting the task discussions
+    public var viewedNotificationsAt: Date?
+
     /// A token used to activate other users
 //    public var loseAccessDate: Date?
 
@@ -111,6 +114,21 @@ extension User {
 
         static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
             conn.future()
+        }
+    }
+}
+
+extension User {
+    struct ViewedNotificationAtMigration: PostgreSQLMigration {
+
+        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            conn.future()
+        }
+
+        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+            PostgreSQLDatabase.update(User.self, on: conn) { builder in
+                builder.field(for: \User.viewedNotificationsAt)
+            }
         }
     }
 }
