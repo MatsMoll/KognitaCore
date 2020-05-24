@@ -10,6 +10,8 @@ import FluentPostgreSQL
 
 public final class MultipleChoiseTask: KognitaCRUDModel {
 
+    public static var tableName: String = "MultipleChoiceTask"
+
     public var id: Int?
 
     /// A bool indicating if the user should be able to select one or more choises

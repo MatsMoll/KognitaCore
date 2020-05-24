@@ -21,14 +21,17 @@ extension PracticeSession {
     /// - Returns: A `TaskSession.PracticeParameter` representing a session
     public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> TaskSession.PracticeParameter {
 
-        return try PracticeSession
-            .create(user, subtopics: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, on: conn)
+        return try PracticeSession.DatabaseRepository(conn: conn)
+            .create(
+                from: Create.Data(
+                    numberOfTaskGoal: numberOfTaskGoal,
+                    subtopicsIDs: subtopicIDs,
+                    topicIDs: nil
+                ),
+                by: user
+            )
             .flatMap { session in
-                try TaskSession.find(session.requireID(), on: conn)
-                    .unwrap(or: Abort(.internalServerError))
-                    .map { taskSession in
-                        TaskSession.PracticeParameter(session: taskSession, practiceSession: session)
-                }
+                TaskSession.PracticeParameter.resolveParameter("\(session.id)", conn: conn)
         }.wait()
     }
 }

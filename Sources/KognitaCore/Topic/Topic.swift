@@ -10,6 +10,8 @@ import Vapor
 
 public final class Topic: KognitaCRUDModel, KognitaModelUpdatable {
 
+    public static var tableName: String = "Topic"
+
     public struct Response: Content {
         public let topic: Topic.Overview
         public let subtopics: [Subtopic.Overview]
@@ -96,25 +98,25 @@ extension Topic {
         return parent(\.subjectId)
     }
 
-    func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
-        return try DatabaseRepository
-            .numberOfTasks(in: self, on: conn)
-    }
-
-    func tasks(on conn: DatabaseConnectable) throws -> Future<[Task]> {
-        return try DatabaseRepository
-            .tasks(in: self, on: conn)
-    }
-
-    func subtopics(on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
-        return try DatabaseRepository
-            .subtopics(in: self, on: conn)
-    }
-
-    func content(on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
-        return try DatabaseRepository
-            .content(for: self, on: conn)
-    }
+//    func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
+//        return try DatabaseRepository
+//            .numberOfTasks(in: self, on: conn)
+//    }
+//
+//    func tasks(on conn: DatabaseConnectable) throws -> Future<[Task]> {
+//        return try DatabaseRepository
+//            .tasks(in: self, on: conn)
+//    }
+//
+//    func subtopics(on conn: DatabaseConnectable) throws -> Future<[Subtopic]> {
+//        return try DatabaseRepository
+//            .subtopics(in: self, on: conn)
+//    }
+//
+//    func content(on conn: DatabaseConnectable) throws -> Future<Topic.Response> {
+//        return try DatabaseRepository
+//            .content(for: self, on: conn)
+//    }
 }
 
 extension Topic: Content { }

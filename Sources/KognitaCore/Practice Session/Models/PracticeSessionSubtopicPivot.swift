@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 extension PracticeSession {
-    public enum Pivot {}
+    enum Pivot {}
 }
 
 extension PracticeSession.Pivot {
@@ -17,7 +17,7 @@ extension PracticeSession.Pivot {
 
         public typealias Database = PostgreSQLDatabase
 
-        public typealias Left = PracticeSession
+        public typealias Left = PracticeSession.DatabaseModel
         public typealias Right = KognitaCore.Subtopic
 
         public static var leftIDKey: LeftIDKey = \.sessionID
@@ -31,7 +31,7 @@ extension PracticeSession.Pivot {
 
         public var createdAt: Date?
 
-        init(subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession) throws {
+        init(subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession.DatabaseModel) throws {
             self.sessionID = try session.requireID()
             self.subtopicID = subtopicID
         }
@@ -40,7 +40,7 @@ extension PracticeSession.Pivot {
 
 extension PracticeSession.Pivot.Subtopic {
 
-    func create(on conn: DatabaseConnectable, subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession) throws -> Future<PracticeSession.Pivot.Subtopic> {
+    func create(on conn: DatabaseConnectable, subtopicID: KognitaCore.Subtopic.ID, session: PracticeSession.DatabaseModel) throws -> Future<PracticeSession.Pivot.Subtopic> {
         return try PracticeSession.Pivot.Subtopic(subtopicID: subtopicID, session: session)
             .create(on: conn)
     }
@@ -54,7 +54,7 @@ extension PracticeSession.Pivot.Subtopic: Migration {
             builder.unique(on: \.sessionID, \.subtopicID)
 
             builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.sessionID, to: \PracticeSession.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 

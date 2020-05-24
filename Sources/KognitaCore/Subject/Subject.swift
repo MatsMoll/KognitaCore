@@ -10,6 +10,8 @@ import Vapor
 
 public final class Subject: KognitaCRUDModel, KognitaModelUpdatable {
 
+    public static var tableName: String = "Subject"
+
     public enum ColorClass: String, PostgreSQLEnum, PostgreSQLMigration {
         case primary
         case danger

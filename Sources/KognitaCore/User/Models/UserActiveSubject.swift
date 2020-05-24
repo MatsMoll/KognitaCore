@@ -4,8 +4,7 @@ import FluentPostgreSQL
 extension User {
     public final class ActiveSubject: KognitaPersistenceModel {
 
-        public static var entity: String = "User.ActiveSubject"
-        public static var name: String = "User.ActiveSubject"
+        public static var tableName: String = "User.ActiveSubject"
 
         public var createdAt: Date?
         public var updatedAt: Date?

@@ -10,6 +10,8 @@ import Vapor
 
 public final class Subtopic: KognitaCRUDModel, KognitaModelUpdatable {
 
+    public static var tableName: String = "Subtopic"
+
     public var id: Int?
 
     public var name: String

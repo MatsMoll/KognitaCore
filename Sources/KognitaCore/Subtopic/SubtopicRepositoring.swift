@@ -18,6 +18,7 @@ public protocol SubtopicRepositoring: CreateModelRepository,
     CreateResponse  == Subtopic.Create.Response,
     UpdateData      == Subtopic.Edit.Data,
     UpdateResponse  == Subtopic.Edit.Response {
-    static func find(_ id: Subtopic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subtopic?>
-    static func getSubtopics(in topic: Topic, with conn: DatabaseConnectable) throws -> EventLoopFuture<[Subtopic]>
+    func find(_ id: Subtopic.ID) -> EventLoopFuture<Subtopic?>
+    func getSubtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]>
+    func subtopics(with topicID: Topic.ID) -> EventLoopFuture<[Subtopic]>
 }

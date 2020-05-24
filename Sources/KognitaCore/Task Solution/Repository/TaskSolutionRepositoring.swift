@@ -9,18 +9,20 @@ public protocol TaskSolutionRepositoring: CreateModelRepository,
     CreateResponse  == TaskSolution.Create.Response,
     UpdateData      == TaskSolution.Update.Data,
     UpdateResponse  == TaskSolution.Update.Response {
-    static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]>
+    func solutions(for taskID: Task.ID, for user: User) -> EventLoopFuture<[TaskSolution.Response]>
 
     /// Upvote a solution
-    static func upvote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func upvote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void>
 
     /// Downvote/revoke vote on a solution
-    static func revokeVote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func revokeVote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void>
 
     /// Approves a `TaskSolution`
     /// - Parameters:
     ///   - solutionID: The `TaskSolutions`s id
     ///   - user: The user approving the solution
     ///   - conn: The database connection
-    static func approve(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func approve(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void>
+
+    func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User) throws -> EventLoopFuture<[TaskSolution.Unverified]>
 }

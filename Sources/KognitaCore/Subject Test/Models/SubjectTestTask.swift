@@ -73,20 +73,22 @@ extension SubjectTest.Pivot.Task {
         public typealias Response = Void
     }
 
-    struct DatabaseRepository: SubjectTestTaskRepositoring {
+    struct DatabaseRepository: SubjectTestTaskRepositoring, DatabaseConnectableRepository {
 
-        static func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
+        let conn: DatabaseConnectable
+
+        func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
             content.taskIDs.map {
                 SubjectTest.Pivot.Task(
                     testID: content.testID,
                     taskID: $0
                 )
-                .create(on: conn)
+                .create(on: self.conn)
             }
             .flatten(on: conn)
         }
 
-        static func update(model: SubjectTest, to data: SubjectTest.Pivot.Task.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        func update(model: SubjectTest, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
             try SubjectTest.Pivot.Task
                 .query(on: conn)
                 .filter(\.testID == model.requireID())
@@ -102,14 +104,14 @@ extension SubjectTest.Pivot.Task {
                                     testID: model.requireID(),
                                     taskID: taskID
                                 )
-                                    .create(on: conn)
+                                    .create(on: self.conn)
                                     .transform(to: ())
                             case .remove(let taskID):
                                 return tasks.first(where: { $0.taskID == taskID })?
-                                    .delete(on: conn)
+                                    .delete(on: self.conn)
                             }
                     }
-                    .flatten(on: conn)
+                    .flatten(on: self.conn)
             }
         }
     }

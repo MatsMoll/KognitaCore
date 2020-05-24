@@ -13,6 +13,10 @@ import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
+    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
+    lazy var taskRepository: some TaskRepository = { Task.DatabaseRepository(conn: conn) }()
+    lazy var typingTaskRepository: some FlashCardTaskRepository = { FlashCardTask.DatabaseRepository(conn: conn) }()
+
     func testTasksInSubject() throws {
 
         let subject = try Subject.create(name: "test", on: conn)
@@ -24,8 +28,8 @@ class TaskTests: VaporTestCase {
         _ = try Task.create(subtopic: subtopic, on: conn)
         _ = try Task.create(on: conn)
 
-        let tasks = try Task.Repository
-            .getTasks(in: subject, with: conn)
+        let tasks = try taskRepository
+            .getTasks(in: subject)
             .wait()
         XCTAssertEqual(tasks.count, 4)
     }
@@ -43,10 +47,10 @@ class TaskTests: VaporTestCase {
             secondSolution.approvedBy = try user.requireID()
             _ = try secondSolution.save(on: conn).wait()
 
-            try TaskSolution.DatabaseRepository.upvote(for: firstSolution.requireID(), by: user, on: conn).wait()
-            try TaskSolution.DatabaseRepository.upvote(for: firstSolution.requireID(), by: secondUser, on: conn).wait()
+            try taskSolutionRepository.upvote(for: firstSolution.requireID(), by: user).wait()
+            try taskSolutionRepository.upvote(for: firstSolution.requireID(), by: secondUser).wait()
 
-            let solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
 
             XCTAssertEqual(solutions.count, 2)
 
@@ -82,7 +86,7 @@ class TaskTests: VaporTestCase {
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
             )
-            XCTAssertThrowsError(try Task.Repository.create(from: createData, by: user, on: conn).wait())
+            XCTAssertThrowsError(try taskRepository.create(from: createData, by: user).wait())
         }
     }
 
@@ -109,8 +113,8 @@ Dette er flere linjer
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
             )
-            let task = try Task.Repository.create(from: createData, by: user, on: conn).wait()
-            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+            let task = try taskRepository.create(from: createData, by: user).wait()
+            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
             XCTAssertEqual(solution.solution, "Hallo\n\nDette er flere linjer")
         }
@@ -134,8 +138,8 @@ Dette er flere linjer
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
             )
-            let task = try Task.Repository.create(from: createData, by: user, on: conn).wait()
-            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+            let task = try taskRepository.create(from: createData, by: user).wait()
+            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
             XCTAssertEqual(task.description, "# XSS test")
             XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
@@ -157,15 +161,15 @@ Dette er flere linjer
                 examPaperSemester: nil,
                 examPaperYear: nil
             )
-            let task = try FlashCardTask.DatabaseRepository.create(from: xssData, by: user, on: conn).wait()
+            let task = try typingTaskRepository.create(from: xssData, by: user).wait()
             let flashCardTask = try FlashCardTask.find(task.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
-            let solution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
             XCTAssertEqual(task.description, "# XSS test")
             XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
 
-            let updatedTask = try FlashCardTask.DatabaseRepository.update(model: flashCardTask, to: xssData, by: user, on: conn).wait()
-            let updatedSolution = try XCTUnwrap(TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait().first)
+            let updatedTask = try typingTaskRepository.update(model: flashCardTask, to: xssData, by: user).wait()
+            let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
             XCTAssertEqual(updatedTask.description, "# XSS test")
             XCTAssertEqual(updatedSolution.solution, "<img>More XSS $$\\frac{1}{2}$$")
@@ -187,14 +191,14 @@ Dette er flere linjer
                 examPaperSemester: nil,
                 examPaperYear: nil
             )
-            let task = try FlashCardTask.DatabaseRepository.create(from: xssData, by: user, on: conn).wait()
+            let task = try typingTaskRepository.create(from: xssData, by: user).wait()
 
             let solutionUpdateDate = TaskSolution.Update.Data(
                 solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
                 presentUser: false
             )
             let solution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
-            _ = try TaskSolution.DatabaseRepository.update(model: solution, to: solutionUpdateDate, by: user, on: conn).wait()
+            _ = try taskSolutionRepository.update(model: solution, to: solutionUpdateDate, by: user).wait()
             let updatedSolution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
 
             XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
@@ -207,10 +211,10 @@ Dette er flere linjer
         do {
             let task = try Task.create(on: conn)
             let user = try User.create(on: conn)
-            let solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             XCTAssertEqual(solutions.count, 1)
             try task.delete(force: true, on: conn).wait()
-            let newSolution = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            let newSolution = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             XCTAssertTrue(newSolution.isEmpty)
         } catch {
             XCTFail(error.localizedDescription)
@@ -223,12 +227,12 @@ Dette er flere linjer
             let unauthorizedUser = try User.create(isAdmin: false, on: conn)
             let task = try Task.create(creator: unauthorizedUser, on: conn)
 
-            var solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             var solution = try XCTUnwrap(solutions.first)
             XCTAssertNil(solution.approvedBy)
 
-            try TaskSolution.DatabaseRepository.approve(for: solution.id, by: user, on: conn).wait()
-            solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            try taskSolutionRepository.approve(for: solution.id, by: user).wait()
+            solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             solution = try XCTUnwrap(solutions.first)
 
             XCTAssertEqual(solution.approvedBy, user.username)
@@ -240,12 +244,12 @@ Dette er flere linjer
             let user = try User.create(isAdmin: false, on: conn)
             let task = try Task.create(creator: user, on: conn)
 
-            var solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             var solution = try XCTUnwrap(solutions.first)
             XCTAssertNil(solution.approvedBy)
 
-            XCTAssertThrowsError(try TaskSolution.DatabaseRepository.approve(for: solution.id, by: user, on: conn).wait())
-            solutions = try TaskSolution.DatabaseRepository.solutions(for: task.requireID(), for: user, on: conn).wait()
+            XCTAssertThrowsError(try taskSolutionRepository.approve(for: solution.id, by: user).wait())
+            solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             solution = try XCTUnwrap(solutions.first)
 
             XCTAssertNil(solution.approvedBy)
@@ -263,10 +267,10 @@ Dette er flere linjer
             let solution = try XCTUnwrap(solutions.first)
 
             throwsError(of: TaskSolutionRepositoryError.self) {
-                try TaskSolution.DatabaseRepository.delete(model: solution, by: user, on: conn).wait()
+                try taskSolutionRepository.delete(model: solution, by: user).wait()
             }
             throwsError(of: Abort.self) {
-                try TaskSolution.DatabaseRepository.delete(model: solution, by: nil, on: conn).wait()
+                try taskSolutionRepository.delete(model: solution, by: nil).wait()
             }
         }
     }

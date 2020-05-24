@@ -41,7 +41,7 @@ extension TaskSession {
     public struct PracticeParameter: ModelParameterRepresentable, Content, PracticeSessionRepresentable {
 
         let session: TaskSession
-        let practiceSession: PracticeSession
+        let practiceSession: PracticeSession.DatabaseModel
 
         public var id: Int? { session.id }
         public var userID: User.ID { session.userID }
@@ -60,7 +60,7 @@ extension TaskSession {
             return TaskSession.query(on: conn)
                 .join(\PracticeSession.id, to: \TaskSession.id)
                 .filter(\TaskSession.id == id)
-                .alsoDecode(PracticeSession.self)
+                .alsoDecode(PracticeSession.DatabaseModel.self)
                 .first()
                 .unwrap(or: Abort(.internalServerError))
                 .map {

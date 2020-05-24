@@ -16,34 +16,44 @@ extension Date {
 }
 
 /// A practice session object
-public final class PracticeSession: KognitaCRUDModel, SoftDeleatableModel {
+extension PracticeSession {
+    final class DatabaseModel: KognitaCRUDModel, SoftDeleatableModel {
 
-    /// The session id
-    public var id: Int?
+        public static var tableName: String = "PracticeSession"
 
-    /// The date the session was ended
-    public var endedAt: Date?
+        /// The session id
+        public var id: Int?
 
-    /// The number of task to complete in the session
-    public var numberOfTaskGoal: Int
+        /// The date the session was ended
+        public var endedAt: Date?
 
-    /// The date when the session was started
-    public var createdAt: Date?
+        /// The number of task to complete in the session
+        public var numberOfTaskGoal: Int
 
-    public var updatedAt: Date?
+        /// The date when the session was started
+        public var createdAt: Date?
 
-    public var deletedAt: Date?
+        public var updatedAt: Date?
 
-    init(sessionID: TaskSession.ID, numberOfTaskGoal: Int) throws {
-        self.id = sessionID
-        guard numberOfTaskGoal > 0 else {
-            throw Abort(.badRequest, reason: "Needs more then 0 task goal")
+        public var deletedAt: Date?
+
+        init(sessionID: TaskSession.ID, numberOfTaskGoal: Int) throws {
+            self.id = sessionID
+            guard numberOfTaskGoal > 0 else {
+                throw Abort(.badRequest, reason: "Needs more then 0 task goal")
+            }
+            self.numberOfTaskGoal = numberOfTaskGoal
         }
-        self.numberOfTaskGoal = numberOfTaskGoal
     }
 }
 
 extension PracticeSession {
+    func representable(on conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.PracticeParameter> {
+        TaskSession.PracticeParameter.resolveParameter("\(id)", conn: conn)
+    }
+}
+
+extension PracticeSession.DatabaseModel {
 
     func representable(with session: TaskSession) -> PracticeSessionRepresentable {
         TaskSession.PracticeParameter(session: session, practiceSession: self)
@@ -63,57 +73,35 @@ extension PracticeSession {
             .count()
     }
 
-    /// Creates the necessary data for a `PracticeSession`
-    ///
-    /// - Parameters:
-    ///   - user: The user executing the session
-    ///   - topics: The topics to practice in the session
-    ///   - conn: A transaction connection to the database
-    /// - Returns: A `PracticeSession` object
-    /// - Throws: If any of the database queries fails
-    static func create(_ user: User, subtopics: Set<Subtopic.ID>, numberOfTaskGoal: Int, on conn: DatabaseConnectable)
-        throws -> EventLoopFuture<PracticeSession> {
-
-        return try DatabaseRepository.create(
-                from: .init(
-                    numberOfTaskGoal: numberOfTaskGoal,
-                    subtopicsIDs: subtopics,
-                    topicIDs: nil
-                ),
-                by: user,
-                on: conn
-            )
-    }
-
-    public func getCurrentTaskIndex(_ conn: DatabaseConnectable) throws -> EventLoopFuture<Int> {
-        return try DatabaseRepository
-            .getCurrentTaskIndex(for: self.requireID(), on: conn)
-    }
-
-    public func currentTask(on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
-        return try DatabaseRepository
-            .currentActiveTask(in: self, on: conn)
-    }
-
-    public func taskAt(index: Int, on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
-        return try DatabaseRepository
-            .taskAt(index: index, in: requireID(), on: conn)
-    }
+//    public func getCurrentTaskIndex(_ conn: DatabaseConnectable) throws -> EventLoopFuture<Int> {
+//        return try DatabaseRepository
+//            .getCurrentTaskIndex(for: self.requireID(), on: conn)
+//    }
+//
+//    public func currentTask(on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
+//        return try DatabaseRepository
+//            .currentActiveTask(in: self, on: conn)
+//    }
+//
+//    public func taskAt(index: Int, on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
+//        return try DatabaseRepository
+//            .taskAt(index: index, in: requireID(), on: conn)
+//    }
 
     public func pathFor(index: Int) throws -> String {
         return try "/practice-sessions/\(requireID())/tasks/\(index)"
     }
 }
 
-extension PracticeSession {
+extension PracticeSession.DatabaseModel {
 
     /// The subtopics being practiced
-    var subtopics: Siblings<PracticeSession, Subtopic, PracticeSession.Pivot.Subtopic> {
+    var subtopics: Siblings<PracticeSession.DatabaseModel, Subtopic, PracticeSession.Pivot.Subtopic> {
         return siblings()
     }
 
     /// The assigned tasks in the session
-    var assignedTasks: Siblings<PracticeSession, Task, PracticeSession.Pivot.Task> {
+    var assignedTasks: Siblings<PracticeSession.DatabaseModel, Task, PracticeSession.Pivot.Task> {
         return siblings()
     }
 

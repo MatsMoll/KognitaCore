@@ -6,6 +6,9 @@ import XCTest
 @available(OSX 10.15, *)
 class TestSessionTests: VaporTestCase {
 
+    lazy var subjectTestRepository: some SubjectTestRepositoring = { SubjectTest.DatabaseRepository(conn: conn) }()
+    lazy var testSessionRepository: some TestSessionRepositoring = { TestSession.DatabaseRepository(conn: conn) }()
+
     func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
 
         let userOne = try User.create(on: conn)
@@ -14,8 +17,8 @@ class TestSessionTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -31,29 +34,29 @@ class TestSessionTests: VaporTestCase {
             let secondCorrectSubmittion     = try submittionAt(index: 2, for: test, isCorrect: true)
             var thiredSubmit                = try submittionAt(index: 3, for: test)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: firstSubmit, for: sessionTwo, by: userTwo, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmit, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: firstSubmit, for: sessionTwo, by: userTwo).wait()
+            try testSessionRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne).wait()
 
             // Submitting a choise to a task that do not contain the choise
             secondIncorrectSubmittion.taskIndex = 1
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+                try testSessionRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: userOne).wait()
             )
             // Submitting to a session that is not the user's
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userTwo, on: conn).wait()
+                try testSessionRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userTwo).wait()
             )
             // Updating old submittion
-            try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: userOne).wait()
 
-            try TestSession.DatabaseRepository.submit(content: thiredSubmit, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: thiredSubmit, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: thiredSubmit, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: thiredSubmit, for: sessionTwo, by: userTwo).wait()
 
             thiredSubmit.taskIndex = 4
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository
-                    .submit(content: thiredSubmit, for: sessionOne, by: userOne, on: conn).wait()
+                try testSessionRepository
+                    .submit(content: thiredSubmit, for: sessionOne, by: userOne).wait()
             )
             let answers         = try TaskSessionAnswer.query(on: conn).all().wait()
             let flashAnswers    = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
@@ -77,17 +80,17 @@ class TestSessionTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
 
             let firstSubmittion             = try submittionAt(index: 1, for: test)
             let secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
             let secondCorrectSubmittion     = try submittionAt(index: 2, for: test, isCorrect: true)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: user, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: user, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: user).wait()
+            try testSessionRepository.submit(content: secondIncorrectSubmittion, for: sessionOne, by: user).wait()
             // Updating old submittion
-            try TestSession.DatabaseRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: user, on: conn).wait()
+            try testSessionRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: user).wait()
 
             let answers = try TaskSessionAnswer.query(on: conn).all().wait()
             let choises = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
@@ -113,8 +116,8 @@ class TestSessionTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -123,15 +126,15 @@ class TestSessionTests: VaporTestCase {
             let secondSubmittion    = try submittionAt(index: 2, for: test)
             let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
 
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
 
             var results = try TaskResult.query(on: conn).all().wait()
 
@@ -139,7 +142,7 @@ class TestSessionTests: VaporTestCase {
             XCTAssertNotNil(sessionOneEntry.submittedAt)
             XCTAssertNil(sessionTwoEntry.submittedAt)
 
-            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
             results = try TaskResult.query(on: conn).all().wait()
 
             XCTAssertEqual(results.count, 5)
@@ -151,11 +154,11 @@ class TestSessionTests: VaporTestCase {
 
             // Should throw when submtting an answer after submitting results
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+                try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
             )
             // Should throw when submtting the second time
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
+                try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -170,8 +173,8 @@ class TestSessionTests: VaporTestCase {
             let userTwo = try User.create(on: conn)
             let userThree = try User.create(on: conn)
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -180,25 +183,25 @@ class TestSessionTests: VaporTestCase {
             let secondSubmittion    = try submittionAt(index: 2, for: test)
             let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
 
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
 
-            let userOneResults = try TestSession.DatabaseRepository.results(in: sessionOne, for: userOne, on: conn).wait()
-            let userTwoResults = try TestSession.DatabaseRepository.results(in: sessionTwo, for: userTwo, on: conn).wait()
+            let userOneResults = try testSessionRepository.results(in: sessionOne, for: userOne).wait()
+            let userTwoResults = try testSessionRepository.results(in: sessionTwo, for: userTwo).wait()
 
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.results(in: sessionOne, for: userThree, on: conn).wait()
+                try testSessionRepository.results(in: sessionOne, for: userThree).wait()
             )
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.results(in: sessionOne, for: userTwo, on: conn).wait()
+                try testSessionRepository.results(in: sessionOne, for: userTwo).wait()
             )
 
             XCTAssertEqual(userOneResults.score, 3)
@@ -221,8 +224,8 @@ class TestSessionTests: VaporTestCase {
             let userTwo = try User.create(on: conn)
             let userThree = try User.create(on: conn)
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -231,19 +234,19 @@ class TestSessionTests: VaporTestCase {
             let secondSubmittion    = try submittionAt(index: 2, for: test)
             let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
 
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            let overviewOne = try TestSession.DatabaseRepository.overview(in: sessionOne, for: userOne, on: conn).wait()
-            let overviewTwo = try TestSession.DatabaseRepository.overview(in: sessionTwo, for: userTwo, on: conn).wait()
+            let overviewOne = try testSessionRepository.overview(in: sessionOne, for: userOne).wait()
+            let overviewTwo = try testSessionRepository.overview(in: sessionTwo, for: userTwo).wait()
 
             XCTAssertThrowsError(
-                try TestSession.DatabaseRepository.overview(in: sessionTwo, for: userThree, on: conn).wait()
+                try testSessionRepository.overview(in: sessionTwo, for: userThree).wait()
             )
 
             XCTAssertEqual(overviewOne.test.id, test.id)
@@ -309,10 +312,10 @@ class TestSessionTests: VaporTestCase {
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {
-            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
-            return try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+            let test = try subjectTestRepository.create(from: data, by: user).wait()
+            return try subjectTestRepository.open(test: test, by: user).wait()
         } else {
-            return try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            return try subjectTestRepository.create(from: data, by: user).wait()
         }
     }
 

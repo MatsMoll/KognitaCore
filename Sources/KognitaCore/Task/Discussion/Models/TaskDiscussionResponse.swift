@@ -8,13 +8,11 @@
 import FluentPostgreSQL
 import Vapor
 
-extension TaskDiscussion {
-    public enum Pivot {}
-}
+extension TaskDiscussionResponse {
 
-extension TaskDiscussion.Pivot {
+    public final class DatabaseModel: KognitaPersistenceModel, Validatable {
 
-    public final class Response: KognitaPersistenceModel, Validatable {
+        public static var tableName: String = "TaskDiscussionResponse"
 
         public var id: Int?
 
@@ -28,15 +26,15 @@ extension TaskDiscussion.Pivot {
 
         public var updatedAt: Date?
 
-        init(data: TaskDiscussion.Pivot.Response.Create.Data, userID: User.ID) throws {
+        init(data: TaskDiscussionResponse.Create.Data, userID: User.ID) throws {
             self.response = try data.response.cleanXSS(whitelist: .basicWithImages())
             self.discussionID = data.discussionID
             self.userID = userID
             try validate()
         }
 
-        public static func validations() throws -> Validations<TaskDiscussion.Pivot.Response> {
-            var validations = Validations(TaskDiscussion.Pivot.Response.self)
+        public static func validations() throws -> Validations<TaskDiscussionResponse.DatabaseModel> {
+            var validations = Validations(TaskDiscussionResponse.DatabaseModel.self)
             try validations.add(\.response, .count(4...))
             try validations.add(\.userID, .range(1...))
             try validations.add(\.discussionID, .range(1...))
@@ -45,15 +43,15 @@ extension TaskDiscussion.Pivot {
     }
 }
 
-extension TaskDiscussion.Pivot.Response {
+extension TaskDiscussionResponse.DatabaseModel {
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(TaskDiscussion.Pivot.Response.self, on: conn) { builder in
+        PostgreSQLDatabase.create(TaskDiscussionResponse.DatabaseModel.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.discussionID, to: \TaskDiscussion.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.discussionID, to: \TaskDiscussion.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
-            PostgreSQLDatabase.update(TaskDiscussion.Pivot.Response.self, on: conn) { builder in
+            PostgreSQLDatabase.update(TaskDiscussionResponse.DatabaseModel.self, on: conn) { builder in
                 builder.deleteField(for: \.userID)
                 builder.field(for: \.userID, type: .int, .default(1))
             }

@@ -11,6 +11,8 @@ import FluentPostgreSQL
 /// One solution to a `Task`
 public final class TaskSolution: KognitaPersistenceModel, Validatable {
 
+    public static var tableName: String = "TaskSolution"
+
     public var id: Int?
 
     public var createdAt: Date?

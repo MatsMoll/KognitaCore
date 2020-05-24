@@ -13,15 +13,20 @@ public protocol UpdateModelRepository {
     associatedtype UpdateResponse
     associatedtype Model
 
-    static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse>
+    func update(model: Model, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
+}
+
+public protocol DatabaseConnectableRepository {
+    var conn: DatabaseConnectable { get }
 }
 
 extension UpdateModelRepository
     where
+    Self: DatabaseConnectableRepository,
     Model: KognitaModelUpdatable,
     Model.EditData == UpdateData,
     UpdateResponse == Model {
-    public static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse> {
+    public func update(model: Model, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse> {
         try model.updateValues(with: data)
         return model.save(on: conn)
     }

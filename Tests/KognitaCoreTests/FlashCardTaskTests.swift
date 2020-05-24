@@ -12,6 +12,10 @@ import FluentPostgreSQL
 
 class FlashCardTaskTests: VaporTestCase {
 
+    lazy var typingTaskRepository: some FlashCardTaskRepository = { FlashCardTask.DatabaseRepository(conn: conn) }()
+    lazy var practiceSessionRepository: some PracticeSessionRepository = { PracticeSession.DatabaseRepository(conn: conn) }()
+    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
+
     func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
@@ -27,12 +31,12 @@ class FlashCardTaskTests: VaporTestCase {
         )
 
         do {
-            let flashCardTask = try FlashCardTask.DatabaseRepository
-                .create(from: taskData, by: user, on: conn)
+            let flashCardTask = try typingTaskRepository
+                .create(from: taskData, by: user)
                 .wait()
 
-            let solution = try TaskSolution.DatabaseRepository
-                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
+            let solution = try taskSolutionRepository
+                .solutions(for: flashCardTask.requireID(), for: user)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)
@@ -60,12 +64,12 @@ class FlashCardTaskTests: VaporTestCase {
         )
 
         do {
-            let flashCardTask = try FlashCardTask.DatabaseRepository
-                .create(from: taskData, by: user, on: conn)
+            let flashCardTask = try typingTaskRepository
+                .create(from: taskData, by: user)
                 .wait()
 
-            let solution = try TaskSolution.DatabaseRepository
-                .solutions(for: flashCardTask.requireID(), for: user, on: conn)
+            let solution = try taskSolutionRepository
+                .solutions(for: flashCardTask.requireID(), for: user)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)
@@ -96,8 +100,8 @@ class FlashCardTaskTests: VaporTestCase {
                 examPaperYear: nil
             )
 
-            let editedTask = try FlashCardTask.DatabaseRepository
-                .update(model: startingFlash, to: content, by: creatorStudent, on: conn).wait()
+            let editedTask = try typingTaskRepository
+                .update(model: startingFlash, to: content, by: creatorStudent).wait()
             startingTask = try Task.query(on: conn, withSoftDeleted: true)
                 .filter(\.id == startingTask.id)
                 .first()
@@ -110,8 +114,8 @@ class FlashCardTaskTests: VaporTestCase {
             let editedFlash = try FlashCardTask.find(editedTask.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
 
             throwsError(of: Abort.self) {
-                _ = try FlashCardTask.DatabaseRepository
-                    .update(model: editedFlash, to: content, by: otherStudent, on: conn).wait()
+                _ = try typingTaskRepository
+                    .update(model: editedFlash, to: content, by: otherStudent).wait()
             }
         }
     }
@@ -134,13 +138,9 @@ class FlashCardTaskTests: VaporTestCase {
         )
 
         do {
-            let session = try PracticeSession.DatabaseRepository
-                .create(from: create, by: user, on: conn).wait()
-            let superSession = try TaskSession
-                .find(session.requireID(), on: conn)
-                .unwrap(or: Abort(.internalServerError))
-                .wait()
-            let sessionRepresentable = session.representable(with: superSession)
+            let session = try practiceSessionRepository
+                .create(from: create, by: user).wait()
+            let sessionRepresentable = try session.representable(on: conn).wait()
 
             let firstSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -148,8 +148,8 @@ class FlashCardTaskTests: VaporTestCase {
                 taskIndex: 1,
                 answer: "First Answer"
             )
-            _ = try PracticeSession.DatabaseRepository
-                .submit(firstSubmit, in: sessionRepresentable, by: user, on: conn).wait()
+            _ = try practiceSessionRepository
+                .submit(firstSubmit, in: sessionRepresentable, by: user).wait()
 
             let secondSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -158,8 +158,8 @@ class FlashCardTaskTests: VaporTestCase {
                 answer: "Second Answer"
             )
 
-            _ = try PracticeSession.DatabaseRepository
-                .submit(secondSubmit, in: sessionRepresentable, by: user, on: conn).wait()
+            _ = try practiceSessionRepository
+                .submit(secondSubmit, in: sessionRepresentable, by: user).wait()
 
             let answers = try FlashCardAnswer.query(on: conn)
                 .all()

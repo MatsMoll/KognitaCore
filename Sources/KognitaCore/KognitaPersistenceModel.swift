@@ -46,6 +46,8 @@ public protocol KognitaModelUpdatable: KognitaCRUDModel {
 /// A protocol that defines a Model to be used in Kognita
 public protocol KognitaPersistenceModel: PostgreSQLModel, Migration {
 
+    static var tableName: String { get }
+
     /// Creation at data
     var createdAt: Date? { get set }
 
@@ -75,6 +77,8 @@ extension KognitaPersistenceModel {
     }
 
     public static func addTableConstraints(to builder: SchemaCreator<Self>) {}
+
+    public static var name: String { tableName }
 }
 //
 //public typealias KognitaCRUDRepository = KognitaRepositoryDeletable & KognitaRepositoryEditable

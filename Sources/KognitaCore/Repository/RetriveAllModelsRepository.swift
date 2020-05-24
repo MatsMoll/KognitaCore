@@ -11,17 +11,17 @@ public protocol RetriveAllModelsRepository {
     associatedtype ResponseModel
     associatedtype Model
 
-    static func all(on conn: DatabaseConnectable) throws -> EventLoopFuture<[ResponseModel]>
+    func all() throws -> EventLoopFuture<[ResponseModel]>
 }
 
-extension RetriveAllModelsRepository where ResponseModel == Model, Model: PostgreSQLModel {
+extension RetriveAllModelsRepository where ResponseModel == Model, Model: PostgreSQLModel, Self: DatabaseConnectableRepository {
 
-    public static func all(on conn: DatabaseConnectable) throws -> EventLoopFuture<[ResponseModel]> {
+    public func all() throws -> EventLoopFuture<[ResponseModel]> {
         Model.query(on: conn)
             .all()
     }
 
-    static public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> EventLoopFuture<[Model]> {
+    public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<[Model]> {
         return Model.query(on: conn)
             .filter(filter)
             .all()
@@ -30,26 +30,28 @@ extension RetriveAllModelsRepository where ResponseModel == Model, Model: Postgr
 
 public protocol RetriveModelRepository {
     associatedtype Model
+    func find(_ id: Int, or error: Error) -> EventLoopFuture<Model>
+    func find(_ id: Int) -> EventLoopFuture<Model?>
 }
 
-extension RetriveModelRepository where Model: PostgreSQLModel {
+extension RetriveModelRepository where Model: PostgreSQLModel, Self: DatabaseConnectableRepository {
 
-    public static func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> EventLoopFuture<Model> {
+    public func find(_ id: Model.ID, or error: Error) -> EventLoopFuture<Model> {
         return Model.find(id, on: conn)
             .unwrap(or: error)
     }
 
-    public static func find(_ id: Model.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Model?> {
+    public func find(_ id: Model.ID) -> EventLoopFuture<Model?> {
         return Model.find(id, on: conn)
     }
 
-    public static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> EventLoopFuture<Model?> {
+    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<Model?> {
         return Model.query(on: conn)
             .filter(filter)
             .first()
     }
 
-    public static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> EventLoopFuture<Model> {
+    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error) -> EventLoopFuture<Model> {
         return Model.query(on: conn)
             .filter(filter)
             .first()

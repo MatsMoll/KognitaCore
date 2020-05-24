@@ -4,6 +4,8 @@ import Vapor
 
 public final class TestSession: KognitaPersistenceModel {
 
+    public static var tableName: String = "TestSession"
+
     public var createdAt: Date?
 
     public var updatedAt: Date?

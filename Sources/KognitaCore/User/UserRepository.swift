@@ -15,21 +15,23 @@ public protocol UserRepository: CreateModelRepository,
     CreateData      == User.Create.Data,
     CreateResponse  == User.Response,
     Model           == User {
-    static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?>
+    func first(with email: String) -> EventLoopFuture<User?>
 
-    static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void>
+    func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Void>
+    func isModerator(user: User, taskID: Task.ID) throws -> EventLoopFuture<Void>
+    func isModerator(user: User, topicID: Topic.ID) throws -> EventLoopFuture<Void>
 
-    static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func canPractice(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void>
 
-    static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token>
+    func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void>
+    func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token>
 }
 
 extension User {
-    public final class DatabaseRepository {}
+    public struct DatabaseRepository: DatabaseConnectableRepository {
+        public let conn: DatabaseConnectable
+    }
 }
 
 extension String {
@@ -67,7 +69,7 @@ extension User.DatabaseRepository: UserRepository {
         }
     }
 
-    static public func login(with user: User, conn: DatabaseConnectable) throws -> Future<User.Login.Token> {
+    public func login(with user: User, conn: DatabaseConnectable) throws -> Future<User.Login.Token> {
         // create new token for this user
         let token = try User.Login.Token.create(userID: user.requireID())
 
@@ -75,7 +77,7 @@ extension User.DatabaseRepository: UserRepository {
         return token.save(on: conn)
     }
 
-    static public func create(from content: User.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.Response> {
+    public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User.Response> {
 
         guard content.acceptedTerms else {
             throw Errors.missingInput
@@ -111,24 +113,24 @@ extension User.DatabaseRepository: UserRepository {
                 guard existingUser == nil else {
                     throw Errors.existingUser(email: newUser.email)
                 }
-                return newUser.save(on: conn)
+                return newUser.save(on: self.conn)
                     .flatMap { user in
 
                         try User.VerifyEmail.Token.create(userID: user.requireID())
-                            .save(on: conn)
+                            .save(on: self.conn)
                             .transform(to: user)
                 }
                     .map { try $0.content() }
         }
     }
 
-    public static func first(with email: String, on conn: DatabaseConnectable) -> EventLoopFuture<User?> {
+    public func first(with email: String) -> EventLoopFuture<User?> {
         User.query(on: conn)
             .filter(\.email == email)
             .first()
     }
 
-    public static func isModerator(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
@@ -141,7 +143,7 @@ extension User.DatabaseRepository: UserRepository {
             .transform(to: ())
     }
 
-    public static func isModerator(user: User, subtopicID: Subtopic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
@@ -155,7 +157,7 @@ extension User.DatabaseRepository: UserRepository {
             .transform(to: ())
     }
 
-    public static func isModerator(user: User, taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func isModerator(user: User, taskID: Task.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
@@ -170,7 +172,7 @@ extension User.DatabaseRepository: UserRepository {
             .transform(to: ())
     }
 
-    public static func isModerator(user: User, topicID: Topic.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func isModerator(user: User, topicID: Topic.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
@@ -183,7 +185,7 @@ extension User.DatabaseRepository: UserRepository {
             .transform(to: ())
     }
 
-    public static func canPractice(user: User, subjectID: Subject.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func canPractice(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
@@ -199,7 +201,7 @@ extension User.DatabaseRepository: UserRepository {
             .transform(to: ())
     }
 
-    public static func verify(user: User, with token: User.VerifyEmail.Request, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void> {
 
         guard user.isEmailVerified == false else {
             return conn.future()
@@ -212,12 +214,12 @@ extension User.DatabaseRepository: UserRepository {
             .unwrap(or: Abort(.badRequest))
             .flatMap { _ in
                 user.isEmailVerified = true
-                return user.save(on: conn)
+                return user.save(on: self.conn)
                     .transform(to: ())
         }
     }
 
-    public static func verifyToken(for userID: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.VerifyEmail.Token> {
+    public func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token> {
         User.VerifyEmail.Token
             .query(on: conn)
             .filter(\.userID == userID)

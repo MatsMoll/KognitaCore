@@ -11,11 +11,11 @@ import FluentPostgreSQL
 public protocol DeleteModelRepository {
     associatedtype Model
 
-    static func delete(model: Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+    func delete(model: Model, by user: User?) throws -> EventLoopFuture<Void>
 }
 
-extension DeleteModelRepository where Model: PostgreSQLModel {
-    public static func delete(model: Model, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+extension DeleteModelRepository where Model: PostgreSQLModel, Self: DatabaseConnectableRepository {
+    public func delete(model: Model, by user: User?) throws -> EventLoopFuture<Void> {
         return model.delete(on: conn)
     }
 }

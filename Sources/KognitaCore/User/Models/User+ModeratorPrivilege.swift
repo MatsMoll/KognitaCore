@@ -3,8 +3,7 @@ import FluentPostgreSQL
 extension User {
     public final class ModeratorPrivilege: KognitaPersistenceModel {
 
-        public static var entity: String = "User.ModeratorPrivilege"
-        public static var name: String = "User.ModeratorPrivilege"
+        public static var tableName: String = "User.ModeratorPrivilege"
 
         public var createdAt: Date?
         public var updatedAt: Date?

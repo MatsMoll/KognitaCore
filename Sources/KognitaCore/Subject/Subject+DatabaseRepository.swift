@@ -27,12 +27,18 @@ extension String {
 }
 
 extension Subject {
-    public final class DatabaseRepository: SubjectRepositoring {}
+    public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
+        public let conn: DatabaseConnectable
+        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
+        private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
+        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
+        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiseTask.DatabaseRepository(conn: conn) }
+    }
 }
 
 extension Subject.DatabaseRepository {
 
-    public static func create(from content: Subject.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject> {
+    public func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject> {
         guard let user = user, user.isAdmin else {
             throw Abort(.forbidden)
         }
@@ -41,7 +47,7 @@ extension Subject.DatabaseRepository {
             .flatMap { subject in
 
                 try User.ModeratorPrivilege(userID: user.requireID(), subjectID: subject.requireID())
-                    .create(on: conn)
+                    .create(on: self.conn)
                     .transform(to: subject)
         }
     }
@@ -51,7 +57,7 @@ extension Subject.DatabaseRepository {
     ///   - topicID: The topic id
     ///   - conn: The database connection
     /// - Returns: A future `Subject`
-    public static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+    public func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject> {
         Topic.query(on: conn)
             .filter(\.id == topicID)
             .join(\Subject.id, to: \Topic.subjectId)
@@ -60,41 +66,41 @@ extension Subject.DatabaseRepository {
             .unwrap(or: Abort(.badRequest))
     }
 
-    public static func subject(for session: PracticeSessionRepresentable, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        PracticeSession.query(on: conn)
-            .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.id)
+    public func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject> {
+        PracticeSession.DatabaseModel.query(on: conn)
+            .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.DatabaseModel.id)
             .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
             .join(\Topic.id, to: \Subtopic.topicId)
             .join(\Subject.id, to: \Topic.subjectId)
-            .filter(\PracticeSession.id == session.id)
+            .filter(\PracticeSession.DatabaseModel.id == session.id)
             .decode(Subject.self)
             .first()
             .unwrap(or: Abort(.internalServerError))
     }
 
-    public static func getSubjectWith(id: Subject.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+    public func getSubjectWith(id: Subject.ID) -> EventLoopFuture<Subject> {
         return Subject
             .find(id, on: conn)
             .unwrap(or: Abort(.badRequest))
     }
 
-    public static func getSubject(in topic: Topic, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+    public func getSubject(in topic: Topic) -> EventLoopFuture<Subject> {
         return topic.subject.get(on: conn)
     }
 
-    public static func importContent(_ content: SubjectExportContent, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
+    public func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject> {
         content.subject.id = nil
         content.subject.creatorId = 1
         return conn.transaction(on: .psql) { conn in
             content.subject.create(on: conn).flatMap { subject in
-                try content.topics.map { try Topic.DatabaseRepository.importContent(from: $0, in: subject, on: conn) }
+                try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject) }
                     .flatten(on: conn)
                     .transform(to: subject)
             }
         }
     }
 
-    public static func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User) throws -> EventLoopFuture<Void> {
 
         let knownTopic = peerWise.filter({ $0.topicName != "" })
 
@@ -111,24 +117,23 @@ extension Subject.DatabaseRepository {
 
                         numberOfTopics += 1
 
-                        return try Topic.DatabaseRepository.create(
+                        return try self.topicRepository.create(
                             from: Topic.Create.Data(
                                 subjectId: subject.requireID(),
                                 name: topicName,
                                 chapter: numberOfTopics
                             ),
-                            by: user,
-                            on: conn
+                            by: user
                         )
                             .flatMap { topic in
-                                try Subtopic.DatabaseRepository
-                                    .getSubtopics(in: topic, with: conn)
+                                try self.subtopicRepository
+                                    .getSubtopics(in: topic)
                                     .flatMap { subtopics in
 
                                         guard let subtopic = subtopics.first else { throw Abort(.internalServerError) }
 
                                         return try tasks.map { task in
-                                            try MultipleChoiseTask.DatabaseRepository.create(
+                                            try self.multipleChoiseRepository.create(
                                                 from: MultipleChoiseTask.Create.Data(
                                                     subtopicId: subtopic.requireID(),
                                                     description: nil,
@@ -140,21 +145,20 @@ extension Subject.DatabaseRepository {
                                                     isTestable: false,
                                                     choises: task.choises
                                                 ),
-                                                by: user,
-                                                on: conn
+                                                by: user
                                             )
                                                 .transform(to: ())
                                         }
-                                        .flatten(on: conn)
+                                        .flatten(on: self.conn)
                                 }
                         }
                 }
-                .flatten(on: conn)
+                .flatten(on: self.conn)
                 .transform(to: ())
         }
     }
 
-    public static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]> {
+    public func allActive(for user: User) throws -> EventLoopFuture<[Subject]> {
 
         return try Subject.query(on: conn)
             .join(\User.ActiveSubject.subjectID, to: \Subject.id, method: .left)
@@ -167,7 +171,7 @@ extension Subject.DatabaseRepository {
         let subjectId: Subject.ID
     }
 
-    static func subjectIDFor(taskIDs: [Task.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(taskIDs: [Task.ID]) -> EventLoopFuture<Subject.ID> {
 
         return conn.databaseConnection(to: .psql)
             .flatMap { conn in
@@ -192,7 +196,7 @@ extension Subject.DatabaseRepository {
         }
     }
 
-    static func subjectIDFor(topicIDs: [Topic.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(topicIDs: [Topic.ID]) -> EventLoopFuture<Subject.ID> {
 
         return conn.databaseConnection(to: .psql)
             .flatMap { conn in
@@ -215,7 +219,7 @@ extension Subject.DatabaseRepository {
         }
     }
 
-    static func subjectIDFor(subtopicIDs: [Subtopic.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID> {
 
         return conn.databaseConnection(to: .psql)
             .flatMap { conn in
@@ -239,7 +243,7 @@ extension Subject.DatabaseRepository {
         }
     }
 
-    public static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void> {
 
         try User.ActiveSubject.query(on: conn)
             .filter(\User.ActiveSubject.subjectID == subject.requireID())
@@ -250,7 +254,7 @@ extension Subject.DatabaseRepository {
             .transform(to: ())
     }
 
-    public static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void> {
         try User.ActiveSubject(
             userID: user.requireID(),
             subjectID: subject.requireID(),
@@ -260,41 +264,41 @@ extension Subject.DatabaseRepository {
             .transform(to: ())
     }
 
-    public static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
 
-        try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+        try userRepository
+            .isModerator(user: moderator, subjectID: subjectID)
             .flatMap {
                 User.ModeratorPrivilege(
                     userID: userID,
                     subjectID: subjectID
                 )
-                    .create(on: conn)
+                    .create(on: self.conn)
                     .transform(to: ())
         }
     }
 
-    public static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
         guard moderator.id != userID else {
             throw Abort(.badRequest)
         }
-        return try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+        return try userRepository
+            .isModerator(user: moderator, subjectID: subjectID)
             .flatMap {
 
-                User.ModeratorPrivilege.query(on: conn)
+                User.ModeratorPrivilege.query(on: self.conn)
                     .filter(\.userID == userID)
                     .filter(\.subjectID == subjectID)
                     .first()
                     .unwrap(or: Abort(.badRequest))
                     .flatMap { privilege in
 
-                        privilege.delete(on: conn)
+                        privilege.delete(on: self.conn)
                 }
         }
     }
 
-    public static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?> {
+    public func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?> {
 
         try User.ActiveSubject.query(on: conn)
             .filter(\.userID == user.requireID())
@@ -302,55 +306,17 @@ extension Subject.DatabaseRepository {
             .first()
     }
 
-    /// Should be in `TaskSolutionRepositoring`
-    public static func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
-
-        return try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
-            .flatMap {
-
-                Task.query(on: conn)
-                    .join(\TaskSolution.taskID, to: \Task.id)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .filter(\Topic.subjectId == subjectID)
-                    .filter(\TaskSolution.approvedBy == nil)
-                    .range(0..<10)
-                    .alsoDecode(TaskSolution.self)
-                    .all()
-                    .flatMap { tasks in
-
-                        MultipleChoiseTaskChoise.query(on: conn)
-                            .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
-                            .all()
-                            .map { (choises: [MultipleChoiseTaskChoise]) in
-
-                                let groupedChoises = choises.group(by: \.taskId)
-
-                                return tasks.map { task, solution in
-                                    TaskSolution.Unverified(
-                                        task: task,
-                                        solution: solution,
-                                        choises: groupedChoises[solution.taskID] ?? []
-                                    )
-                                }
-                        }
-                }
-        }
-        .catchMap { _ in [] }
-    }
-
     struct ActiveSubjectQuery: Codable {
         let canPractice: Bool
     }
 
-    public static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]> {
+    public func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]> {
 
         return Subject.query(on: conn)
             .all()
             .flatMap { subjects in
 
-                try User.ActiveSubject.query(on: conn)
+                try User.ActiveSubject.query(on: self.conn)
                     .filter(\.userID == user.requireID())
                     .all()
                     .map { activeSubjects in
@@ -375,7 +341,7 @@ extension Subject.DatabaseRepository {
         let subtopicID: Subtopic.ID
     }
 
-    public static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
+    public func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter) throws -> EventLoopFuture<Subject.Compendium> {
 
         return conn.databaseConnection(to: .psql)
             .flatMap { conn in

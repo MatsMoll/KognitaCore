@@ -17,82 +17,83 @@ public protocol FlashCardTaskRepository: CreateModelRepository,
     CreateResponse  == FlashCardTask.Create.Response,
     UpdateData      == FlashCardTask.Edit.Data,
     UpdateResponse  == FlashCardTask.Edit.Response {
-    static func importTask(
-        from task: Task.BetaFormat,
-        in subtopic: Subtopic,
-        on conn: DatabaseConnectable
-    ) throws -> EventLoopFuture<Void>
-
-    static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
+    func importTask(from task: Task.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
+    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
+    func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit) -> EventLoopFuture<TaskAnswer>
 }
 
 extension FlashCardTask {
-
-    public final class DatabaseRepository: FlashCardTaskRepository {}
+    public struct DatabaseRepository: FlashCardTaskRepository, DatabaseConnectableRepository {
+        public let conn: DatabaseConnectable
+        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
+        private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
+        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
+        private var taskRepository: some TaskRepository { Task.DatabaseRepository(conn: conn) }
+    }
 }
 
 extension FlashCardTask.DatabaseRepository {
 
-    public static func create(from content: FlashCardTask.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public func create(from content: FlashCardTask.Create.Data, by user: User?) throws -> EventLoopFuture<Task> {
 
         guard let user = user else {
             throw Abort(.unauthorized)
         }
         try content.validate()
-        return Subtopic.DatabaseRepository
-            .find(content.subtopicId, on: conn)
+        return subtopicRepository
+            .find(content.subtopicId)
             .unwrap(or: Task.Create.Errors.invalidTopic)
             .flatMap { subtopic in
 
-                conn.transaction(on: .psql) { conn in
+                self.conn.transaction(on: .psql) { conn in
 
-                    try Task.Repository
+                    try self
+                        .taskRepository
                         .create(
                             from: .init(
                                 content: content,
                                 subtopicID: subtopic.requireID(),
                                 solution: content.solution
                             ),
-                            by: user,
-                            on: conn
-                    )
+                            by: user
+                        )
                         .flatMap { task in
 
                             try FlashCardTask(task: task)
-                                .create(on: conn)
+                                .create(on: self.conn)
                                 .transform(to: task)
                     }
                 }
         }
     }
 
-    public static func update(model flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public func update(model flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
 
         guard let task = flashCard.task else {
             throw Abort(.internalServerError)
         }
         try content.validate()
 
-        return try User.DatabaseRepository
-            .isModerator(user: user, taskID: flashCard.requireID(), on: conn)
+        return try userRepository
+            .isModerator(user: user, taskID: flashCard.requireID())
             .flatMap {
-                try update(task: task, to: content, by: user, on: conn)
+                try self.update(task: task, to: content, by: user)
         }
         .catchFlatMap { _ in
-            task.get(on: conn).flatMap { newTask in
+            task.get(on: self.conn).flatMap { newTask in
                 guard try newTask.creatorID == user.requireID() else {
                     throw Abort(.forbidden)
                 }
-                return try update(task: task, to: content, by: user, on: conn)
+                return try self.update(task: task, to: content, by: user)
             }
         }
     }
 
-    private static func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    private func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
 
         conn.transaction(on: .psql) { conn in
-            try FlashCardTask.DatabaseRepository
-                .create(from: content, by: user, on: conn)
+            try FlashCardTask.DatabaseRepository(conn: conn)
+                .create(from: content, by: user)
                 .flatMap { newTask in
 
                     task.get(on: conn)
@@ -107,14 +108,14 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public static func delete(model flashCard: FlashCardTask, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func delete(model flashCard: FlashCardTask, by user: User?) throws -> EventLoopFuture<Void> {
 
         guard let user = user else {
             throw Abort(.unauthorized)
         }
 
-        return try User.DatabaseRepository
-            .isModerator(user: user, taskID: flashCard.requireID(), on: conn)
+        return try userRepository
+            .isModerator(user: user, taskID: flashCard.requireID())
             .map { true }
             .catchMap { _ in false }
             .flatMap { isModerator in
@@ -122,18 +123,18 @@ extension FlashCardTask.DatabaseRepository {
                 guard let task = flashCard.task else {
                     throw Abort(.internalServerError)
                 }
-                return task.get(on: conn)
+                return task.get(on: self.conn)
                     .flatMap { task in
 
                         guard isModerator || task.creatorID == user.id else {
                             throw Abort(.forbidden)
                         }
-                        return task.delete(on: conn)
+                        return task.delete(on: self.conn)
                 }
         }
     }
 
-    public static func importTask(from task: Task.BetaFormat, in subtopic: Subtopic, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func importTask(from task: Task.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
         return try Task(
             subtopicID: subtopic.requireID(),
@@ -147,7 +148,7 @@ extension FlashCardTask.DatabaseRepository {
                 try FlashCardTask(
                     taskId: savedTask.requireID()
                 )
-                    .create(on: conn)
+                    .create(on: self.conn)
                     .flatMap { _ in
                         if let solution = task.solution {
                             return try TaskSolution(
@@ -158,30 +159,30 @@ extension FlashCardTask.DatabaseRepository {
                                 ),
                                 creatorID: 1
                             )
-                                .create(on: conn)
+                                .create(on: self.conn)
                                 .transform(to: ())
                         } else {
-                            return conn.future()
+                            return self.conn.future()
                         }
                 }
         }
     }
 
-    public static func get(task flashCard: FlashCardTask, conn: DatabaseConnectable) throws -> EventLoopFuture<Task> {
+    public func get(task flashCard: FlashCardTask) throws -> EventLoopFuture<Task> {
         guard let task = flashCard.task else {
             throw Abort(.internalServerError)
         }
         return task.get(on: conn)
     }
 
-    public static func getCollection(conn: DatabaseConnectable) -> Future<[Task]> {
+    public func getCollection() -> Future<[Task]> {
         return FlashCardTask.query(on: conn)
             .join(\FlashCardTask.id, to: \Task.id)
             .decode(Task.self)
             .all()
     }
 
-    public static func content(for flashCard: FlashCardTask, on conn: DatabaseConnectable) -> EventLoopFuture<TaskPreviewContent> {
+    public func content(for flashCard: FlashCardTask) -> EventLoopFuture<TaskPreviewContent> {
 
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\Task.id == flashCard.id)
@@ -202,7 +203,7 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public static func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit, on conn: DatabaseConnectable) -> EventLoopFuture<TaskAnswer> {
+    public func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit) -> EventLoopFuture<TaskAnswer> {
         TaskAnswer()
             .create(on: conn)
             .flatMap { answer in
@@ -211,12 +212,12 @@ extension FlashCardTask.DatabaseRepository {
                     taskID: task.requireID(),
                     answer: submit.answer
                 )
-                .create(on: conn)
+                .create(on: self.conn)
                 .transform(to: answer)
         }
     }
 
-    public static func modifyContent(forID taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<FlashCardTask.ModifyContent> {
+    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<FlashCardTask.ModifyContent> {
 
         Task.query(on: conn)
             .join(\FlashCardTask.id, to: \Task.id)
@@ -227,7 +228,7 @@ extension FlashCardTask.DatabaseRepository {
             .unwrap(or: Abort(.internalServerError))
             .flatMap { taskInfo in
 
-                Subject.query(on: conn)
+                Subject.query(on: self.conn)
                     .join(\Topic.subjectId, to: \Subject.id)
                     .join(\Subtopic.topicId, to: \Topic.id)
                     .filter(\Subtopic.id == taskInfo.0.subtopicID)
@@ -235,7 +236,7 @@ extension FlashCardTask.DatabaseRepository {
                     .unwrap(or: Abort(.internalServerError))
                     .flatMap { subject in
 
-                        try Topic.DatabaseRepository.getTopicResponses(in: subject, conn: conn)
+                        try self.topicRepository.getTopicResponses(in: subject)
                             .map { topics in
 
                                 FlashCardTask.ModifyContent(

@@ -3,8 +3,13 @@ import Foundation
 import KognitaCoreTestable
 import XCTest
 
+//swiftlint:disable type_body_length
+
 @available(OSX 10.15, *)
 class SubjectTestTests: VaporTestCase {
+
+    lazy var subjectTestRepository: some SubjectTestRepositoring = { SubjectTest.DatabaseRepository(conn: conn) }()
+    lazy var testSessionRepository: some TestSessionRepositoring = { TestSession.DatabaseRepository(conn: conn) }()
 
     func testCreateTest() throws {
 
@@ -42,7 +47,7 @@ class SubjectTestTests: VaporTestCase {
             isTeamBasedLearning: false
         )
         XCTAssertThrowsError(
-            _ = try SubjectTest.DatabaseRepository.create(from: data, by: nil, on: conn).wait()
+            _ = try subjectTestRepository.create(from: data, by: nil).wait()
         )
     }
 
@@ -58,7 +63,7 @@ class SubjectTestTests: VaporTestCase {
             isTeamBasedLearning: false
         )
         XCTAssertThrowsError(
-            _ = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            _ = try subjectTestRepository.create(from: data, by: user).wait()
         )
     }
 
@@ -67,7 +72,7 @@ class SubjectTestTests: VaporTestCase {
 
         let test = try setupTestWithTasks()
         XCTAssertThrowsError(
-            try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+            try subjectTestRepository.open(test: test, by: user).wait()
         )
     }
 
@@ -80,8 +85,8 @@ class SubjectTestTests: VaporTestCase {
                 scheduledAt: Date().addingTimeInterval(.minutes(2))
             )
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository
-                    .enter(test: test, with: enterRequest, by: user, on: conn).wait()
+                try subjectTestRepository
+                    .enter(test: test, with: enterRequest, by: user).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -95,8 +100,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository
-                    .enter(test: test, with: .init(password: "incorrect"), by: user, on: conn).wait()
+                try subjectTestRepository
+                    .enter(test: test, with: .init(password: "incorrect"), by: user).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -111,8 +116,8 @@ class SubjectTestTests: VaporTestCase {
         do {
             let test = try setupTestWithTasks()
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -123,8 +128,8 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(sessionTwo.userID, userTwo.id)
 
             XCTAssertThrowsError(
-                _ = try SubjectTest.DatabaseRepository
-                    .enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
+                _ = try subjectTestRepository
+                    .enter(test: test, with: enterRequest, by: userOne).wait()
             )
 
             let sessions = try TestSession.query(on: conn).all().wait()
@@ -142,34 +147,34 @@ class SubjectTestTests: VaporTestCase {
             let userOne = try User.create(isAdmin: false, on: conn)
             let userTwo = try User.create(isAdmin: false, on: conn)
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
 
-            var status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+            var status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
             // Students / users should not be able to see the completion status of the test
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: userOne, on: conn).wait()
+                try subjectTestRepository.userCompletionStatus(in: test, user: userOne).wait()
             )
 
             XCTAssertEqual(status.amountOfEnteredUsers, 2)
             XCTAssertEqual(status.amountOfCompletedUsers, 0)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try TestSession.DatabaseRepository.submit(test: sessionOne, by: userOne, on: conn).wait()
+            try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
 
-            status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+            status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
             XCTAssertEqual(status.amountOfEnteredUsers, 2)
             XCTAssertEqual(status.amountOfCompletedUsers, 1)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try TestSession.DatabaseRepository.submit(test: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
 
-            status = try SubjectTest.DatabaseRepository.userCompletionStatus(in: test, user: teacher, on: conn).wait()
+            status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
             XCTAssertEqual(status.amountOfEnteredUsers, 2)
             XCTAssertEqual(status.amountOfCompletedUsers, 2)
@@ -188,8 +193,8 @@ class SubjectTestTests: VaporTestCase {
             let userOne = try User.create(isAdmin: false, on: conn)
             let userTwo = try User.create(isAdmin: false, on: conn)
 
-            let sessionOneEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userOne, on: conn).wait()
-            let sessionTwoEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: userTwo, on: conn).wait()
+            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
             let sessionOne = try sessionOneEntry.representable(on: conn).wait()
             let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
@@ -197,8 +202,8 @@ class SubjectTestTests: VaporTestCase {
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
 
-            var userOneTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionOne, for: userOne, on: conn).wait()
-            var userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userTwo, on: conn).wait()
+            var userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
+            var userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
 
             XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
             XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
@@ -210,11 +215,11 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
             XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-            try TestSession.DatabaseRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne, on: conn).wait()
-            try TestSession.DatabaseRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo, on: conn).wait()
+            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            userOneTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionOne, for: userOne, on: conn).wait()
-            userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userTwo, on: conn).wait()
+            userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
+            userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
 
             XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
             XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
@@ -227,7 +232,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
             XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-            userTwoTaskContent = try SubjectTest.DatabaseRepository.taskWith(id: 2, in: sessionTwo, for: userTwo, on: conn).wait()
+            userTwoTaskContent = try subjectTestRepository.taskWith(id: 2, in: sessionTwo, for: userTwo).wait()
 
             XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
             XCTAssertEqual(userTwoTaskContent.testTasks.filter({ $0.testTaskID == 2 }).first?.isCurrent, true)
@@ -235,7 +240,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(userTwoTaskContent.choises.filter({ $0.isSelected && $0.isCorrect == false }).count, 2)
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.taskWith(id: 1, in: sessionTwo, for: userOne, on: conn).wait()
+                try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userOne).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -262,7 +267,7 @@ class SubjectTestTests: VaporTestCase {
             try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
             try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect, thirdSubmittion])
 
-            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
+            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
 
             XCTAssertEqual(result.title, test.title)
             XCTAssertEqual(result.heldAt, test.openedAt)
@@ -285,7 +290,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+                try subjectTestRepository.results(for: test, user: userOne).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -314,12 +319,12 @@ class SubjectTestTests: VaporTestCase {
             try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
             try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
+            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
 
             try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
             try submitTestWithAnswers(secondTest, for: userTwo, with: [firstSubmittion, secondSubmittion])
 
-            let secondResult = try SubjectTest.DatabaseRepository.results(for: secondTest, user: teacher, on: conn).wait()
+            let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
 
             XCTAssertEqual(secondResult.title, secondTest.title)
             XCTAssertEqual(secondResult.heldAt, secondTest.openedAt)
@@ -342,7 +347,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+                try subjectTestRepository.results(for: test, user: userOne).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -377,14 +382,14 @@ class SubjectTestTests: VaporTestCase {
             try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
             try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittion, thirdSubmittion])
 
-            let result = try SubjectTest.DatabaseRepository.results(for: test, user: teacher, on: conn).wait()
-            let secondResult = try SubjectTest.DatabaseRepository.results(for: secondTest, user: teacher, on: conn).wait()
+            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
+            let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
 
             XCTAssertEqual(result.averageScore, 1/3)
             XCTAssertEqual(secondResult.averageScore, 1)
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.results(for: test, user: userOne, on: conn).wait()
+                try subjectTestRepository.results(for: test, user: userOne).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -407,10 +412,10 @@ class SubjectTestTests: VaporTestCase {
             try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
             try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let histogram = try SubjectTest.DatabaseRepository.scoreHistogram(for: test, user: admin, on: conn).wait()
+            let histogram = try subjectTestRepository.scoreHistogram(for: test, user: admin).wait()
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.scoreHistogram(for: test, user: userOne, on: conn).wait()
+                try subjectTestRepository.scoreHistogram(for: test, user: userOne).wait()
             )
 
             XCTAssertEqual(histogram.scores.count, 4)
@@ -445,10 +450,10 @@ class SubjectTestTests: VaporTestCase {
             try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
             try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let results = try SubjectTest.DatabaseRepository.detailedUserResults(for: test, maxScore: 3, user: admin, on: conn).wait()
+            let results = try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: admin).wait()
 
             XCTAssertThrowsError(
-                try SubjectTest.DatabaseRepository.detailedUserResults(for: test, maxScore: 3, user: userOne, on: conn).wait()
+                try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: userOne).wait()
             )
 
             XCTAssertEqual(results.count, 2)
@@ -466,15 +471,15 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
-        let sessionEntry = try SubjectTest.DatabaseRepository.enter(test: test, with: enterRequest, by: user, on: conn).wait()
+        let sessionEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
 
         let session = try sessionEntry.representable(on: conn).wait()
 
         try submittions.forEach {
-            try TestSession.DatabaseRepository.submit(content: $0, for: session, by: user, on: conn).wait()
+            try testSessionRepository.submit(content: $0, for: session, by: user).wait()
         }
 
-        try TestSession.DatabaseRepository.submit(test: session, by: user, on: conn).wait()
+        try testSessionRepository.submit(test: session, by: user).wait()
     }
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
@@ -528,10 +533,10 @@ class SubjectTestTests: VaporTestCase {
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {
-            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
-            return try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+            let test = try subjectTestRepository.create(from: data, by: user).wait()
+            return try subjectTestRepository.open(test: test, by: user).wait()
         } else {
-            return try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            return try subjectTestRepository.create(from: data, by: user).wait()
         }
     }
 
@@ -560,10 +565,10 @@ class SubjectTestTests: VaporTestCase {
         )
 
         if scheduledAt.timeIntervalSinceNow < 0 {
-            let test = try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
-            return try SubjectTest.DatabaseRepository.open(test: test, by: user, on: conn).wait()
+            let test = try subjectTestRepository.create(from: data, by: user).wait()
+            return try subjectTestRepository.open(test: test, by: user).wait()
         } else {
-            return try SubjectTest.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            return try subjectTestRepository.create(from: data, by: user).wait()
         }
     }
 

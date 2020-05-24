@@ -10,6 +10,8 @@ import Vapor
 
 public final class FlashCardTask: KognitaCRUDModel {
 
+    public static var tableName: String = "FlashCardTask"
+
     static let actionDescriptor = "Les spørsmålet og skriv et passende svar"
 
     public var id: Int?
@@ -37,10 +39,6 @@ extension FlashCardTask: ModelParameterRepresentable { }
 extension FlashCardTask {
     var task: Parent<FlashCardTask, Task>? {
         return parent(\.id)
-    }
-
-    func content(on conn: DatabaseConnectable) -> EventLoopFuture<TaskPreviewContent> {
-        return FlashCardTask.DatabaseRepository.content(for: self, on: conn)
     }
 }
 

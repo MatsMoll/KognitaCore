@@ -1,5 +1,6 @@
 import Vapor
 import FluentPostgreSQL
+import FluentSQL
 
 enum TaskSolutionRepositoryError: String, Debuggable {
 
@@ -18,7 +19,10 @@ enum TaskSolutionRepositoryError: String, Debuggable {
 
 extension TaskSolution {
 
-    public final class DatabaseRepository: TaskSolutionRepositoring {
+    public struct DatabaseRepository: TaskSolutionRepositoring, DatabaseConnectableRepository {
+
+        public let conn: DatabaseConnectable
+        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
 
         struct Query {
             struct SolutionID: Codable {
@@ -39,7 +43,7 @@ extension TaskSolution {
             static let taskSolutionForTaskID = #"SELECT "sol"."id", "sol"."createdAt", "sol"."presentUser", "sol"."solution", "creator"."id" AS "creatorID", "creator"."username" AS "creatorUsername", "approved"."username" AS "approvedBy" FROM "TaskSolution" AS "sol" INNER JOIN "User" AS "creator" ON "sol"."creatorID" = "creator"."id" LEFT JOIN "User" AS "approved" ON "sol"."approvedBy" = "approved"."id" INNER JOIN "Task" ON "sol"."taskID" = "Task"."id" WHERE "Task"."id" = ($1)"#
         }
 
-        public static func create(from content: TaskSolution.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Create.Response> {
+        public func create(from content: TaskSolution.Create.Data, by user: User?) throws -> EventLoopFuture<TaskSolution.Create.Response> {
 
             guard let user = user else { throw Abort(.unauthorized) }
 
@@ -54,18 +58,19 @@ extension TaskSolution {
             .save(on: conn)
             .flatMap { solution in
 
-                try User.DatabaseRepository
-                    .isModerator(user: user, taskID: content.taskID, on: conn)
+                try self
+                    .userRepository
+                    .isModerator(user: user, taskID: content.taskID)
                     .flatMap {
                         solution.isApproved = true
                         try solution.approvedBy = user.requireID()
-                        return solution.save(on: conn)
+                        return solution.save(on: self.conn)
                             .transform(to: .init())
                 }.catchMap { _ in .init() }
             }
         }
 
-        public static func solutions(for taskID: Task.ID, for user: User, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskSolution.Response]> {
+        public func solutions(for taskID: Task.ID, for user: User) -> EventLoopFuture<[TaskSolution.Response]> {
 
             return conn.databaseConnection(to: .psql).flatMap { psqlConn in
 
@@ -102,36 +107,36 @@ extension TaskSolution {
             }
         }
 
-        public static func upvote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public func upvote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
             try TaskSolution.Pivot.Vote(userID: user.requireID(), solutionID: solutionID)
                 .create(on: conn)
                 .transform(to: ())
         }
 
-        public static func revokeVote(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public func revokeVote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
             try TaskSolution.Pivot.Vote.query(on: conn)
                 .filter(\.userID == user.requireID())
                 .filter(\.solutionID == solutionID)
                 .first()
                 .unwrap(or: Abort(.badRequest))
                 .flatMap { vote in
-                    vote.delete(on: conn)
+                    vote.delete(on: self.conn)
             }
         }
 
-        public static func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskSolution.Update.Response> {
+        public func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution.Update.Response> {
             if try model.creatorID == user.requireID() {
                 try model.update(with: data)
                 return model.save(on: conn).transform(to: .init())
             } else {
-                return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
+                return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
                     try model.update(with: data)
-                    return model.save(on: conn).transform(to: .init())
+                    return model.save(on: self.conn).transform(to: .init())
                 }
             }
         }
 
-        public static func delete(model: TaskSolution, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public func delete(model: TaskSolution, by user: User?) throws -> EventLoopFuture<Void> {
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
@@ -144,31 +149,69 @@ extension TaskSolution {
                     guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
 
                     if try model.creatorID == user.requireID() {
-                        return model.delete(on: conn)
+                        return model.delete(on: self.conn)
                     } else {
-                        return try User.DatabaseRepository.isModerator(user: user, taskID: model.taskID, on: conn).flatMap {
-                            model.delete(on: conn)
+                        return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
+                            model.delete(on: self.conn)
                         }
                     }
             }
         }
 
-        public static func approve(for solutionID: TaskSolution.ID, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+        public func approve(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
 
             TaskSolution
                 .find(solutionID, on: conn)
                 .unwrap(or: Abort(.badRequest))
                 .flatMap { (solution: TaskSolution) in
 
-                    try User.DatabaseRepository
-                        .isModerator(user: user, taskID: solution.taskID, on: conn)
+                    try self.userRepository
+                        .isModerator(user: user, taskID: solution.taskID)
                         .flatMap {
 
                             try solution.approve(by: user)
-                                .save(on: conn)
+                                .save(on: self.conn)
                     }
             }
             .transform(to: ())
+        }
+
+        /// Should be in `TaskSolutionRepositoring`
+        public func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
+
+            return try userRepository
+                .isModerator(user: moderator, subjectID: subjectID)
+                .flatMap {
+
+                    Task.query(on: self.conn)
+                        .join(\TaskSolution.taskID, to: \Task.id)
+                        .join(\Subtopic.id, to: \Task.subtopicID)
+                        .join(\Topic.id, to: \Subtopic.topicId)
+                        .filter(\Topic.subjectId == subjectID)
+                        .filter(\TaskSolution.approvedBy == nil)
+                        .range(0..<10)
+                        .alsoDecode(TaskSolution.self)
+                        .all()
+                        .flatMap { tasks in
+
+                            MultipleChoiseTaskChoise.query(on: self.conn)
+                                .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
+                                .all()
+                                .map { (choises: [MultipleChoiseTaskChoise]) in
+
+                                    let groupedChoises = choises.group(by: \.taskId)
+
+                                    return tasks.map { task, solution in
+                                        TaskSolution.Unverified(
+                                            task: task,
+                                            solution: solution,
+                                            choises: groupedChoises[solution.taskID] ?? []
+                                        )
+                                    }
+                            }
+                    }
+            }
+            .catchMap { _ in [] }
         }
     }
 }

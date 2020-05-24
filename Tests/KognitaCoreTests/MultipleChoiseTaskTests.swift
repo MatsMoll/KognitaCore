@@ -12,6 +12,10 @@ import FluentPostgreSQL
 
 class MultipleChoiseTaskTests: VaporTestCase {
 
+    lazy var multipleChoiceRepository: some MultipleChoiseTaskRepository = { MultipleChoiseTask.DatabaseRepository(conn: conn) }()
+    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
+    lazy var practiceSessionRepository: some PracticeSessionRepository = { PracticeSession.DatabaseRepository(conn: conn) }()
+
     func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
@@ -30,16 +34,16 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTask.DatabaseRepository
-            .create(from: taskData, by: user, on: conn)
+        let multiple = try multipleChoiceRepository
+            .create(from: taskData, by: user)
             .wait()
 
         let content = try multiple
             .content(on: conn)
             .wait()
 
-        let solution = try TaskSolution.DatabaseRepository
-            .solutions(for: multiple.requireID(), for: user, on: conn)
+        let solution = try taskSolutionRepository
+            .solutions(for: multiple.requireID(), for: user)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
@@ -70,16 +74,16 @@ class MultipleChoiseTaskTests: VaporTestCase {
                 .init(choise: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTask.DatabaseRepository
-            .create(from: taskData, by: user, on: conn)
+        let multiple = try multipleChoiceRepository
+            .create(from: taskData, by: user)
             .wait()
 
         let content = try multiple
             .content(on: conn)
             .wait()
 
-        let solution = try TaskSolution.DatabaseRepository
-            .solutions(for: multiple.requireID(), for: user, on: conn)
+        let solution = try taskSolutionRepository
+            .solutions(for: multiple.requireID(), for: user)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
@@ -111,8 +115,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: user, on: conn).wait()
+        let editedMultiple = try multipleChoiceRepository
+            .update(model: startingMultiple, to: content, by: user).wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)
@@ -146,8 +150,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: creatorStudent, on: conn).wait()
+        let editedMultiple = try multipleChoiceRepository
+            .update(model: startingMultiple, to: content, by: creatorStudent).wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingTask.id)
@@ -159,8 +163,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
         XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
 
         throwsError(of: Abort.self) {
-            _ = try MultipleChoiseTask.DatabaseRepository
-                .update(model: editedMultiple, to: content, by: otherStudent, on: conn).wait()
+            _ = try multipleChoiceRepository
+                .update(model: editedMultiple, to: content, by: otherStudent).wait()
         }
     }
 
@@ -183,8 +187,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: user, on: conn)
+        let editedMultiple = try multipleChoiceRepository
+            .update(model: startingMultiple, to: content, by: user)
             .wait()
         let editedTask = try editedMultiple.task!.get(on: conn).wait()
         startingTask = try Task.query(on: conn, withSoftDeleted: true)
@@ -214,11 +218,11 @@ class MultipleChoiseTaskTests: VaporTestCase {
             topicIDs: nil
         )
 
-        let session = try PracticeSession.DatabaseRepository
-            .create(from: create, by: user, on: conn).wait()
+        let session = try practiceSessionRepository
+            .create(from: create, by: user).wait()
         let representable = try session.representable(on: conn).wait()
 
-        let firstTask = try session.currentTask(on: conn).wait()
+        let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
         let firstChoises = try firstTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == true).all().wait()
 
         let firstSubmit = MultipleChoiseTask.Submit(
@@ -226,10 +230,10 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: firstChoises.compactMap { $0.id },
             taskIndex: 1
         )
-        _ = try PracticeSession.DatabaseRepository
-            .submit(firstSubmit, in: representable, by: user, on: conn).wait()
+        _ = try practiceSessionRepository
+            .submit(firstSubmit, in: representable, by: user).wait()
 
-        let secondTask = try session.currentTask(on: conn).wait()
+        let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
         let secondChoises = try secondTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == false).all().wait()
 
         let secondSubmit = MultipleChoiseTask.Submit(
@@ -238,8 +242,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             taskIndex: 2
         )
 
-        _ = try PracticeSession.DatabaseRepository
-            .submit(secondSubmit, in: representable, by: user, on: conn).wait()
+        _ = try practiceSessionRepository
+            .submit(secondSubmit, in: representable, by: user).wait()
 
         let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
 

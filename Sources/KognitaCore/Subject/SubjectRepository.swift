@@ -15,7 +15,8 @@ public struct SubjectCompendiumFilter: Codable {
 public protocol SubjectRepositoring: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository,
-    RetriveAllModelsRepository
+    RetriveAllModelsRepository,
+    RetriveModelRepository
     where
     Model           == Subject,
     CreateData      == Subject.Create.Data,
@@ -23,15 +24,20 @@ public protocol SubjectRepositoring: CreateModelRepository,
     UpdateData      == Subject.Edit.Data,
     UpdateResponse  == Subject.Edit.Response,
     ResponseModel   == Subject {
-    static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject>
-    static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]>
-    static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]>
-    static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?>
-    static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium>
+    func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>
+    func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]>
+    func allActive(for user: User) throws -> EventLoopFuture<[Subject]>
+    func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?>
+    func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void>
+    func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void>
+    func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
+    func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
+    func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter) throws -> EventLoopFuture<Subject.Compendium>
+    func subjectIDFor(taskIDs: [Task.ID]) -> EventLoopFuture<Subject.ID>
+    func subjectIDFor(topicIDs: [Topic.ID]) -> EventLoopFuture<Subject.ID>
+    func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>
+    func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject>
+    func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
 }
 
 extension Subject {

@@ -5,6 +5,8 @@ import Vapor
 /// A practice session object
 public final class SubjectTest: KognitaPersistenceModel {
 
+    public static var tableName: String = "SubjectTest"
+
     /// The session id
     public var id: Int?
 

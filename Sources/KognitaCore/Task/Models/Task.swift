@@ -11,6 +11,8 @@ import FluentPostgreSQL
 /// The superclass of all task types
 public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
 
+    public static var tableName: String = "Task"
+
     /// The semester a exam was taken
     ///
     /// - fall: The fall
@@ -135,49 +137,49 @@ extension Task {
         )
     }
 
-    func taskContent(_ req: Request) -> EventLoopFuture<TaskContent> {
-        return topic(on: req)
-            .flatMap { topic in
-                topic.subject
-                    .get(on: req)
-                    .flatMap { subject in
-                        try self.getTaskTypePath(req).map { path in
-                            TaskContent(task: self, topic: topic, subject: subject, creator: nil, taskTypePath: path)
-                        }
-                }
-        }
-    }
+//    func taskContent(_ req: Request) -> EventLoopFuture<TaskContent> {
+//        return topic(on: req)
+//            .flatMap { topic in
+//                topic.subject
+//                    .get(on: req)
+//                    .flatMap { subject in
+//                        try self.getTaskTypePath(req).map { path in
+//                            TaskContent(task: self, topic: topic, subject: subject, creator: nil, taskTypePath: path)
+//                        }
+//                }
+//        }
+//    }
+//
+//    static func taskContent(where filter: FilterOperator<PostgreSQLDatabase, Task>, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskContent]> {
+//        return Task.query(on: conn)
+//            .filter(filter)
+//            .join(\Subtopic.id, to: \Task.subtopicID)
+//            .join(\Topic.id, to: \Subtopic.topicId)
+//            .join(\Subject.id, to: \Topic.subjectId)
+//            .alsoDecode(Topic.self)
+//            .alsoDecode(Subject.self)
+//            .all()
+//            .flatMap { tasks in
+//                return try tasks.map { (taskTopic, subject) in
+//                    try taskTopic.0.getTaskTypePath(conn).map { path in
+//                        TaskContent(task: taskTopic.0, topic: taskTopic.1, subject: subject, creator: nil, taskTypePath: path)
+//                    }
+//                }.flatten(on: conn)
+//        }
+//    }
 
-    static func taskContent(where filter: FilterOperator<PostgreSQLDatabase, Task>, on conn: DatabaseConnectable) -> EventLoopFuture<[TaskContent]> {
-        return Task.query(on: conn)
-            .filter(filter)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .alsoDecode(Topic.self)
-            .alsoDecode(Subject.self)
-            .all()
-            .flatMap { tasks in
-                return try tasks.map { (taskTopic, subject) in
-                    try taskTopic.0.getTaskTypePath(conn).map { path in
-                        TaskContent(task: taskTopic.0, topic: taskTopic.1, subject: subject, creator: nil, taskTypePath: path)
-                    }
-                }.flatten(on: conn)
-        }
-    }
-
-    func getTaskTypePath(_ conn: DatabaseConnectable) throws -> EventLoopFuture<String> {
-        return try Task.Repository
-            .getTaskTypePath(for: requireID(), conn: conn)
-    }
-
-    func topic(on conn: DatabaseConnectable) -> Future<Topic> {
-        return Topic.query(on: conn)
-            .join(\Subtopic.topicId, to: \Topic.id)
-            .filter(\Subtopic.id == subtopicID)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
-    }
+//    func getTaskTypePath(_ conn: DatabaseConnectable) throws -> EventLoopFuture<String> {
+//        return try Task.Repository
+//            .getTaskTypePath(for: requireID(), conn: conn)
+//    }
+//
+//    func topic(on conn: DatabaseConnectable) -> Future<Topic> {
+//        return Topic.query(on: conn)
+//            .join(\Subtopic.topicId, to: \Topic.id)
+//            .filter(\Subtopic.id == subtopicID)
+//            .first()
+//            .unwrap(or: Abort(.internalServerError))
+//    }
 }
 
 extension Task: Content { }

@@ -3,6 +3,8 @@ import XCTest
 
 final class TaskDiscussionTests: VaporTestCase {
 
+    lazy var taskDiscussionRepository: some TaskDiscussionRepositoring = { TaskDiscussion.DatabaseRepository(conn: conn) }()
+
     func testCreateDiscussionNotLoggedIn() {
         do {
             _ = try Task.create(on: conn)
@@ -14,7 +16,7 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: data, by: nil, on: conn).wait())
+            XCTAssertThrowsError(try taskDiscussionRepository.create(from: data, by: nil).wait())
 
         } catch {
             XCTFail(error.localizedDescription)
@@ -33,9 +35,9 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            _ = try TaskDiscussion.DatabaseRepository.create(from: data, by: user, on: conn).wait()
+            _ = try taskDiscussionRepository.create(from: data, by: user).wait()
 
-            let discussions = try TaskDiscussion.DatabaseRepository.getDiscussions(in: data.taskID, on: conn).wait()
+            let discussions = try taskDiscussionRepository.getDiscussions(in: data.taskID).wait()
 
             XCTAssertEqual(discussions.count, 1)
 
@@ -63,8 +65,8 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: insufficientData, by: user, on: conn))
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.create(from: noDescriptionData, by: user, on: conn))
+            XCTAssertThrowsError(try taskDiscussionRepository.create(from: insufficientData, by: user))
+            XCTAssertThrowsError(try taskDiscussionRepository.create(from: noDescriptionData, by: user))
 
         } catch {
             XCTFail(error.localizedDescription)
@@ -75,13 +77,13 @@ final class TaskDiscussionTests: VaporTestCase {
         do {
             let user = try User.create(on: conn)
 
-            let data = TaskDiscussion.Pivot.Response.Create.Data(
+            let data = TaskDiscussionResponse.Create.Data(
                 response: "test",
                 discussionID: -1
             )
 
             XCTAssertThrowsError(
-                try TaskDiscussion.DatabaseRepository.respond(with: data, by: user, on: conn).wait()
+                try taskDiscussionRepository.respond(with: data, by: user).wait()
             )
 
         } catch {
@@ -94,20 +96,20 @@ final class TaskDiscussionTests: VaporTestCase {
             let user = try User.create(on: conn)
             let discussion = try TaskDiscussion.create(on: conn)
 
-            let firstDiscussionResponse = try TaskDiscussion.Pivot.Response.Create.Data(
+            let firstDiscussionResponse = try TaskDiscussionResponse.Create.Data(
                 response: "test",
                 discussionID: discussion.requireID()
             )
 
-            let secondDiscussionResponse = try TaskDiscussion.Pivot.Response.Create.Data(
+            let secondDiscussionResponse = try TaskDiscussionResponse.Create.Data(
                 response: "testing",
                 discussionID: discussion.requireID()
             )
 
-            _ = try TaskDiscussion.DatabaseRepository.respond(with: firstDiscussionResponse, by: user, on: conn).wait()
-            _ = try TaskDiscussion.DatabaseRepository.respond(with: secondDiscussionResponse, by: user, on: conn).wait()
+            _ = try taskDiscussionRepository.respond(with: firstDiscussionResponse, by: user).wait()
+            _ = try taskDiscussionRepository.respond(with: secondDiscussionResponse, by: user).wait()
 
-            let responses = try TaskDiscussion.DatabaseRepository.responses(to: discussion.requireID(), for: user, on: conn).wait()
+            let responses = try taskDiscussionRepository.responses(to: discussion.requireID(), for: user).wait()
 
             XCTAssertEqual(responses.count, 2)
 
@@ -130,18 +132,18 @@ final class TaskDiscussionTests: VaporTestCase {
             let discussion = try TaskDiscussion.create(on: conn)
             let user = try User.create(on: conn)
 
-            let noResponse = try TaskDiscussion.Pivot.Response.Create.Data(
+            let noResponse = try TaskDiscussionResponse.Create.Data(
                 response: "",
                 discussionID: discussion.requireID()
             )
 
-            let insufficientData = try TaskDiscussion.Pivot.Response.Create.Data(
+            let insufficientData = try TaskDiscussionResponse.Create.Data(
                 response: "tre",
                 discussionID: discussion.requireID()
             )
 
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: insufficientData, by: user, on: conn))
-            XCTAssertThrowsError(try TaskDiscussion.DatabaseRepository.respond(with: noResponse, by: user, on: conn))
+            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: insufficientData, by: user))
+            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: noResponse, by: user))
 
         } catch {
             XCTFail(error.localizedDescription)

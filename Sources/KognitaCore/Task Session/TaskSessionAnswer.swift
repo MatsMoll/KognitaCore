@@ -5,6 +5,8 @@ import Vapor
 
 public final class TaskSessionAnswer: KognitaPersistenceModel {
 
+    public static var tableName: String = "TaskSessionAnswer"
+
     public var createdAt: Date?
 
     public var updatedAt: Date?
@@ -26,10 +28,18 @@ public final class TaskSessionAnswer: KognitaPersistenceModel {
     }
 }
 
+protocol TaskSessionAnswerRepository {
+    func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]>
+    func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?>
+}
+
 extension TaskSessionAnswer {
 
-    public class DatabaseRepository {
-        public static func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
+    public struct DatabaseRepository: TaskSessionAnswerRepository, DatabaseConnectableRepository {
+
+        public let conn: DatabaseConnectable
+
+        public func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
             MultipleChoiseTaskAnswer.query(on: conn, withSoftDeleted: true)
                 .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
                 .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
@@ -38,7 +48,7 @@ extension TaskSessionAnswer {
                 .all()
         }
 
-        public static func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID, on conn: DatabaseConnectable) -> EventLoopFuture<FlashCardAnswer?> {
+        public func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?> {
             FlashCardAnswer.query(on: conn)
                 .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id)
                 .filter(\TaskSessionAnswer.sessionID == sessionID)

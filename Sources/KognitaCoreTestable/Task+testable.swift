@@ -55,15 +55,14 @@ extension Task {
             .save(on: conn)
             .flatMap { task in
                 if createSolution {
-                    return try TaskSolution.DatabaseRepository
+                    return try TaskSolution.DatabaseRepository(conn: conn)
                         .create(from:
                             TaskSolution.Create.Data(
                                 solution: explenation,
                                 presentUser: true,
                                 taskID: task.requireID()
                             ),
-                            by: creator,
-                            on: conn
+                            by: creator
                     ).transform(to: task)
                 } else {
                     return conn.future(task)

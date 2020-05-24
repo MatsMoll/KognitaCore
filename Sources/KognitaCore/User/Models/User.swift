@@ -11,6 +11,8 @@ public protocol UserContent {
 /// A registered user, capable of owning todo items.
 public final class User: KognitaCRUDModel {
 
+    public static var tableName: String = "User"
+
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
     public var id: Int?

@@ -10,7 +10,7 @@ import FluentPostgreSQL
 
 extension PracticeSession.Pivot {
 
-    public final class Task: PostgreSQLPivot {
+    final class Task: PostgreSQLPivot {
 
         public typealias Database = PostgreSQLDatabase
 
@@ -30,7 +30,7 @@ extension PracticeSession.Pivot {
 
         var score: Double?
 
-        public typealias Left = PracticeSession
+        public typealias Left = PracticeSession.DatabaseModel
         public typealias Right = KognitaCore.Task
 
         public static var leftIDKey: LeftIDKey = \.sessionID
@@ -67,7 +67,7 @@ extension PracticeSession.Pivot.Task: Migration {
             try addProperties(to: builder)
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.sessionID, to: \PracticeSession.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.sessionID, to: \PracticeSession.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
 
             builder.unique(on: \.sessionID, \.taskID)
         }
