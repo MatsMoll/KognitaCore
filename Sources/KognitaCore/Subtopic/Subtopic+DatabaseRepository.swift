@@ -12,6 +12,7 @@ extension Subtopic {
     public struct DatabaseRepository: SubtopicRepositoring, DatabaseConnectableRepository {
 
         public let conn: DatabaseConnectable
+
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
     }
 }
@@ -25,20 +26,39 @@ extension Subtopic.DatabaseRepository {
             .isModerator(user: user, topicID: content.topicId)
             .flatMap {
 
-                Subtopic(content: content)
+                Subtopic.DatabaseModel(content: content)
                     .save(on: self.conn)
+                    .map { try $0.content() }
         }
     }
 
+    public func update(model: Subtopic, to data: Subtopic.Update.Data, by user: User) throws -> EventLoopFuture<Subtopic> {
+        updateDatabase(Subtopic.DatabaseModel.self, model: model, to: data)
+    }
+
+    public func delete(model: Subtopic, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Subtopic.DatabaseModel.self, model: model)
+    }
+
+    public func find(_ id: Subtopic.ID) -> EventLoopFuture<Subtopic?> {
+        findDatabaseModel(Subtopic.DatabaseModel.self, withID: id)
+    }
+
+    public func find(_ id: Int, or error: Error) -> EventLoopFuture<Subtopic> {
+        findDatabaseModel(Subtopic.DatabaseModel.self, withID: id, or: error)
+    }
+
     public func getSubtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]> {
-        return try Subtopic.query(on: conn)
-            .filter(\.topicId == topic.requireID())
+        return Subtopic.DatabaseModel.query(on: conn)
+            .filter(\.topicId == topic.id)
             .all()
+            .map { try $0.map { try $0.content() }}
     }
 
     public func subtopics(with topicID: Topic.ID) -> EventLoopFuture<[Subtopic]> {
-        return Subtopic.query(on: conn)
+        return Subtopic.DatabaseModel.query(on: conn)
             .filter(\.topicId == topicID)
             .all()
+            .map { try $0.map { try $0.content() }}
     }
 }

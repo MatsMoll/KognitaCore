@@ -93,7 +93,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
         self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable     = content.isTestable
-        self.creatorID      = try creator.requireID()
+        self.creatorID      = creator.id
         self.examPaperSemester = content.examPaperSemester
         self.examPaperYear  = content.examPaperYear
         if description?.isEmpty == true {
@@ -105,8 +105,8 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         PostgreSQLDatabase.create(Task.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.subtopicID, to: \Subtopic.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.subtopicID, to: \Subtopic.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.creatorID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
             PostgreSQLDatabase.update(Task.self, on: conn) { builder in
                 builder.deleteField(for: \.creatorID)
@@ -118,11 +118,11 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
 
 extension Task {
 
-    var subtopic: Parent<Task, Subtopic> {
+    var subtopic: Parent<Task, Subtopic.DatabaseModel> {
         return parent(\.subtopicID)
     }
 
-    var creator: Parent<Task, User>? {
+    var creator: Parent<Task, User.DatabaseModel>? {
         return parent(\.creatorID)
     }
 

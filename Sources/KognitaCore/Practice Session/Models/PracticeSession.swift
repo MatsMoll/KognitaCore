@@ -96,7 +96,7 @@ extension PracticeSession.DatabaseModel {
 extension PracticeSession.DatabaseModel {
 
     /// The subtopics being practiced
-    var subtopics: Siblings<PracticeSession.DatabaseModel, Subtopic, PracticeSession.Pivot.Subtopic> {
+    var subtopics: Siblings<PracticeSession.DatabaseModel, Subtopic.DatabaseModel, PracticeSession.Pivot.Subtopic> {
         return siblings()
     }
 
@@ -133,9 +133,9 @@ extension PracticeSession {
         public let session: TaskSession.PracticeParameter
         public let task: TaskType
         public let index: Int
-        public let user: User.Response
+        public let user: User
 
-        public init(session: TaskSession.PracticeParameter, task: TaskType, index: Int, user: User.Response) {
+        public init(session: TaskSession.PracticeParameter, task: TaskType, index: Int, user: User) {
             self.session = session
             self.task = task
             self.index = index

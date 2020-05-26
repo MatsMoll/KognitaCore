@@ -23,7 +23,11 @@ public protocol PracticeSessionRepository: CreateModelRepository
 
 extension PracticeSession {
     public struct DatabaseRepository: DatabaseConnectableRepository {
+
+        typealias DatabaseModel = PracticeSession.DatabaseModel
+
         public let conn: DatabaseConnectable
+
         private var flashCardRepository: some FlashCardTaskRepository { FlashCardTask.DatabaseRepository(conn: conn) }
         private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiseTask.DatabaseRepository(conn: conn) }
         private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
@@ -108,7 +112,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         }
         return conn.transaction(on: .psql) { conn in
 
-            try TaskSession(userID: user.requireID())
+            try TaskSession(userID: user.id)
                 .create(on: conn)
                 .flatMap { superSession in
 
@@ -137,8 +141,8 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         return try PracticeSession.Pivot.Subtopic
             .query(on: conn)
             .filter(\.sessionID == session.requireID())
-            .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
-            .decode(Subtopic.self)
+            .join(\Subtopic.DatabaseModel.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
+            .decode(data: Subtopic.self)
             .all()
     }
 
@@ -169,7 +173,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
                                     assignedTasks.map { try $0.requireID() }
                                 )
                             )
-                            .filter(\.subtopicID ~~ subtopics.map { try $0.requireID() })
+                            .filter(\.subtopicID ~~ subtopics.map { $0.id })
                             .filter(\.isTestable == false)
                             .all()
                             .map { uncompletedTasks in
@@ -291,7 +295,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func submit(_ submit: MultipleChoiseTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
-        guard try user.requireID() == session.userID else {
+        guard user.id == session.userID else {
             throw Abort(.forbidden)
         }
 
@@ -331,7 +335,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>> {
 
-        guard try user.requireID() == session.userID else {
+        guard try user.id == session.userID else {
             throw Abort(.forbidden)
         }
 
@@ -434,7 +438,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable> {
 
-        guard try session.userID == user.requireID() else {
+        guard try session.userID == user.id else {
             throw Abort(.forbidden)
         }
 
@@ -477,8 +481,8 @@ extension PracticeSession.DatabaseRepository {
             .flatMap { conn in
 
                 conn.select()
-                    .column(\Topic.name, as: "topicName")
-                    .column(\Topic.id, as: "topicID")
+                    .column(\Topic.DatabaseModel.name, as: "topicName")
+                    .column(\Topic.DatabaseModel.id, as: "topicID")
                     .column(\PracticeSession.Pivot.Task.index, as: "taskIndex")
                     .column(\TaskResult.createdAt, as: "date")
                     .column(\Task.question, as: "question")
@@ -488,8 +492,8 @@ extension PracticeSession.DatabaseRepository {
                     .column(\TaskResult.isSetManually, as: "isSetManually")
                     .from(PracticeSession.Pivot.Task.self)
                     .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
-                    .join(\Task.subtopicID, to: \Subtopic.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                     .join(\Task.id, to: \TaskResult.taskID)
                     .where(\TaskResult.sessionID == sessionID)
                     .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
@@ -502,7 +506,7 @@ extension PracticeSession.DatabaseRepository {
         return try PracticeSession.DatabaseModel
             .query(on: conn)
             .join(\TaskSession.id, to: \PracticeSession.DatabaseModel.id)
-            .filter(\TaskSession.userID == user.requireID())
+            .filter(\TaskSession.userID == user.id)
             .filter(\PracticeSession.DatabaseModel.endedAt != nil)
             .sort(\PracticeSession.DatabaseModel.createdAt, .descending)
             .all()
@@ -516,20 +520,20 @@ extension PracticeSession.DatabaseRepository {
         on conn: PostgreSQLConnection
     ) throws -> EventLoopFuture<PracticeSession.HistoryList> {
 
-        return try conn.select()
+        return conn.select()
             .all(table: PracticeSession.DatabaseModel.self)
-            .all(table: Subject.self)
+            .all(table: Subject.DatabaseModel.self)
             .from(PracticeSession.DatabaseModel.self)
             .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
             .join(\PracticeSession.DatabaseModel.id, to: \PracticeSession.Pivot.Subtopic.sessionID)
-            .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.id)
-            .join(\Subtopic.topicId, to: \Topic.id)
-            .join(\Topic.subjectId, to: \Subject.id)
+            .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
             .where(\PracticeSession.DatabaseModel.endedAt != nil)
-            .where(\TaskSession.userID == user.requireID())
+            .where(\TaskSession.userID == user.id)
             .orderBy(\PracticeSession.DatabaseModel.createdAt, .descending)
             .groupBy(\PracticeSession.DatabaseModel.id)
-            .groupBy(\Subject.id)
+            .groupBy(\Subject.DatabaseModel.id)
             .all(decoding: PracticeSession.self, Subject.self)
             .map { sessions in
                 PracticeSession.HistoryList(
@@ -549,22 +553,22 @@ extension PracticeSession.DatabaseRepository {
             .flatMap { conn in
 
                 try conn.select()
-                    .column(\Subject.name, as: "subjectName")
-                    .column(\Subject.id, as: "subjectID")
+                    .column(\Subject.DatabaseModel.name, as: "subjectName")
+                    .column(\Subject.DatabaseModel.id, as: "subjectID")
                     .column(\PracticeSession.DatabaseModel.id, as: "id")
                     .column(\PracticeSession.DatabaseModel.createdAt, as: "createdAt")
                     .column(\PracticeSession.DatabaseModel.endedAt, as: "endedAt")
                     .from(PracticeSession.DatabaseModel.self)
                     .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
                     .join(\PracticeSession.DatabaseModel.id, to: \PracticeSession.Pivot.Subtopic.sessionID)
-                    .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .join(\Topic.subjectId, to: \Subject.id)
+                    .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
                     .where(\PracticeSession.DatabaseModel.endedAt != nil)
-                    .where(\TaskSession.userID == user.requireID())
+                    .where(\TaskSession.userID == user.id)
                     .orderBy(\PracticeSession.DatabaseModel.createdAt, .descending)
                     .groupBy(\PracticeSession.DatabaseModel.id)
-                    .groupBy(\Subject.id)
+                    .groupBy(\Subject.DatabaseModel.id)
                     .all(decoding: PracticeSession.HighOverview.self)
         }
     }
@@ -572,7 +576,7 @@ extension PracticeSession.DatabaseRepository {
     func register<T: Content>(_ submitResult: TaskSubmitResult, result: TaskSessionResult<T>, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskResult> {
 
         return try TaskResult.DatabaseRepository
-            .createResult(from: submitResult, userID: user.requireID(), with: session.requireID(), on: conn)
+            .createResult(from: submitResult, userID: user.id, with: session.requireID(), on: conn)
             .flatMap { result in
 
                 try self.markAsComplete(taskID: submitResult.taskID, in: session)
@@ -610,9 +614,9 @@ extension PracticeSession.DatabaseRepository {
 
     public func getLatestUnfinnishedSessionPath(for user: User) throws -> EventLoopFuture<String?> {
 
-        return try PracticeSession.DatabaseModel.query(on: conn)
+        return PracticeSession.DatabaseModel.query(on: conn)
             .join(\TaskSession.id, to: \PracticeSession.id)
-            .filter(\TaskSession.userID == user.requireID())
+            .filter(\TaskSession.userID == user.id)
             .filter(\PracticeSession.DatabaseModel.endedAt == nil)
             .sort(\PracticeSession.DatabaseModel.createdAt, .descending)
             .first()
@@ -632,7 +636,7 @@ extension PracticeSession.DatabaseRepository {
     /// Returns the number of tasks in a session
     public func getNumberOfTasks(in session: PracticeSession) throws -> EventLoopFuture<Int> {
 
-        return try PracticeSession.Pivot.Subtopic.query(on: conn)
+        return PracticeSession.Pivot.Subtopic.query(on: conn)
             .join(\Task.subtopicID, to: \PracticeSession.Pivot.Subtopic.subtopicID)
             .filter(\PracticeSession.Pivot.Subtopic.sessionID == session.id)
             .count()
@@ -648,7 +652,7 @@ extension PracticeSession.DatabaseRepository {
     }
 
     public func extend(session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<Void> {
-        guard try session.userID == user.requireID() else {
+        guard session.userID == user.id else {
             throw Abort(.forbidden)
         }
         return session.extendSession(with: 5, on: conn)

@@ -42,7 +42,7 @@ extension User.ResetPassword.Token {
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
             try addProperties(to: builder)
-            builder.reference(from: \.userId, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.userId, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
             PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
                 builder.deleteField(for: \.userId)
@@ -71,61 +71,51 @@ extension User.ResetPassword {
     }
 }
 
-protocol ResetPasswordRepositoring: CreateModelRepository,
-    DeleteModelRepository,
-    RetriveModelRepository
-    where
-    CreateData      == User.ResetPassword.Token.Create.Data,
-    CreateResponse  == User.ResetPassword.Token.Create.Response,
-    Model           == User.ResetPassword.Token {
+protocol ResetPasswordRepositoring {
+    func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response>
     func reset(to content: User.ResetPassword.Data, with token: String) throws -> EventLoopFuture<Void>
 }
 
 extension User.ResetPassword.Token {
     public struct DatabaseRepository: DatabaseConnectableRepository {
+
+        typealias DatabaseModel = User.ResetPassword.Token
+
         public let conn: DatabaseConnectable
 
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
     }
 }
 
-extension User.ResetPassword.Token.DatabaseRepository: ResetPasswordRepositoring {
+extension User.DatabaseRepository: ResetPasswordRepositoring {
 
-    enum Errors: Error {
+    enum ResetErrors: Error {
         case incorrectOrExpiredToken
     }
 
-    public func create(from content: User.ResetPassword.Token.Create.Data = .init(), by user: User?) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
+    func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
 
-        guard let user = user else { throw Abort(.unauthorized) }
-
-        return try User.ResetPassword
-            .Token(userId: user.requireID())
+        return try User.ResetPassword.Token(userId: user.id)
             .save(on: conn)
             .map { token in
                 .init(token: token.string)
         }
     }
 
-    public func delete(model: User.ResetPassword.Token, by user: User?) throws -> EventLoopFuture<Void> {
-
-        guard try user?.requireID() == model.userId else {
-            throw Abort(.forbidden)
-        }
-        return model.delete(on: conn)
-            .transform(to: ())
-    }
-
     public func reset(to content: User.ResetPassword.Data, with token: String) throws -> EventLoopFuture<Void> {
 
         guard content.password == content.verifyPassword else { throw User.DatabaseRepository.Errors.passwordMismatch }
 
-        return self
-            .first(where: \.string == token, or: Errors.incorrectOrExpiredToken)
+        return User.ResetPassword.Token
+            .query(on: conn)
+            .filter(\.string == token)
+            .first()
+            .unwrap(or: ResetErrors.incorrectOrExpiredToken)
             .flatMap { tokenModel in
 
-                self.userRepository
-                    .find(tokenModel.userId, or: Abort(.internalServerError))
+                User.DatabaseModel
+                    .find(tokenModel.userId, on: self.conn)
+                    .unwrap(or: Abort(.badRequest))
                     .flatMap { user in
 
                         try user.update(password: content.password)

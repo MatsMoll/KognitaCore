@@ -28,7 +28,11 @@ extension String {
 
 extension Subject {
     public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
+
+        typealias DatabaseModel = Subject.DatabaseModel
+
         public let conn: DatabaseConnectable
+
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
@@ -42,15 +46,27 @@ extension Subject.DatabaseRepository {
         guard let user = user, user.isAdmin else {
             throw Abort(.forbidden)
         }
-        return try Subject(content: content, creator: user)
+        return try Subject.DatabaseModel(content: content, creator: user)
             .create(on: conn)
             .flatMap { subject in
 
-                try User.ModeratorPrivilege(userID: user.requireID(), subjectID: subject.requireID())
+                try User.ModeratorPrivilege(userID: user.id, subjectID: subject.requireID())
                     .create(on: self.conn)
-                    .transform(to: subject)
+                    .map { _ in try subject.content() }
         }
     }
+
+    public func delete(model: Subject, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Subject.DatabaseModel.self, model: model)
+    }
+
+    public func update(model: Subject, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject> {
+        updateDatabase(Subject.DatabaseModel.self, model: model, to: data)
+    }
+
+    public func all() throws -> EventLoopFuture<[Subject]> { all(Subject.DatabaseModel.self) }
+    public func find(_ id: Int) -> EventLoopFuture<Subject?> { findDatabaseModel(Subject.DatabaseModel.self, withID: id) }
+    public func find(_ id: Int, or error: Error) -> EventLoopFuture<Subject> { findDatabaseModel(Subject.DatabaseModel.self, withID: id, or: error) }
 
     /// Fetches the subject for a given topic
     /// - Parameters:
@@ -58,44 +74,56 @@ extension Subject.DatabaseRepository {
     ///   - conn: The database connection
     /// - Returns: A future `Subject`
     public func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject> {
-        Topic.query(on: conn)
+        Topic.DatabaseModel.query(on: conn)
             .filter(\.id == topicID)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .decode(Subject.self)
+            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+            .decode(Subject.DatabaseModel.self)
             .first()
             .unwrap(or: Abort(.badRequest))
+            .map { try $0.content() }
     }
 
     public func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject> {
         PracticeSession.DatabaseModel.query(on: conn)
             .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.DatabaseModel.id)
             .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\Subject.id, to: \Topic.subjectId)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
             .filter(\PracticeSession.DatabaseModel.id == session.id)
-            .decode(Subject.self)
+            .decode(Subject.DatabaseModel.self)
             .first()
             .unwrap(or: Abort(.internalServerError))
+            .map { try $0.content() }
     }
 
     public func getSubjectWith(id: Subject.ID) -> EventLoopFuture<Subject> {
-        return Subject
+        return Subject.DatabaseModel
             .find(id, on: conn)
             .unwrap(or: Abort(.badRequest))
+            .map { try $0.content() }
     }
 
     public func getSubject(in topic: Topic) -> EventLoopFuture<Subject> {
-        return topic.subject.get(on: conn)
+        Subject.DatabaseModel.query(on: conn)
+            .filter(\Subject.DatabaseModel.id == topic.subjectID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .map { try $0.content() }
     }
 
     public func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject> {
-        content.subject.id = nil
-        content.subject.creatorId = 1
         return conn.transaction(on: .psql) { conn in
-            content.subject.create(on: conn).flatMap { subject in
-                try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject) }
-                    .flatten(on: conn)
-                    .transform(to: subject)
+            try Subject.DatabaseModel(
+                name: content.subject.name,
+                category: content.subject.category,
+                description: content.subject.description,
+                creatorId: 1
+                )
+                .create(on: conn)
+                .flatMap { subject in
+                    try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
+                        .flatten(on: conn)
+                        .map { try subject.content() }
             }
         }
     }
@@ -104,8 +132,8 @@ extension Subject.DatabaseRepository {
 
         let knownTopic = peerWise.filter({ $0.topicName != "" })
 
-        return try Topic.query(on: conn)
-            .filter(\.subjectId == subject.requireID())
+        return Topic.DatabaseModel.query(on: conn)
+            .filter(\.subjectId == subject.id)
             .count()
             .flatMap { numberOfExistingTopics in
 
@@ -119,7 +147,7 @@ extension Subject.DatabaseRepository {
 
                         return try self.topicRepository.create(
                             from: Topic.Create.Data(
-                                subjectId: subject.requireID(),
+                                subjectID: subject.id,
                                 name: topicName,
                                 chapter: numberOfTopics
                             ),
@@ -135,7 +163,7 @@ extension Subject.DatabaseRepository {
                                         return try tasks.map { task in
                                             try self.multipleChoiseRepository.create(
                                                 from: MultipleChoiseTask.Create.Data(
-                                                    subtopicId: subtopic.requireID(),
+                                                    subtopicId: subtopic.id,
                                                     description: nil,
                                                     question: task.question,
                                                     solution: task.solution,
@@ -160,11 +188,12 @@ extension Subject.DatabaseRepository {
 
     public func allActive(for user: User) throws -> EventLoopFuture<[Subject]> {
 
-        return try Subject.query(on: conn)
-            .join(\User.ActiveSubject.subjectID, to: \Subject.id, method: .left)
-            .filter(\User.ActiveSubject.userID == user.requireID())
-            .decode(Subject.self)
+        return Subject.DatabaseModel.query(on: conn)
+            .join(\User.ActiveSubject.subjectID, to: \Subject.DatabaseModel.id, method: .left)
+            .filter(\User.ActiveSubject.userID == user.id)
+            .decode(Subject.DatabaseModel.self)
             .all()
+            .map { try $0.map { try $0.content() } }
     }
 
     struct SubjectID: Decodable {
@@ -177,12 +206,12 @@ extension Subject.DatabaseRepository {
             .flatMap { conn in
 
                 conn.select()
-                    .column(\Topic.subjectId)
+                    .column(\Topic.DatabaseModel.subjectId)
                     .from(Task.self)
-                    .join(\Task.subtopicID, to: \Subtopic.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
+                    .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                     .where(\Task.id, .in, taskIDs)
-                    .groupBy(\Topic.subjectId)
+                    .groupBy(\Topic.DatabaseModel.subjectId)
                     .all(decoding: SubjectID.self)
                     .map { subjectIDs in
                         guard
@@ -202,10 +231,10 @@ extension Subject.DatabaseRepository {
             .flatMap { conn in
 
                 conn.select()
-                    .column(\Topic.subjectId)
-                    .from(Topic.self)
-                    .where(\Topic.id, .in, topicIDs)
-                    .groupBy(\Topic.subjectId)
+                    .column(\Topic.DatabaseModel.subjectId)
+                    .from(Topic.DatabaseModel.self)
+                    .where(\Topic.DatabaseModel.id, .in, topicIDs)
+                    .groupBy(\Topic.DatabaseModel.subjectId)
                     .all(decoding: SubjectID.self)
                     .map { subjectIDs in
                         guard
@@ -225,11 +254,11 @@ extension Subject.DatabaseRepository {
             .flatMap { conn in
 
                 conn.select()
-                    .column(\Topic.subjectId)
-                    .from(Subtopic.self)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .where(\Subtopic.id, .in, subtopicIDs)
-                    .groupBy(\Topic.subjectId)
+                    .column(\Topic.DatabaseModel.subjectId)
+                    .from(Subtopic.DatabaseModel.self)
+                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .where(\Subtopic.DatabaseModel.id, .in, subtopicIDs)
+                    .groupBy(\Topic.DatabaseModel.subjectId)
                     .all(decoding: SubjectID.self)
                     .map { subjectIDs in
                         guard
@@ -245,9 +274,9 @@ extension Subject.DatabaseRepository {
 
     public func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void> {
 
-        try User.ActiveSubject.query(on: conn)
-            .filter(\User.ActiveSubject.subjectID == subject.requireID())
-            .filter(\User.ActiveSubject.userID == user.requireID())
+        User.ActiveSubject.query(on: conn)
+            .filter(\User.ActiveSubject.subjectID == subject.id)
+            .filter(\User.ActiveSubject.userID == user.id)
             .first()
             .unwrap(or: Abort(.badRequest))
             .delete(on: conn)
@@ -255,9 +284,9 @@ extension Subject.DatabaseRepository {
     }
 
     public func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void> {
-        try User.ActiveSubject(
-            userID: user.requireID(),
-            subjectID: subject.requireID(),
+        User.ActiveSubject(
+            userID: user.id,
+            subjectID: subject.id,
             canPractice: canPractice
         )
             .create(on: conn)
@@ -300,9 +329,9 @@ extension Subject.DatabaseRepository {
 
     public func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?> {
 
-        try User.ActiveSubject.query(on: conn)
-            .filter(\.userID == user.requireID())
-            .filter(\.subjectID == subject.requireID())
+        User.ActiveSubject.query(on: conn)
+            .filter(\.userID == user.id)
+            .filter(\.subjectID == subject.id)
             .first()
     }
 
@@ -312,12 +341,12 @@ extension Subject.DatabaseRepository {
 
     public func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]> {
 
-        return Subject.query(on: conn)
+        return Subject.DatabaseModel.query(on: conn)
             .all()
             .flatMap { subjects in
 
-                try User.ActiveSubject.query(on: self.conn)
-                    .filter(\.userID == user.requireID())
+                User.ActiveSubject.query(on: self.conn)
+                    .filter(\.userID == user.id)
                     .all()
                     .map { activeSubjects in
 
@@ -346,29 +375,29 @@ extension Subject.DatabaseRepository {
         return conn.databaseConnection(to: .psql)
             .flatMap { conn in
 
-                Subject.find(subjectID, on: conn)
+                Subject.DatabaseModel.find(subjectID, on: conn)
                     .unwrap(or: Abort(.badRequest))
                     .flatMap { subject in
 
                         var query = conn.select()
                             .column(\Task.question)
                             .column(\TaskSolution.solution)
-                            .column(\Topic.name, as: "topicName")
-                            .column(\Topic.id, as: "topicID")
-                            .column(\Topic.chapter, as: "topicChapter")
-                            .column(\Subtopic.name, as: "subtopicName")
-                            .column(\Subtopic.id, as: "subtopicID")
+                            .column(\Topic.DatabaseModel.name, as: "topicName")
+                            .column(\Topic.DatabaseModel.id, as: "topicID")
+                            .column(\Topic.DatabaseModel.chapter, as: "topicChapter")
+                            .column(\Subtopic.DatabaseModel.name, as: "subtopicName")
+                            .column(\Subtopic.DatabaseModel.id, as: "subtopicID")
                             .from(Task.self)
-                            .join(\Task.subtopicID, to: \Subtopic.id)
-                            .join(\Subtopic.topicId, to: \Topic.id)
+                            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+                            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                             .join(\Task.id, to: \FlashCardTask.id) // Only flash card tasks
                             .join(\Task.id, to: \TaskSolution.taskID)
                             .where(\Task.description == nil)
                             .where(\Task.deletedAt == nil)
-                            .where(\Topic.subjectId == subjectID)
+                            .where(\Topic.DatabaseModel.subjectId == subjectID)
 
                         if let subtopicIDs = filter.subtopicIDs {
-                            query = query.where(\Subtopic.id, .in, Array(subtopicIDs))
+                            query = query.where(\Subtopic.DatabaseModel.id, .in, Array(subtopicIDs))
                         }
 
                         return query
@@ -407,6 +436,18 @@ extension Subject.DatabaseRepository {
                         }
                 }
         }
+    }
+}
+
+extension Subject.ListOverview {
+    init(subject: Subject.DatabaseModel, isActive: Bool) {
+        self.init(
+            id: subject.id ?? 0,
+            name: subject.name,
+            description: subject.description,
+            category: subject.category,
+            isActive: isActive
+        )
     }
 }
 

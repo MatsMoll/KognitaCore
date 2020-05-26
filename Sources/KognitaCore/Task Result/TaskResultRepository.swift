@@ -109,12 +109,12 @@ extension TaskResult.DatabaseRepository {
 
                 psqlConn.select()
                     .column(.count(.all, as: "resultCount"))
-                    .column(.keyPath(\User.id, as: "userID"))
-                    .column(.keyPath(\User.username, as: "username"))
+                    .column(.keyPath(\User.DatabaseModel.id, as: "userID"))
+                    .column(.keyPath(\User.DatabaseModel.username, as: "username"))
                     .column(.function("sum", [.expression(.column(\TaskResult.resultScore))]), as: "totalScore")
-                    .from(User.self)
-                    .join(\User.id, to: \TaskResult.userID)
-                    .groupBy(\User.id)
+                    .from(User.DatabaseModel.self)
+                    .join(\User.DatabaseModel.id, to: \TaskResult.userID)
+                    .groupBy(\User.DatabaseModel.id)
                     .all(decoding: UserResultOverview.self)
         }
     }
@@ -176,8 +176,8 @@ extension TaskResult.DatabaseRepository {
                     .filter(filter)
                     .sort(\.revisitDate)
                     .join(\Task.id, to: \TaskResult.taskID)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
+                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
 
                 if let maxRevisitDays = maxRevisitDays,
                     let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
@@ -193,7 +193,7 @@ extension TaskResult.DatabaseRepository {
 
         return try Query.results(
             revisitingAfter: Date(),
-            for: user.requireID()
+            for: user.id
         )
             .query(for: conn)
             .all(decoding: SubqueryResult.self)
@@ -204,11 +204,11 @@ extension TaskResult.DatabaseRepository {
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
                     .join(\Task.id, to: \TaskResult.taskID)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .join(\Subject.id, to: \Topic.subjectId)
-                    .alsoDecode(Topic.self)
-                    .alsoDecode(Subject.self)
+                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+                    .alsoDecode(Topic.DatabaseModel.self)
+                    .alsoDecode(Subject.DatabaseModel.self)
                     .range(...limit)
                     .all()
                     .map { contens in
@@ -220,9 +220,9 @@ extension TaskResult.DatabaseRepository {
                             let topic = content.0.1
 
                             if let response = try responses[topic.requireID()] {
-                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result], topic: topic, subject: content.1)
+                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result], topic: topic.content(), subject: content.1.content())
                             } else {
-                                try responses[topic.requireID()] = TopicResultContent(results: [result], topic: topic, subject: content.1)
+                                try responses[topic.requireID()] = TopicResultContent(results: [result], topic: topic.content(), subject: content.1.content())
                             }
                         }
                         return responses.map { $0.value }
@@ -241,7 +241,7 @@ extension TaskResult.DatabaseRepository {
             .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "year")
             .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
             .from(TaskResult.self)
-            .where(\TaskResult.userID == user.requireID())
+            .where(\TaskResult.userID == user.id)
             .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
             .groupBy(.column(.column(nil, "year")))
             .groupBy(.column(.column(nil, "week")))
@@ -298,11 +298,11 @@ extension TaskResult.DatabaseRepository {
             .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
             .from(TaskResult.self)
             .join(\TaskResult.taskID, to: \Task.id)
-            .join(\Task.subtopicID, to: \Subtopic.id)
-            .join(\Subtopic.topicId, to: \Topic.id)
-            .where(\TaskResult.userID == user.requireID())
+            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .where(\TaskResult.userID == user.id)
             .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
-            .where(\Topic.subjectId == subjectId)
+            .where(\Topic.DatabaseModel.subjectId == subjectId)
             .groupBy(.column(.column(nil, "year")))
             .groupBy(.column(.column(nil, "week")))
             .all(decoding: TaskResult.History.self)
@@ -366,12 +366,12 @@ extension TaskResult.DatabaseRepository {
 
                         return psqlConn.select()
                             .column(.column(\TaskResult.resultScore), as: "resultScore")
-                            .column(.column(\Topic.id), as: "topicID")
+                            .column(.column(\Topic.DatabaseModel.id), as: "topicID")
                             .from(TaskResult.self)
                             .where(\TaskResult.id, .in, ids)
                             .join(\TaskResult.taskID, to: \Task.id)
-                            .join(\Task.subtopicID, to: \Subtopic.id)
-                            .join(\Subtopic.topicId, to: \Topic.id)
+                            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+                            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                             .all(decoding: UserLevelScore.self)
                             .flatMap { scores in
 
@@ -379,8 +379,8 @@ extension TaskResult.DatabaseRepository {
                                     .map { topicID, grouped in
 
                                     Task.query(on: psqlConn)
-                                        .join(\Subtopic.id, to: \Task.subtopicID)
-                                        .filter(\Subtopic.topicId == topicID)
+                                        .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                                        .filter(\Subtopic.DatabaseModel.topicId == topicID)
                                         .count()
                                         .map { maxScore in
                                             User.TopicLevel(
@@ -400,7 +400,7 @@ extension TaskResult.DatabaseRepository {
         conn.databaseConnection(to: .psql)
             .flatMap { psqlConn in
 
-                try Query.resultsInSubject(subject.requireID(), for: userId)
+                try Query.resultsInSubject(subject.id, for: userId)
                     .query(for: psqlConn)
                     .all(decoding: SubqueryResult.self)
                     .flatMap { result in
@@ -409,7 +409,7 @@ extension TaskResult.DatabaseRepository {
 
                         guard ids.isEmpty == false else {
                             return psqlConn.future(
-                                try User.SubjectLevel(subjectID: subject.requireID(), correctScore: 0, maxScore: 1)
+                                User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
                             )
                         }
 
@@ -418,15 +418,15 @@ extension TaskResult.DatabaseRepository {
                             .sum(\.resultScore)
                             .flatMap { score in
 
-                                try Task.query(on: psqlConn)
-                                    .join(\Subtopic.id, to: \Task.subtopicID)
-                                    .join(\Topic.id, to: \Subtopic.topicId)
-                                    .filter(\Topic.subjectId == subject.requireID())
+                                Task.query(on: psqlConn)
+                                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                                    .filter(\Topic.DatabaseModel.subjectId == subject.id)
                                     .count()
                                     .map { maxScore in
 
-                                        try User.SubjectLevel(
-                                            subjectID: subject.requireID(),
+                                        User.SubjectLevel(
+                                            subjectID: subject.id,
                                             correctScore: score,
                                             maxScore: Double(maxScore)
                                         )

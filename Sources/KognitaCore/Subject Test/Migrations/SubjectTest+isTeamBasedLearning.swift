@@ -8,13 +8,13 @@ extension SubjectTest {
         struct IsTeamBasedLearning: PostgreSQLMigration {
 
             static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                PostgreSQLDatabase.update(SubjectTest.self, on: conn) { builder in
-                    builder.field(for: \SubjectTest.isTeamBasedLearning, type: .boolean, .default(.literal(.boolean(.true))))
+                PostgreSQLDatabase.update(SubjectTest.DatabaseModel.self, on: conn) { builder in
+                    builder.field(for: \SubjectTest.DatabaseModel.isTeamBasedLearning, type: .boolean, .default(.literal(.boolean(.true))))
                 }
             }
 
             static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                PostgreSQLDatabase.update(SubjectTest.self, on: conn) { builder in
+                PostgreSQLDatabase.update(SubjectTest.DatabaseModel.self, on: conn) { builder in
                     builder.deleteField(for: \.isTeamBasedLearning)
                 }
             }

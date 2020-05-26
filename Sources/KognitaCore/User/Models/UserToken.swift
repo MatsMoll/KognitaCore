@@ -4,11 +4,9 @@ import FluentPostgreSQL
 import Vapor
 
 /// An ephermal authentication token that identifies a registered user.
-extension User {
-    public enum Login {}
-}
-extension User.Login {
-    public final class Token: PostgreSQLModel {
+
+extension User.Login.Token {
+    final class DatabaseModel: PostgreSQLModel {
 
         public typealias Database = PostgreSQLDatabase
 
@@ -16,7 +14,7 @@ extension User.Login {
         public static var name: String = "User.Login.Token"
 
         /// Creates a new `UserToken` for a given user.
-        static func create(userID: User.ID) throws -> User.Login.Token {
+        static func create(userID: User.ID) throws -> User.Login.Token.DatabaseModel {
             // generate a random 128-bit, base64-encoded string.
             let string = try CryptoRandom().generateData(count: 16).base64EncodedString()
             // init a new `UserToken` from that string.
@@ -49,39 +47,39 @@ extension User.Login {
     }
 }
 
-extension User.Login.Token {
+extension User.Login.Token.DatabaseModel {
     /// Fluent relation to the user that owns this token.
-    var user: Parent<User.Login.Token, User> {
+    var user: Parent<User.Login.Token.DatabaseModel, User.DatabaseModel> {
         return parent(\.userID)
     }
 }
 
 /// Allows this model to be used as a TokenAuthenticatable's token.
-extension User.Login.Token: Token {
+extension User.Login.Token.DatabaseModel: Token {
     /// See `Token`.
-    public typealias UserType = User
+    public typealias UserType = User.DatabaseModel
 
     /// See `Token`.
-    public static var tokenKey: WritableKeyPath<User.Login.Token, String> {
+    public static var tokenKey: WritableKeyPath<User.Login.Token.DatabaseModel, String> {
         return \.string
     }
 
     /// See `Token`.
-    public static var userIDKey: WritableKeyPath<User.Login.Token, User.ID> {
+    public static var userIDKey: WritableKeyPath<User.Login.Token.DatabaseModel, User.ID> {
         return \.userID
     }
 }
 
 /// Allows `UserToken` to be used as a Fluent migration.
-extension User.Login.Token: Migration {
+extension User.Login.Token.DatabaseModel: Migration {
     /// See `Migration`.
     public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(User.Login.Token.self, on: conn) { builder in
+        return PostgreSQLDatabase.create(User.Login.Token.DatabaseModel.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
-            PostgreSQLDatabase.update(User.Login.Token.self, on: conn) { builder in
+            PostgreSQLDatabase.update(User.Login.Token.DatabaseModel.self, on: conn) { builder in
                 builder.deleteField(for: \.userID)
                 builder.field(for: \.userID, type: .int, .default(1))
             }
@@ -89,12 +87,22 @@ extension User.Login.Token: Migration {
     }
 
     public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(User.Login.Token.self, on: connection)
+        return PostgreSQLDatabase.delete(User.Login.Token.DatabaseModel.self, on: connection)
     }
 }
 
 /// Allows `UserToken` to be encoded to and decoded from HTTP messages.
 extension User.Login.Token: Content { }
+extension User.Login.Token.DatabaseModel: ContentConvertable {
+    func content() throws -> User.Login.Token {
+        try .init(
+            id: requireID(),
+            string: string,
+            userID: userID,
+            expiresAt: expiresAt
+        )
+    }
+}
 
 /// Allows `UserToken` to be used as a dynamic parameter in route definitions.
-extension User.Login.Token: ModelParameterRepresentable { }
+//extension User.Login.Token: ModelParameterRepresentable { }

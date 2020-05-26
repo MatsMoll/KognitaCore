@@ -10,22 +10,22 @@ import FluentPostgreSQL
 @testable import KognitaCore
 
 extension Subject {
-    public static func create(name: String = "Math", category: String = "Tech", colorClass: ColorClass = .primary, creator: User? = nil, on conn: PostgreSQLConnection) throws -> Subject {
+    public static func create(name: String = "Math", category: String = "Tech", creator: User? = nil, on conn: PostgreSQLConnection) throws -> Subject {
 
         let createCreator = try creator ?? User.create(on: conn)
-        return try Subject.create(name: name, category: category, colorClass: colorClass, creatorId: createCreator.requireID(), on: conn)
+        return try Subject.create(name: name, category: category, creatorId: createCreator.id, on: conn)
     }
 
-    public static func create(name: String = "Math", category: String = "Tech", colorClass: ColorClass = .primary, description: String = "Some description", creatorId: User.ID, on conn: PostgreSQLConnection) throws -> Subject {
+    public static func create(name: String = "Math", category: String = "Tech", description: String = "Some description", creatorId: User.ID, on conn: PostgreSQLConnection) throws -> Subject {
 
-        return try Subject(
+        return try Subject.DatabaseModel(
             name: name,
             category: category,
-            colorClass: colorClass,
             description: description,
             creatorId: creatorId
         )
             .save(on: conn)
+            .map { try $0.content() }
             .wait()
     }
 
@@ -38,6 +38,6 @@ extension Subject {
     }
 
     public func grantModeratorPrivilege(for userID: User.ID, by moderator: User, on conn: DatabaseConnectable) throws {
-        try Subject.DatabaseRepository(conn: conn).grantModeratorPrivilege(for: userID, in: self.requireID(), by: moderator).wait()
+        try Subject.DatabaseRepository(conn: conn).grantModeratorPrivilege(for: userID, in: self.id, by: moderator).wait()
     }
 }

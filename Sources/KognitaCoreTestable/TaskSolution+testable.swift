@@ -20,7 +20,7 @@ extension TaskSolution {
         let usedCreator = try creator ?? User.create(on: conn)
         let usedTask = try task ?? Task.create(on: conn)
 
-        return try create(creatorId: usedCreator.requireID(), solution: solution, presentUser: presentUser, taskID: usedTask.requireID(), on: conn)
+        return try create(creatorId: usedCreator.id, solution: solution, presentUser: presentUser, taskID: usedTask.requireID(), on: conn)
     }
 
     public static func create(creatorId: User.ID,

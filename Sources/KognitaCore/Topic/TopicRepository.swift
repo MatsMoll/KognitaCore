@@ -17,12 +17,12 @@ public protocol TopicRepository: CreateModelRepository,
     ResponseModel   == Topic,
     CreateData      == Topic.Create.Data,
     CreateResponse  == Topic.Create.Response,
-    UpdateData      == Topic.Edit.Data,
-    UpdateResponse  == Topic.Edit.Response {
+    UpdateData      == Topic.Update.Data,
+    UpdateResponse  == Topic.Update.Response {
     func getTopics(in subject: Subject) throws -> EventLoopFuture<[Topic]>
     func exportTasks(in topic: Topic) throws -> EventLoopFuture<TopicExportContent>
     func exportTopics(in subject: Subject) throws -> EventLoopFuture<SubjectExportContent>
-    func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic.Response]>
+    func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic]>
     func importContent(from content: TopicExportContent, in subject: Subject) throws -> EventLoopFuture<Void>
     func importContent(from content: SubtopicExportContent, in topic: Topic) throws -> EventLoopFuture<Void>
 }
@@ -76,7 +76,9 @@ extension Topic {
 
 extension Topic {
     public struct DatabaseRepository: DatabaseConnectableRepository {
+
         public let conn: DatabaseConnectable
+
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
@@ -87,45 +89,53 @@ extension Topic {
 
 extension Topic.DatabaseRepository: TopicRepository {
 
+    public func delete(model: Topic, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Topic.DatabaseModel.self, model: model)
+    }
+
+    public func update(model: Topic, to data: Topic.Update.Data, by user: User) throws -> EventLoopFuture<Topic> {
+        updateDatabase(Topic.DatabaseModel.self, model: model, to: data)
+    }
+
+    public func all() throws -> EventLoopFuture<[Topic]> { all(Topic.DatabaseModel.self) }
+
     public func create(from content: Topic.Create.Data, by user: User?) throws -> EventLoopFuture<Topic.Create.Response> {
 
         guard let user = user else { throw Abort(.forbidden) }
 
         return try userRepository
-            .isModerator(user: user, subjectID: content.subjectId)
+            .isModerator(user: user, subjectID: content.subjectID)
             .flatMap { _ in
 
                 self.subjectRepository
-                    .find(content.subjectId, or: Abort(.badRequest))
+                    .find(content.subjectID, or: Abort(.badRequest))
                     .flatMap { subject in
 
-                        try Topic(content: content, subject: subject, creator: user)
+                        try Topic.DatabaseModel(content: content, subject: subject, creator: user)
                             .create(on: self.conn)
                             .flatMap { topic in
-                                try Subtopic(
-                                    content: Subtopic.Create.Data(
-                                        name: "Generelt",
-                                        topicId: topic.requireID()
-                                    )
+                                try Subtopic.DatabaseModel(
+                                    name: "Generelt",
+                                    topicId: topic.requireID()
                                 )
                                 .save(on: self.conn)
-                                .transform(to: topic)
+                                .map { _ in try topic.content() }
                         }
                 }
         }
     }
 
     public func numberOfTasks(in topic: Topic) throws -> EventLoopFuture<Int> {
-        return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopic)
-            .filter(\Subtopic.topicId == topic.requireID())
+        return Task.query(on: conn)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
+            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
             .count()
     }
 
     public func tasks(in topic: Topic) throws -> EventLoopFuture<[Task]> {
-        return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopic)
-            .filter(\Subtopic.topicId == topic.requireID())
+        return Task.query(on: conn)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
+            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
             .all()
     }
 
@@ -139,39 +149,41 @@ extension Topic.DatabaseRepository: TopicRepository {
             .subtopics(with: topicID)
     }
 
-    public func content(for topic: Topic) throws -> EventLoopFuture<Topic.Response> {
+    public func content(for topic: Topic) throws -> EventLoopFuture<Topic> {
         return try subtopics(in: topic)
-            .map { subtopics in
-                Topic.Response(topic: .init(topic: topic), subtopics: subtopics.map { .init(subtopic: $0) })
+            .map { _ in
+                // FIXME: - Should also return subtopics
+                topic
+//                Topic(topic: .init(topic: topic), subtopics: subtopics.map { .init(subtopic: $0) })
         }
     }
 
     public func getAll() -> EventLoopFuture<[Topic]> {
-        return Topic
-            .query(on: conn)
+        return Topic.DatabaseModel.query(on: conn)
             .all()
+            .map { try $0.map { try $0.content() } }
     }
 
     public func getTopics(in subject: Subject) throws -> EventLoopFuture<[Topic]> {
-        return try subject
-            .topics
-            .query(on: conn)
+        return Topic.DatabaseModel.query(on: conn)
+            .filter(\.subjectId == subject.id)
             .sort(\.chapter, .ascending)
             .all()
+            .map { try $0.map { try $0.content() }}
     }
 
     public func getTopicsWithTaskCount(in subject: Subject) throws -> EventLoopFuture<[Topic.WithTaskCount]> {
 
         conn.databaseConnection(to: .psql)
             .flatMap { psqlConn in
-                try psqlConn.select()
-                    .all(table: Topic.self)
-                    .from(Topic.self)
+                psqlConn.select()
+                    .all(table: Topic.DatabaseModel.self)
+                    .from(Topic.DatabaseModel.self)
                     .column(.count(\Task.id), as: "taskCount")
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .groupBy(\Topic.id)
-                    .where(\Topic.subjectId == subject.requireID())
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                    .groupBy(\Topic.DatabaseModel.id)
+                    .where(\Topic.DatabaseModel.subjectId == subject.id)
                     .where(\Task.isTestable == false)
                     .all(decoding: Topic.self, TopicTaskCount.self)
                     .map { topics in
@@ -186,7 +198,7 @@ extension Topic.DatabaseRepository: TopicRepository {
         }
    }
 
-    public func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic.Response]> {
+    public func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic]> {
         return try getTopics(in: subject)
             .flatMap { topics in
                 try topics.map {
@@ -197,27 +209,28 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public func getTopic(for task: Task) -> EventLoopFuture<Topic> {
-        return Topic.query(on: conn)
-            .join(\Subtopic.topicId, to: \Topic.id)
-            .filter(\Subtopic.id == task.subtopicID)
+        return Topic.DatabaseModel.query(on: conn)
+            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .filter(\Subtopic.DatabaseModel.id == task.subtopicID)
             .first()
             .unwrap(or: Abort(.internalServerError))
+            .map { try $0.content() }
     }
 
     public func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[TimelyTopic]> {
 
         return conn.select()
-            .column(\Subject.name, as: "subjectName")
-            .column(\Topic.name, as: "topicName")
-            .column(\Topic.id, as: "topicID")
+            .column(\Subject.DatabaseModel.name, as: "subjectName")
+            .column(\Topic.DatabaseModel.name, as: "topicName")
+            .column(\Topic.DatabaseModel.id, as: "topicID")
             .column(.count(\Task.id), as: "numberOfTasks")
-            .from(Subject.self)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .join(\Topic.id, to: \Subtopic.topicId, method: .left)
-            .join(\Subtopic.id, to: \Task.subtopicID, method: .left)
+            .from(Subject.DatabaseModel.self)
+            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId, method: .left)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID, method: .left)
             .where(\Task.deletedAt == nil)
-            .groupBy(\Topic.id)
-            .groupBy(\Subject.id)
+            .groupBy(\Topic.DatabaseModel.id)
+            .groupBy(\Subject.DatabaseModel.id)
             .limit(limit)
             .all(decoding: TimelyTopic.self)
     }
@@ -233,12 +246,12 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public func exportTasks(in topic: Topic) throws -> EventLoopFuture<TopicExportContent> {
-        return try Subtopic.query(on: conn)
-            .filter(\.topicId == topic.requireID())
+        return try Subtopic.DatabaseModel.query(on: conn)
+            .filter(\.topicId == topic.id)
             .all()
             .flatMap { subtopics in
                 try subtopics.map {
-                    try self.exportTasks(in: $0)
+                    try self.exportTasks(in: $0.content())
                 }
                 .flatten(on: self.conn)
                 .map { subtopicContent in
@@ -254,7 +267,7 @@ extension Topic.DatabaseRepository: TopicRepository {
         return conn.databaseConnection(to: .psql)
             .flatMap { psqlConn in
 
-                try psqlConn.select()
+                psqlConn.select()
                     .all(table: Task.self)
                     .all(table: MultipleChoiseTask.self)
                     .all(table: MultipleChoiseTaskChoise.self)
@@ -264,7 +277,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .join(\Task.id, to: \FlashCardTask.id, method: .left)
                     .join(\MultipleChoiseTask.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
                     .join(\Task.id, to: \TaskSolution.taskID, method: .left)
-                    .where(\Task.subtopicID == subtopic.requireID())
+                    .where(\Task.subtopicID == subtopic.id)
                     .all(decoding: Task.BetaFormat.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
                     .map { tasks in
 
@@ -304,14 +317,15 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public func importContent(from content: TopicExportContent, in subject: Subject) throws -> EventLoopFuture<Void> {
-
-        content.topic.id = nil
-        try content.topic.subjectId = subject.requireID()
-        return content.topic
+        try Topic.DatabaseModel(
+            name: content.topic.name,
+            chapter: content.topic.chapter,
+            subjectId: subject.id
+        )
             .create(on: conn)
             .flatMap { topic in
                 try content.subtopics.map {
-                    try self.importContent(from: $0, in: topic)
+                    try self.importContent(from: $0, in: topic.content())
                 }
                 .flatten(on: self.conn)
         }.transform(to: ())
@@ -319,17 +333,20 @@ extension Topic.DatabaseRepository: TopicRepository {
 
     public func importContent(from content: SubtopicExportContent, in topic: Topic) throws -> EventLoopFuture<Void> {
 
-        content.subtopic.id = nil
-        content.subtopic.topicId = try topic.requireID()
+//        content.subtopic.id = nil
+//        content.subtopic.topicId = try topic.requireID()
 
-        return content.subtopic
+        return Subtopic.DatabaseModel(
+            name: content.subtopic.name,
+            topicId: content.subtopic.topicID
+            )
             .create(on: conn)
             .flatMap { subtopic in
                 try content.multipleChoiseTasks
                     .map { task in
                         try self
                             .multipeChoiseRepository
-                            .importTask(from: task, in: subtopic)
+                            .importTask(from: task, in: subtopic.content())
                 }
                 .flatten(on: self.conn)
                 .flatMap { _ in
@@ -337,7 +354,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .map { task in
                         try self
                             .typingTaskRepository
-                            .importTask(from: task, in: subtopic)
+                            .importTask(from: task, in: subtopic.content())
                     }
                     .flatten(on: self.conn)
                 }
@@ -365,53 +382,53 @@ extension Topic.DatabaseRepository: TopicRepository {
 //            .all()
 //    }
 
-    func structure(_ topics: [Topic], with preknowleged: [Topic.Pivot.Preknowleged]) -> [[Topic]] {
-        var knowlegedGraph = [Topic.ID: [Topic.ID]]()
-        for knowleged in preknowleged {
-            if let value = knowlegedGraph[knowleged.topicID] {
-                knowlegedGraph[knowleged.topicID] = value + [knowleged.preknowlegedID]
-            } else {
-                knowlegedGraph[knowleged.topicID] = [knowleged.preknowlegedID]
-            }
-        }
-        var levels = [Topic.ID: Int]()
-        var unleveledTopics = topics
-        var topicIndex = unleveledTopics.count - 1
-        while topicIndex >= 0 {
-            let currentTopic = unleveledTopics[topicIndex]
-            guard let currentTopicID = try? currentTopic.requireID() else {
-                unleveledTopics.remove(at: topicIndex)
-                topicIndex -= 1
-                continue
-            }
-            if let node = knowlegedGraph[currentTopicID] {
-                let preLevels = node.compactMap { levels[$0] }
-                if preLevels.count == node.count {
-                    levels[currentTopicID] = preLevels.reduce(1) { max($0, $1) } + 1
-                    unleveledTopics.remove(at: topicIndex)
-                }
-            } else {
-                unleveledTopics.remove(at: topicIndex)
-                levels[currentTopicID] = 1
-            }
-
-            if topicIndex >= 1 {
-                topicIndex -= 1
-            } else {
-                topicIndex = unleveledTopics.count - 1
-            }
-        }
-        var leveledTopics = [[Topic]]()
-        for (topicID, level) in levels.sorted(by: { $0.1 < $1.1 }) {
-            if leveledTopics.count < level {
-                leveledTopics.append([])
-            }
-            if let topic = topics.first(where: { $0.id == topicID }) {
-                leveledTopics[level - 1] = leveledTopics[level - 1] + [topic]
-            }
-        }
-        return leveledTopics.map { level in level.sorted(by: { $0.chapter < $1.chapter }) }
-    }
+//    func structure(_ topics: [Topic], with preknowleged: [Topic.Pivot.Preknowleged]) -> [[Topic]] {
+//        var knowlegedGraph = [Topic.ID: [Topic.ID]]()
+//        for knowleged in preknowleged {
+//            if let value = knowlegedGraph[knowleged.topicID] {
+//                knowlegedGraph[knowleged.topicID] = value + [knowleged.preknowlegedID]
+//            } else {
+//                knowlegedGraph[knowleged.topicID] = [knowleged.preknowlegedID]
+//            }
+//        }
+//        var levels = [Topic.ID: Int]()
+//        var unleveledTopics = topics
+//        var topicIndex = unleveledTopics.count - 1
+//        while topicIndex >= 0 {
+//            let currentTopic = unleveledTopics[topicIndex]
+//            guard let currentTopicID = try? currentTopic.id else {
+//                unleveledTopics.remove(at: topicIndex)
+//                topicIndex -= 1
+//                continue
+//            }
+//            if let node = knowlegedGraph[currentTopicID] {
+//                let preLevels = node.compactMap { levels[$0] }
+//                if preLevels.count == node.count {
+//                    levels[currentTopicID] = preLevels.reduce(1) { max($0, $1) } + 1
+//                    unleveledTopics.remove(at: topicIndex)
+//                }
+//            } else {
+//                unleveledTopics.remove(at: topicIndex)
+//                levels[currentTopicID] = 1
+//            }
+//
+//            if topicIndex >= 1 {
+//                topicIndex -= 1
+//            } else {
+//                topicIndex = unleveledTopics.count - 1
+//            }
+//        }
+//        var leveledTopics = [[Topic]]()
+//        for (topicID, level) in levels.sorted(by: { $0.1 < $1.1 }) {
+//            if leveledTopics.count < level {
+//                leveledTopics.append([])
+//            }
+//            if let topic = topics.first(where: { $0.id == topicID }) {
+//                leveledTopics[level - 1] = leveledTopics[level - 1] + [topic]
+//            }
+//        }
+//        return leveledTopics.map { level in level.sorted(by: { $0.chapter < $1.chapter }) }
+//    }
 }
 
 public struct SubtopicExportContent: Content {

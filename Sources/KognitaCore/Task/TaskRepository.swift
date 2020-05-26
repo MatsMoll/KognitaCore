@@ -37,7 +37,10 @@ extension Task {
 
     public struct DatabaseRepository: TaskRepository, DatabaseConnectableRepository {
 
+        typealias DatabaseModel = Task
+
         public let conn: DatabaseConnectable
+
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var taskSolutionRepository: some TaskSolutionRepositoring { TaskSolution.DatabaseRepository(conn: conn) }
         private var taskRepository: some TaskRepository { Task.DatabaseRepository(conn: conn) }
@@ -71,22 +74,22 @@ extension Task.DatabaseRepository {
 
     public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
 
-        return try subject.topics
-            .query(on: conn)
-            .join(\Subtopic.topicId, to: \Topic.id)
-            .join(\Task.subtopicID, to: \Subtopic.id)
-            .join(\User.id, to: \Task.creatorID)
+        return Topic.DatabaseModel.query(on: conn)
+            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+            .join(\User.DatabaseModel.id, to: \Task.creatorID)
+            .filter(\.subjectId == subject.id)
             .alsoDecode(Task.self)
-            .alsoDecode(User.self)
+            .alsoDecode(User.DatabaseModel.self)
             .all()
             .flatMap { tasks in
                 try tasks.map { content in
                     try self.taskRepository.getTaskTypePath(for: content.0.1.requireID()).map { path in
-                        TaskContent(
+                        try TaskContent(
                             task: content.0.1,
-                            topic: content.0.0,
+                            topic: content.0.0.content(),
                             subject: subject,
-                            creator: content.1,
+                            creator: content.1.content(),
                             taskTypePath: path
                         )
                     }
@@ -95,23 +98,23 @@ extension Task.DatabaseRepository {
     }
 
     public func getTasks(in topic: Topic) throws -> EventLoopFuture<[Task]> {
-        return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .filter(\Subtopic.topicId == topic.requireID())
+        return Task.query(on: conn)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
             .all()
     }
 
     public func getTasks<A>(where filter: FilterOperator<PostgreSQLDatabase, A>, maxAmount: Int? = nil, withSoftDeleted: Bool = false) throws -> EventLoopFuture<[TaskContent]> {
 
         return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .join(\User.id, to: \Task.creatorID)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+            .join(\User.DatabaseModel.id, to: \Task.creatorID)
             .filter(filter)
-            .alsoDecode(Topic.self)
-            .alsoDecode(Subject.self)
-            .alsoDecode(User.self)
+            .alsoDecode(Topic.DatabaseModel.self)
+            .alsoDecode(Subject.DatabaseModel.self)
+            .alsoDecode(User.DatabaseModel.self)
             .range(lower: 0, upper: maxAmount)
             .all()
             .flatMap { tasks in
@@ -119,11 +122,11 @@ extension Task.DatabaseRepository {
                     try self.taskRepository
                         .getTaskTypePath(for: content.0.0.0.requireID())
                         .map { path in
-                            TaskContent(
+                            try TaskContent(
                                 task: content.0.0.0,
-                                topic: content.0.0.1,
-                                subject: content.0.1,
-                                creator: content.1,
+                                topic: content.0.0.1.content(),
+                                subject: content.0.1.content(),
+                                creator: content.1.content(),
                                 taskTypePath: path
                             )
                     }
@@ -147,12 +150,12 @@ extension Task.DatabaseRepository {
                 let useSoftDeleted = isModerator ? withSoftDeleted : false
                 var dbQuery = Task.query(on: self.conn, withSoftDeleted: useSoftDeleted)
                     .join(\User.id, to: \Task.creatorID)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
+                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
                     .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
-                    .filter(\Topic.subjectId == subjectId)
-                    .alsoDecode(User.self)
-                    .alsoDecode(Topic.self)
+                    .filter(\Topic.DatabaseModel.subjectId == subjectId)
+                    .alsoDecode(User.DatabaseModel.self)
+                    .alsoDecode(Topic.DatabaseModel.self)
                     .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
                     .range(lower: 0, upper: maxAmount)
 
@@ -169,11 +172,11 @@ extension Task.DatabaseRepository {
                 return dbQuery
                     .all()
                     .map { content in
-                        content.map { taskContent in
-                            CreatorTaskContent(
+                        try content.map { taskContent in
+                            try CreatorTaskContent(
                                 task: taskContent.0.0.0,
-                                topic: taskContent.0.1,
-                                creator: taskContent.0.0.1,
+                                topic: taskContent.0.1.content(),
+                                creator: taskContent.0.0.1.content(),
                                 isMultipleChoise: taskContent.1.isMultipleSelect != nil
                             )
                         }
@@ -217,11 +220,11 @@ extension Task.DatabaseRepository {
 
         return conn.select()
             .column(.count(.all, as: "taskCount"))
-            .column(.keyPath(\User.id, as: "userID"))
-            .column(.keyPath(\User.username, as: "username"))
+            .column(.keyPath(\User.DatabaseModel.id, as: "userID"))
+            .column(.keyPath(\User.DatabaseModel.username, as: "username"))
             .from(Task.self)
-            .join(\Task.creatorID, to: \User.id)
-            .groupBy(\User.id)
+            .join(\Task.creatorID, to: \User.DatabaseModel.id)
+            .groupBy(\User.DatabaseModel.id)
             .all(decoding: TaskCreators.self)
     }
 
@@ -255,10 +258,10 @@ extension Task.DatabaseRepository {
 
     public func examTasks(subjectID: Subject.ID) -> EventLoopFuture<[Task]> {
         Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
             .filter(\.isTestable == true)
-            .filter(\Topic.subjectId == subjectID)
+            .filter(\Topic.DatabaseModel.subjectId == subjectID)
             .all()
     }
 }

@@ -21,8 +21,8 @@ public protocol SubjectRepositoring: CreateModelRepository,
     Model           == Subject,
     CreateData      == Subject.Create.Data,
     CreateResponse  == Subject.Create.Response,
-    UpdateData      == Subject.Edit.Data,
-    UpdateResponse  == Subject.Edit.Response,
+    UpdateData      == Subject.Update.Data,
+    UpdateResponse  == Subject.Update.Response,
     ResponseModel   == Subject {
     func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>
     func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]>
@@ -38,20 +38,4 @@ public protocol SubjectRepositoring: CreateModelRepository,
     func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>
     func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject>
     func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
-}
-
-extension Subject {
-
-    public enum Create {
-        public struct Data: Content {
-            let name: String
-            let colorClass: Subject.ColorClass = .primary
-            let description: String
-            let category: String
-        }
-
-        public typealias Response = Subject
-    }
-
-    public typealias Edit = Create
 }

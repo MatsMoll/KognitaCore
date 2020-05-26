@@ -24,6 +24,9 @@ public protocol FlashCardTaskRepository: CreateModelRepository,
 
 extension FlashCardTask {
     public struct DatabaseRepository: FlashCardTaskRepository, DatabaseConnectableRepository {
+
+        public typealias DatabaseModel = FlashCardTask
+
         public let conn: DatabaseConnectable
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
         private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
@@ -52,7 +55,7 @@ extension FlashCardTask.DatabaseRepository {
                         .create(
                             from: .init(
                                 content: content,
-                                subtopicID: subtopic.requireID(),
+                                subtopicID: subtopic.id,
                                 solution: content.solution
                             ),
                             by: user
@@ -81,7 +84,7 @@ extension FlashCardTask.DatabaseRepository {
         }
         .catchFlatMap { _ in
             task.get(on: self.conn).flatMap { newTask in
-                guard try newTask.creatorID == user.requireID() else {
+                guard newTask.creatorID == user.id else {
                     throw Abort(.forbidden)
                 }
                 return try self.update(task: task, to: content, by: user)
@@ -137,7 +140,7 @@ extension FlashCardTask.DatabaseRepository {
     public func importTask(from task: Task.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
         return try Task(
-            subtopicID: subtopic.requireID(),
+            subtopicID: subtopic.id,
             description: task.description,
             question: task.question,
             creatorID: 1
@@ -186,17 +189,17 @@ extension FlashCardTask.DatabaseRepository {
 
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\Task.id == flashCard.id)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .alsoDecode(Topic.self)
-            .alsoDecode(Subject.self)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+            .alsoDecode(Topic.DatabaseModel.self)
+            .alsoDecode(Subject.DatabaseModel.self)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .map { preview in
-                TaskPreviewContent(
-                    subject: preview.1,
-                    topic: preview.0.1,
+                try TaskPreviewContent(
+                    subject: preview.1.content(),
+                    topic: preview.0.1.content(),
                     task: preview.0.0,
                     actionDescription: FlashCardTask.actionDescriptor
                 )
@@ -228,23 +231,23 @@ extension FlashCardTask.DatabaseRepository {
             .unwrap(or: Abort(.internalServerError))
             .flatMap { taskInfo in
 
-                Subject.query(on: self.conn)
-                    .join(\Topic.subjectId, to: \Subject.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .filter(\Subtopic.id == taskInfo.0.subtopicID)
+                Subject.DatabaseModel.query(on: self.conn)
+                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .filter(\Subtopic.DatabaseModel.id == taskInfo.0.subtopicID)
                     .first()
                     .unwrap(or: Abort(.internalServerError))
                     .flatMap { subject in
 
-                        try self.topicRepository.getTopicResponses(in: subject)
+                        try self.topicRepository.getTopicResponses(in: subject.content())
                             .map { topics in
 
-                                FlashCardTask.ModifyContent(
+                                try FlashCardTask.ModifyContent(
                                     task: Task.ModifyContent(
                                         task: taskInfo.0,
                                         solution: taskInfo.1
                                     ),
-                                    subject: Subject.Overview(subject: subject),
+                                    subject: subject.content(),
                                     topics: topics
                                 )
                         }

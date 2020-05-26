@@ -14,13 +14,14 @@ extension Topic {
 
         let createSubject = try subject ?? Subject.create(creator: creator, on: conn)
 
-        return try Topic.create(name: name, chapter: chapter, subjectId: createSubject.requireID(), on: conn)
+        return try Topic.create(name: name, chapter: chapter, subjectId: createSubject.id, on: conn)
     }
 
     public static func create(name: String = "Topic", chapter: Int = 1, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
 
-        return try Topic(name: name, chapter: chapter, subjectId: subjectId)
+        return try Topic.DatabaseModel(name: name, chapter: chapter, subjectId: subjectId)
             .save(on: conn)
+            .map { try $0.content() }
             .wait()
     }
 }

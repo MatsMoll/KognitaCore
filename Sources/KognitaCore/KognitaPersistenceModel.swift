@@ -96,3 +96,8 @@ public protocol SoftDeleatableModel: KognitaPersistenceModel {
 extension SoftDeleatableModel {
     public static var deletedAtKey: WritableKeyPath<Self, Date?>? { return \Self.deletedAt }
 }
+
+public protocol ContentConvertable {
+    associatedtype ResponseModel
+    func content() throws -> ResponseModel
+}

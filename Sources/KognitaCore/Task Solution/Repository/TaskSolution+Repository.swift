@@ -21,6 +21,8 @@ extension TaskSolution {
 
     public struct DatabaseRepository: TaskSolutionRepositoring, DatabaseConnectableRepository {
 
+        typealias DatabaseModel = TaskSolution
+
         public let conn: DatabaseConnectable
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
 
@@ -53,7 +55,7 @@ extension TaskSolution {
                     presentUser: true,
                     taskID: content.taskID
                 ),
-                creatorID: user.requireID()
+                creatorID: user.id
             )
             .save(on: conn)
             .flatMap { solution in
@@ -63,7 +65,7 @@ extension TaskSolution {
                     .isModerator(user: user, taskID: content.taskID)
                     .flatMap {
                         solution.isApproved = true
-                        try solution.approvedBy = user.requireID()
+                        try solution.approvedBy = user.id
                         return solution.save(on: self.conn)
                             .transform(to: .init())
                 }.catchMap { _ in .init() }
@@ -108,14 +110,14 @@ extension TaskSolution {
         }
 
         public func upvote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
-            try TaskSolution.Pivot.Vote(userID: user.requireID(), solutionID: solutionID)
+            TaskSolution.Pivot.Vote(userID: user.id, solutionID: solutionID)
                 .create(on: conn)
                 .transform(to: ())
         }
 
         public func revokeVote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
-            try TaskSolution.Pivot.Vote.query(on: conn)
-                .filter(\.userID == user.requireID())
+            TaskSolution.Pivot.Vote.query(on: conn)
+                .filter(\.userID == user.id)
                 .filter(\.solutionID == solutionID)
                 .first()
                 .unwrap(or: Abort(.badRequest))
@@ -125,7 +127,7 @@ extension TaskSolution {
         }
 
         public func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution.Update.Response> {
-            if try model.creatorID == user.requireID() {
+            if model.creatorID == user.id {
                 try model.update(with: data)
                 return model.save(on: conn).transform(to: .init())
             } else {
@@ -148,7 +150,7 @@ extension TaskSolution {
 
                     guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
 
-                    if try model.creatorID == user.requireID() {
+                    if model.creatorID == user.id {
                         return model.delete(on: self.conn)
                     } else {
                         return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
@@ -185,9 +187,9 @@ extension TaskSolution {
 
                     Task.query(on: self.conn)
                         .join(\TaskSolution.taskID, to: \Task.id)
-                        .join(\Subtopic.id, to: \Task.subtopicID)
-                        .join(\Topic.id, to: \Subtopic.topicId)
-                        .filter(\Topic.subjectId == subjectID)
+                        .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                        .filter(\Topic.DatabaseModel.subjectId == subjectID)
                         .filter(\TaskSolution.approvedBy == nil)
                         .range(0..<10)
                         .alsoDecode(TaskSolution.self)

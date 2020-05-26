@@ -17,8 +17,9 @@ extension User {
         let createUsername = username ?? UUID().uuidString
 
         let password = try BCrypt.hash("password")
-        return try User(username: createUsername, email: createEmail, passwordHash: password, isAdmin: isAdmin, isEmailVerified: isEmailVerified)
+        return try User.DatabaseModel(username: createUsername, email: createEmail, passwordHash: password, isAdmin: isAdmin, isEmailVerified: isEmailVerified)
             .save(on: conn)
+            .map { try $0.content() }
             .wait()
     }
 }

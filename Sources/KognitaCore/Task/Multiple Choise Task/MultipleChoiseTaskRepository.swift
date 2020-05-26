@@ -31,7 +31,10 @@ public protocol MultipleChoiseTaskRepository: CreateModelRepository,
 extension MultipleChoiseTask {
     public struct DatabaseRepository: MultipleChoiseTaskRepository, DatabaseConnectableRepository {
 
+        typealias DatabaseModel = MultipleChoiseTask
+
         public let conn: DatabaseConnectable
+
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
@@ -59,7 +62,7 @@ extension MultipleChoiseTask.DatabaseRepository {
                         .create(
                             from: .init(
                                 content: content,
-                                subtopicID: subtopic.requireID(),
+                                subtopicID: subtopic.id,
                                 solution: content.solution
                             ),
                             by: user
@@ -96,7 +99,7 @@ extension MultipleChoiseTask.DatabaseRepository {
         }
         .catchFlatMap { _ in
             task.get(on: self.conn).flatMap { taskModel in
-                guard try taskModel.creatorID == user.requireID() else {
+                guard taskModel.creatorID == user.id else {
                     throw Abort(.forbidden)
                 }
                 return try self.update(task: task, to: data, by: user)
@@ -148,8 +151,8 @@ extension MultipleChoiseTask.DatabaseRepository {
 
     public func importTask(from taskContent: MultipleChoiseTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
-        return try Task(
-            subtopicID: subtopic.requireID(),
+        return Task(
+            subtopicID: subtopic.id,
             description: taskContent.task.description,
             question: taskContent.task.question,
             creatorID: 1
@@ -218,20 +221,20 @@ extension MultipleChoiseTask.DatabaseRepository {
 
                 Task.query(on: self.conn, withSoftDeleted: true)
                     .filter(\Task.id == multiple.id)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .join(\Subject.id, to: \Topic.subjectId)
-                    .alsoDecode(Topic.self)
-                    .alsoDecode(Subject.self)
+                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+                    .alsoDecode(Topic.DatabaseModel.self)
+                    .alsoDecode(Subject.DatabaseModel.self)
                     .first()
                     .unwrap(or: Abort(.internalServerError))
                     .map { preview in
 
                         // Returning a tupple
-                        (
+                        try (
                             TaskPreviewContent(
-                                subject: preview.1,
-                                topic: preview.0.1,
+                                subject: preview.1.content(),
+                                topic: preview.0.1.content(),
                                 task: preview.0.0,
                                 actionDescription: multiple.actionDescription
                             ),
@@ -336,24 +339,24 @@ extension MultipleChoiseTask.DatabaseRepository {
                             .all()
                             .flatMap { choises in
 
-                                Subject.query(on: conn)
-                                    .join(\Topic.subjectId, to: \Subject.id)
-                                    .join(\Subtopic.topicId, to: \Topic.id)
-                                    .filter(\Subtopic.id, .equal, taskContent.0.subtopicID)
+                                Subject.DatabaseModel.query(on: conn)
+                                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
+                                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                                    .filter(\Subtopic.DatabaseModel.id, .equal, taskContent.0.subtopicID)
                                     .first()
                                     .unwrap(or: Abort(.internalServerError))
                                     .flatMap { subject in
 
                                         try self.topicRepository
-                                            .getTopicResponses(in: subject)
+                                            .getTopicResponses(in: subject.content())
                                             .map { topics in
 
-                                                MultipleChoiseTask.ModifyContent(
+                                                try MultipleChoiseTask.ModifyContent(
                                                     task: Task.ModifyContent(
                                                         task: taskContent.0,
                                                         solution: taskContent.2
                                                     ),
-                                                    subject: .init(subject: subject),
+                                                    subject: subject.content(),
                                                     topics: topics,
                                                     multiple: taskContent.1,
                                                     choises: choises.map { .init(choise: $0) }

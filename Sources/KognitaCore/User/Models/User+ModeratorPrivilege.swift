@@ -24,8 +24,8 @@ extension User.ModeratorPrivilege {
     public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         PostgreSQLDatabase.create(User.ModeratorPrivilege.self, on: conn) { builder in
             try addProperties(to: builder)
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.subjectID, to: \Subject.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.subjectID, to: \Subject.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
             builder.unique(on: \.subjectID, \.userID)
         }
     }

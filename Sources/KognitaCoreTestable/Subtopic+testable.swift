@@ -21,7 +21,7 @@ extension Subtopic {
 
         let usedTopic = try topic ?? Topic.create(on: conn)
 
-        return try Subtopic.create(name: name, topicId: usedTopic.requireID(), on: conn)
+        return try Subtopic.create(name: name, topicId: usedTopic.id, on: conn)
     }
 
     /// Creates a Subtopic for testing
@@ -33,8 +33,9 @@ extension Subtopic {
     /// - Returns: The created `Subtopic`
     public static func create(name: String = "Topic", topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
 
-        return try Subtopic(name: name, topicId: topicId)
+        return try Subtopic.DatabaseModel(name: name, topicId: topicId)
             .save(on: conn)
+            .map { try $0.content() }
             .wait()
     }
 }

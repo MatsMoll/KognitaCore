@@ -1,28 +1,28 @@
+////
+////  UserResponse.swift
+////  KognitaCore
+////
+////  Created by Mats Mollestad on 11/04/2019.
+////
 //
-//  UserResponse.swift
-//  KognitaCore
+//import Vapor
 //
-//  Created by Mats Mollestad on 11/04/2019.
+///// Public representation of user data.
+//extension User {
 //
-
-import Vapor
-
-/// Public representation of user data.
-extension User {
-
-    public struct Response: Content, UserContent {
-
-        /// User's unique identifier.
-        /// Not optional since we only return users that exist in the DB.
-        public var userId: Int
-
-        /// User's full name.
-        public let username: String
-
-        /// User's email address.
-        public let email: String
-
-        /// The User's registration date
-        public let registrationDate: Date
-    }
-}
+//    public struct Response: Content, UserContent {
+//
+//        /// User's unique identifier.
+//        /// Not optional since we only return users that exist in the DB.
+//        public var userId: Int
+//
+//        /// User's full name.
+//        public let username: String
+//
+//        /// User's email address.
+//        public let email: String
+//
+//        /// The User's registration date
+//        public let registrationDate: Date
+//    }
+//}

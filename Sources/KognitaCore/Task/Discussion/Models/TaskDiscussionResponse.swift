@@ -49,7 +49,7 @@ extension TaskDiscussionResponse.DatabaseModel {
             try addProperties(to: builder)
 
             builder.reference(from: \.discussionID, to: \TaskDiscussion.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
             PostgreSQLDatabase.update(TaskDiscussionResponse.DatabaseModel.self, on: conn) { builder in
                 builder.deleteField(for: \.userID)

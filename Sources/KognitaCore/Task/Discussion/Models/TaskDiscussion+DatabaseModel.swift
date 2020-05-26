@@ -47,7 +47,7 @@ extension TaskDiscussion {
                 PostgreSQLDatabase.update(TaskDiscussion.DatabaseModel.self, on: conn) { builder in
                     builder.deleteField(for: \.userID)
                     builder.field(for: \.userID, type: .int, .default(1))
-                    builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+                    builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
                 }
             }
         }

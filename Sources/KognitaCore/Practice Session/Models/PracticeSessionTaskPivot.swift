@@ -12,6 +12,8 @@ extension PracticeSession.Pivot {
 
     final class Task: PostgreSQLPivot {
 
+        static var name: String = "PracticeSession.Task"
+
         public typealias Database = PostgreSQLDatabase
 
         public var id: Int?

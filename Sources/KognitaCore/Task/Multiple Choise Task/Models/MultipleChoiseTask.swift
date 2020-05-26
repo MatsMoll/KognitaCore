@@ -94,18 +94,18 @@ extension MultipleChoiseTask {
         return parent(\.id)
     }
 
-    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
-        return try Task.query(on: conn)
-            .filter(\.subtopicID == subtopic.requireID())
+    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiseTask]> {
+        return Task.query(on: conn)
+            .filter(\.subtopicID == subtopic.id)
             .join(\MultipleChoiseTask.id, to: \Task.id)
             .decode(MultipleChoiseTask.self)
             .all()
     }
 
-    static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> Future<[MultipleChoiseTask]> {
-        return try Task.query(on: conn)
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .filter(\Subtopic.topicId == topic.requireID())
+    static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiseTask]> {
+        return Task.query(on: conn)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
             .join(\MultipleChoiseTask.id, to: \Task.id)
             .decode(MultipleChoiseTask.self)
             .all()

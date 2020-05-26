@@ -21,10 +21,26 @@ extension RetriveAllModelsRepository where ResponseModel == Model, Model: Postgr
             .all()
     }
 
-    public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<[Model]> {
+    func all(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<[Model]> {
         return Model.query(on: conn)
             .filter(filter)
             .all()
+    }
+}
+
+extension RetriveAllModelsRepository where Model: Identifiable, Self: DatabaseConnectableRepository {
+
+    func all<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: PostgreSQLModel, DatabaseModel.ResponseModel == ResponseModel {
+        DatabaseModel.query(on: conn)
+            .all()
+            .map { try $0.map { try $0.content() } }
+    }
+
+    func all<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: PostgreSQLModel, DatabaseModel.ResponseModel == ResponseModel {
+        DatabaseModel.query(on: conn)
+            .filter(filter)
+            .all()
+            .map { try $0.map { try $0.content() } }
     }
 }
 
@@ -34,27 +50,31 @@ public protocol RetriveModelRepository {
     func find(_ id: Int) -> EventLoopFuture<Model?>
 }
 
-extension RetriveModelRepository where Model: PostgreSQLModel, Self: DatabaseConnectableRepository {
+extension RetriveModelRepository where Model: Identifiable, Self: DatabaseConnectableRepository {
 
-    public func find(_ id: Model.ID, or error: Error) -> EventLoopFuture<Model> {
-        return Model.find(id, on: conn)
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Model.ID) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: PostgreSQLModel, Model.ID == DatabaseModel.ID {
+        DatabaseModel.find(id, on: conn)
+            .map { try $0?.content() }
+    }
+
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Model.ID, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: PostgreSQLModel, Model.ID == DatabaseModel.ID {
+        DatabaseModel.find(id, on: conn)
             .unwrap(or: error)
+            .map { try $0.content() }
     }
 
-    public func find(_ id: Model.ID) -> EventLoopFuture<Model?> {
-        return Model.find(id, on: conn)
-    }
-
-    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<Model?> {
-        return Model.query(on: conn)
-            .filter(filter)
-            .first()
-    }
-
-    public func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error) -> EventLoopFuture<Model> {
-        return Model.query(on: conn)
+    func first<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: PostgreSQLModel {
+        DatabaseModel.query(on: conn)
             .filter(filter)
             .first()
             .unwrap(or: error)
+            .map { try $0.content() }
+    }
+
+    func first<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: PostgreSQLModel {
+        DatabaseModel.query(on: conn)
+            .filter(filter)
+            .first()
+            .map { try $0?.content() }
     }
 }

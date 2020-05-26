@@ -20,17 +20,16 @@ public class DatabaseMigrations {
     static func setupTables(_ migrations: inout MigrationConfig) {
 
         migrations.add(migration: Task.ExamSemester.self, database: .psql)
-        migrations.add(migration: Subject.ColorClass.self, database: .psql)
 
-        migrations.add(model: User.self, database: .psql)
-        migrations.add(model: User.Login.Token.self, database: .psql)
+        migrations.add(model: User.DatabaseModel.self, database: .psql)
+        migrations.add(model: User.Login.Token.DatabaseModel.self, database: .psql)
         migrations.add(model: User.ResetPassword.Token.self, database: .psql)
         migrations.add(model: User.VerifyEmail.Token.self, database: .psql)
-        migrations.add(model: Subject.self, database: .psql)
+        migrations.add(model: Subject.DatabaseModel.self, database: .psql)
         migrations.add(model: User.ModeratorPrivilege.self, database: .psql)
         migrations.add(model: User.ActiveSubject.self, database: .psql)
-        migrations.add(model: Topic.self, database: .psql)
-        migrations.add(model: Subtopic.self, database: .psql)
+        migrations.add(model: Topic.DatabaseModel.self, database: .psql)
+        migrations.add(model: Subtopic.DatabaseModel.self, database: .psql)
         migrations.add(model: Task.self, database: .psql)
         migrations.add(model: TaskDiscussion.DatabaseModel.self, database: .psql)
         migrations.add(model: TaskDiscussionResponse.DatabaseModel.self, database: .psql)
@@ -47,8 +46,8 @@ public class DatabaseMigrations {
         migrations.add(model: TaskAnswer.self, database: .psql)
         migrations.add(model: MultipleChoiseTaskAnswer.self, database: .psql)
         migrations.add(model: FlashCardAnswer.self, database: .psql)
-        migrations.add(model: TestSession.self, database: .psql)
-        migrations.add(model: SubjectTest.self, database: .psql)
+        migrations.add(model: TestSession.DatabaseModel.self, database: .psql)
+        migrations.add(model: SubjectTest.DatabaseModel.self, database: .psql)
         migrations.add(model: SubjectTest.Pivot.Task.self, database: .psql)
         migrations.add(model: TaskSessionAnswer.self, database: .psql)
     }

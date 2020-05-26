@@ -8,93 +8,84 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class Topic: KognitaCRUDModel, KognitaModelUpdatable {
+extension Topic {
+    final class DatabaseModel: KognitaCRUDModel, KognitaModelUpdatable {
 
-    public static var tableName: String = "Topic"
+        public static var tableName: String = "Topic"
+//
+//        public struct Response: Content {
+//            public let topic: Topic.Overview
+//            public let subtopics: [Subtopic.Overview]
+//        }
+//
+//        public struct Overview: Content {
+//            public let id: Int
+//            public let subjectID: Subject.ID
+//            public let name: String
+//            public let chapter: Int
+//
+//            init(topic: Topic) {
+//                self.id = topic.id ?? 0
+//                self.subjectID = topic.subjectId
+//                self.name = topic.name
+//                self.chapter = topic.chapter
+//            }
+//        }
 
-    public struct Response: Content {
-        public let topic: Topic.Overview
-        public let subtopics: [Subtopic.Overview]
-    }
+        public var id: Int?
 
-    public struct Overview: Content {
-        public let id: Int
-        public let subjectID: Subject.ID
-        public let name: String
-        public let chapter: Int
+        /// The subject the topic is assigned to
+        public var subjectId: Subject.ID
 
-        init(topic: Topic) {
-            self.id = topic.id ?? 0
-            self.subjectID = topic.subjectId
-            self.name = topic.name
-            self.chapter = topic.chapter
+        /// The name of the topic
+        public private(set) var name: String
+
+        /// The chapther number in a subject
+        public private(set) var chapter: Int
+
+        public var createdAt: Date?
+        public var updatedAt: Date?
+
+        public init(name: String, chapter: Int, subjectId: Subject.ID) throws {
+            self.name           = name
+            self.chapter        = chapter
+            self.subjectId      = subjectId
         }
-    }
 
-    public var id: Int?
+        init(content: Create.Data, subject: Subject, creator: User) throws {
+            subjectId   = subject.id
+            name        = content.name
+            chapter     = content.chapter
+        }
 
-    /// The subject the topic is assigned to
-    public var subjectId: Subject.ID
+        public func updateValues(with content: Create.Data) throws {
+            name        = content.name
+            chapter     = content.chapter
+        }
 
-    /// The name of the topic
-    public private(set) var name: String
+        public static func addTableConstraints(to builder: SchemaCreator<Topic.DatabaseModel>) {
 
-    /// The chapther number in a subject
-    public private(set) var chapter: Int
+            builder.unique(on: \.chapter, \.subjectId)
 
-    public var createdAt: Date?
-    public var updatedAt: Date?
-
-    public init(name: String, chapter: Int, subjectId: Subject.ID) throws {
-        self.name           = name
-        self.chapter        = chapter
-        self.subjectId      = subjectId
-    }
-
-    init(content: Create.Data, subject: Subject, creator: User) throws {
-        subjectId   = try subject.requireID()
-        name        = content.name
-        chapter     = content.chapter
-    }
-
-    public func updateValues(with content: Create.Data) throws {
-        name        = content.name
-        chapter     = content.chapter
-    }
-
-    public static func addTableConstraints(to builder: SchemaCreator<Topic>) {
-
-        builder.unique(on: \.chapter, \.subjectId)
-
-        builder.reference(from: \.subjectId, to: \Subject.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.subjectId, to: \Subject.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+        }
     }
 }
 
-extension Topic {
-
-    public enum Create {
-
-        public struct Data: Content {
-
-            /// This subject id
-            public let subjectId: Subject.ID
-
-            /// The name of the topic
-            public let name: String
-
-            /// The chapther number in a subject
-            public let chapter: Int
-        }
-
-        public typealias Response = Topic
+extension Topic.DatabaseModel: ContentConvertable {
+    public func content() throws -> Topic {
+        try .init(
+            id: requireID(),
+            subjectID: subjectId,
+            name: name,
+            chapter: chapter
+        )
     }
-
-    public typealias Edit = Create
 }
 
-extension Topic {
+extension Topic.DatabaseModel {
 
-    var subject: Parent<Topic, Subject> {
+    var subject: Parent<Topic.DatabaseModel, Subject.DatabaseModel> {
         return parent(\.subjectId)
     }
 
@@ -120,4 +111,4 @@ extension Topic {
 }
 
 extension Topic: Content { }
-extension Topic: ModelParameterRepresentable { }
+//extension Topic: ModelParameterRepresentable { }

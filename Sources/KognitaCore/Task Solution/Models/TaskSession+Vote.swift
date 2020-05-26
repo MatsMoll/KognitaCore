@@ -27,7 +27,7 @@ extension TaskSolution.Pivot.Vote: PostgreSQLMigration {
         PostgreSQLDatabase.create(TaskSolution.Pivot.Vote.self, on: connection) { (builder) in
             try addProperties(to: builder)
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
             builder.reference(from: \.solutionID, to: \TaskSolution.id, onUpdate: .cascade, onDelete: .cascade)
             builder.unique(on: \.solutionID, \.userID)
         }

@@ -63,7 +63,7 @@ extension User.VerifyEmail.Token: Migration {
         return PostgreSQLDatabase.create(User.VerifyEmail.Token.self, on: conn) { builder in
             try addProperties(to: builder)
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 

@@ -4,12 +4,12 @@ import Vapor
 
 /// A practice session object
 extension SubjectTest {
-    public enum Pivot {
-        public final class Task: PostgreSQLPivot {
+    enum Pivot {
+        final class Task: PostgreSQLPivot {
 
             public typealias Database = PostgreSQLDatabase
 
-            public typealias Left = SubjectTest
+            typealias Left = SubjectTest.DatabaseModel
             public typealias Right = KognitaCore.Task
 
             public static var leftIDKey: LeftIDKey = \.testID
@@ -39,7 +39,7 @@ extension SubjectTest.Pivot.Task: Migration {
             builder.unique(on: \.taskID, \.testID)
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.testID, to: \SubjectTest.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.testID, to: \SubjectTest.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 
@@ -48,7 +48,7 @@ extension SubjectTest.Pivot.Task: Migration {
     }
 }
 
-public protocol SubjectTestTaskRepositoring: CreateModelRepository,
+internal protocol SubjectTestTaskRepositoring: CreateModelRepository,
     UpdateModelRepository
     where
     CreateData      == SubjectTest.Pivot.Task.Create.Data,
@@ -89,9 +89,9 @@ extension SubjectTest.Pivot.Task {
         }
 
         func update(model: SubjectTest, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
-            try SubjectTest.Pivot.Task
+            SubjectTest.Pivot.Task
                 .query(on: conn)
-                .filter(\.testID == model.requireID())
+                .filter(\.testID == model.id)
                 .all()
                 .flatMap { (tasks: [SubjectTest.Pivot.Task]) in
 
@@ -101,7 +101,7 @@ extension SubjectTest.Pivot.Task {
                             switch change {
                             case .insert(let taskID):
                                 return try SubjectTest.Pivot.Task(
-                                    testID: model.requireID(),
+                                    testID: model.id,
                                     taskID: taskID
                                 )
                                     .create(on: self.conn)

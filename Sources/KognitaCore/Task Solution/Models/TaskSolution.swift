@@ -46,8 +46,8 @@ public final class TaskSolution: KognitaPersistenceModel, Validatable {
             try addProperties(to: builder)
 
             builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-            builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.creatorID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
+            builder.reference(from: \.approvedBy, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
         }.flatMap {
             PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
                 builder.deleteField(for: \.creatorID)
@@ -70,7 +70,7 @@ public final class TaskSolution: KognitaPersistenceModel, Validatable {
         guard approvedBy == nil else {
             return self
         }
-        approvedBy = try user.requireID()
+        approvedBy = user.id
         isApproved = true
         return self
     }

@@ -42,7 +42,7 @@ public protocol SubjectTestRepositoring: CreateModelRepository,
     ///   - user: The user to fetch the data for
     ///   - conn: The database connection
     /// - Returns: The data needed to present a task
-    func taskWith(id: SubjectTest.Pivot.Task.ID, in session: TestSessionRepresentable, for user: User) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent>
+    func taskWith(id: Int, in session: TestSessionRepresentable, for user: User) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent>
 
     /// Fetches the general results on a test
     /// - Parameters:
@@ -55,7 +55,7 @@ public protocol SubjectTestRepositoring: CreateModelRepository,
     /// Returns the tests that a user can enter in
     /// - Parameter user: The user to find the tests for
     /// - Parameter conn: The database connection
-    func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.OverviewResponse?>
+    func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?>
 
     /// Returns a list of all the different tests in a subject
     /// - Parameter subject: The subject the tests is for
@@ -70,13 +70,13 @@ public protocol SubjectTestRepositoring: CreateModelRepository,
     ///   - conn: The database connection
     func taskIDsFor(testID id: SubjectTest.ID) throws -> EventLoopFuture<[Task.ID]>
 
-    func firstTaskID(testID: SubjectTest.ID) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?>
+    func firstTaskID(testID: SubjectTest.ID) throws -> EventLoopFuture<Int?>
 
     func end(test: SubjectTest, by user: User) throws -> EventLoopFuture<Void>
 
     func scoreHistogram(for test: SubjectTest, user: User) throws -> EventLoopFuture<SubjectTest.ScoreHistogram>
 
-    func currentlyOpenTest(in subject: Subject, user: User) throws -> EventLoopFuture<SubjectTest.OverviewResponse?>
+    func currentlyOpenTest(in subject: Subject, user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?>
 
     func isOpen(testID: SubjectTest.ID) -> EventLoopFuture<Bool>
 
@@ -103,6 +103,10 @@ extension SubjectTest {
             case alreadyEnded
         }
 
+        public func delete(model: SubjectTest, by user: User?) throws -> EventLoopFuture<Void> {
+            deleteDatabase(SubjectTest.DatabaseModel.self, model: model)
+        }
+
         public func create(from content: SubjectTest.Create.Data, by user: User?) throws -> EventLoopFuture<SubjectTest> {
             guard let user = user else {
                 throw Abort(.unauthorized)
@@ -120,7 +124,7 @@ extension SubjectTest {
                         .isModerator(user: user, subjectID: subjectID)
                         .flatMap {
 
-                            SubjectTest(data: content)
+                            SubjectTest.DatabaseModel(data: content)
                                 .create(on: self.conn)
                                 .flatMap { test in
                                     try self.subjectTestTaskRepositoring
@@ -131,7 +135,7 @@ extension SubjectTest {
                                             ),
                                             by: user
                                     )
-                                    .transform(to: test)
+                                    .map { _ in try test.content() }
                             }
                     }
             }
@@ -151,9 +155,9 @@ extension SubjectTest {
                         .isModerator(user: user, subjectID: subjectID)
                         .flatMap {
 
-                            return model.update(with: data)
-                                .save(on: self.conn)
+                            self.updateDatabase(SubjectTest.DatabaseModel.self, model: model, to: data)
                                 .flatMap { test in
+
                                     try self.subjectTestTaskRepositoring
                                         .update(
                                             model: test,
@@ -173,25 +177,26 @@ extension SubjectTest {
             guard test.password == request.password else {
                 throw Errors.incorrectPassword
             }
-            return try TestSession.query(on: conn)
-                .join(\TaskSession.id, to: \TestSession.id)
-                .filter(\TaskSession.userID == user.requireID())
-                .filter(\TestSession.testID == test.requireID())
+            return TestSession.DatabaseModel.query(on: conn)
+                .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
+                .filter(\TaskSession.userID == user.id)
+                .filter(\TestSession.testID == test.id)
                 .first()
                 .flatMap { session in
 
                     if let session = session {
                         throw try Errors.alreadyEntered(sessionID: session.requireID())
                     }
-                    return try TaskSession(userID: user.requireID())
+                    return TaskSession(userID: user.id)
                         .create(on: self.conn)
                         .flatMap { session in
 
-                            try TestSession(
+                            try TestSession.DatabaseModel(
                                 sessionID: session.requireID(),
-                                testID: test.requireID()
+                                testID: test.id
                             )
                             .create(on: self.conn)
+                            .map { try $0.content() }
                     }
             }
         }
@@ -200,7 +205,12 @@ extension SubjectTest {
             return try userRepository
                 .isModerator(user: user, subjectID: test.subjectID)
                 .flatMap {
-                    test.open(on: self.conn)
+                    SubjectTest.DatabaseModel.find(test.id, on: self.conn)
+                        .unwrap(or: Abort(.badRequest))
+                        .flatMap { test in
+                            test.open(on: self.conn)
+                                .map { try $0.content() }
+                    }
             }
         }
 
@@ -210,8 +220,8 @@ extension SubjectTest {
                 .isModerator(user: user, subjectID: test.subjectID)
                 .flatMap {
 
-                    try TestSession.query(on: self.conn)
-                        .filter(\.testID == test.requireID())
+                    TestSession.DatabaseModel.query(on: self.conn)
+                        .filter(\.testID == test.id)
                         .all()
                         .map { sessions in
                             sessions.reduce(
@@ -230,9 +240,9 @@ extension SubjectTest {
             }
         }
 
-        public func taskWith(id: SubjectTest.Pivot.Task.ID, in session: TestSessionRepresentable, for user: User) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
+        public func taskWith(id: Int, in session: TestSessionRepresentable, for user: User) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
 
-            guard try session.userID == user.requireID() else {
+            guard session.userID == user.id else {
                 throw Abort(.forbidden)
             }
 
@@ -263,27 +273,28 @@ extension SubjectTest {
                         .filter(\MultipleChoiseTaskChoise.taskId == task.requireID())
                         .decode(MultipleChoiseTaskAnswer.self)
                         .all()
-                        .flatMap { answers in
+                        .flatMap { _ in
 
                             SubjectTest.Pivot.Task
                                 .query(on: self.conn)
                                 .filter(\.testID == session.testID)
                                 .all()
-                                .flatMap { testTasks in
+                                .flatMap { _ in
 
-                                    SubjectTest
+                                    SubjectTest.DatabaseModel
                                         .find(session.testID, on: self.conn)
                                         .unwrap(or: Abort(.internalServerError))
-                                        .map { test in
+                                        .map { _ in
 
-                                            SubjectTest.MultipleChoiseTaskContent(
-                                                test: test,
-                                                task: task,
-                                                multipleChoiseTask: multipleChoiseTask,
-                                                choises: taskContent.map { $0.1 },
-                                                selectedChoises: answers,
-                                                testTasks: testTasks
-                                            )
+                                            throw Abort(.notImplemented)
+//                                            try SubjectTest.MultipleChoiseTaskContent(
+//                                                test: test.content(),
+//                                                task: task,
+//                                                multipleChoiseTask: multipleChoiseTask,
+//                                                choises: taskContent.map { $0.1 },
+//                                                selectedChoises: answers,
+//                                                testTasks: testTasks
+//                                            )
                                     }
                             }
                     }
@@ -307,24 +318,24 @@ extension SubjectTest {
                     self.conn.databaseConnection(to: .psql)
                         .flatMap { conn in
 
-                            try conn.select()
+                            conn.select()
                                 .column(\MultipleChoiseTaskAnswer.choiseID)
                                 .column(.count(\MultipleChoiseTaskAnswer.id), as: "numberOfAnswers")
-                                .from(TestSession.self)
-                                .join(\TestSession.id, to: \TaskSessionAnswer.sessionID)
+                                .from(TestSession.DatabaseModel.self)
+                                .join(\TestSession.DatabaseModel.id, to: \TaskSessionAnswer.sessionID)
                                 .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
                                 .groupBy(\MultipleChoiseTaskAnswer.choiseID)
-                                .where(\TestSession.testID == test.requireID())
+                                .where(\TestSession.DatabaseModel.testID == test.id)
                                 .all(decoding: MultipleChoiseTaskAnswerCount.self)
                                 .flatMap { choiseCount in
 
-                                    try conn.select()
+                                    conn.select()
                                         .all(table: Task.self)
                                         .all(table: MultipleChoiseTaskChoise.self)
                                         .from(SubjectTest.Pivot.Task.self)
                                         .join(\SubjectTest.Pivot.Task.taskID, to: \Task.id)
                                         .join(\Task.id, to: \MultipleChoiseTaskChoise.taskId)
-                                        .where(\SubjectTest.Pivot.Task.testID == test.requireID())
+                                        .where(\SubjectTest.Pivot.Task.testID == test.id)
                                         .all(decoding: Task.self, MultipleChoiseTaskChoise.self)
                                         .flatMap { tasks in
                                             try self.calculateResultStatistics(
@@ -395,12 +406,12 @@ extension SubjectTest {
             return try detailedUserResults(for: test, maxScore: Double(taskResults.count), user: user)
                 .flatMap { userResults in
 
-                    try TestSession.query(on: self.conn)
-                        .filter(\.testID == test.requireID())
+                    TestSession.DatabaseModel.query(on: self.conn)
+                        .filter(\.testID == test.id)
                         .count()
                         .flatMap { numberOfSessions in
 
-                            Subject.find(test.subjectID, on: self.conn)
+                            Subject.DatabaseModel.find(test.subjectID, on: self.conn)
                                 .unwrap(or: Abort(.internalServerError))
                                 .map { subject in
 
@@ -418,37 +429,37 @@ extension SubjectTest {
             }
         }
 
-        public func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.OverviewResponse?> {
+        public func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?> {
 
             return conn.databaseConnection(to: .psql)
                 .flatMap { conn in
 
-                    try conn.select()
-                        .all(table: SubjectTest.self)
-                        .all(table: Subject.self)
-                        .from(SubjectTest.self)
-                        .join(\SubjectTest.subjectID, to: \User.ActiveSubject.subjectID)
-                        .join(\SubjectTest.subjectID, to: \Subject.id)
-                        .where(\SubjectTest.openedAt != nil)
-                        .where(\User.ActiveSubject.userID == user.requireID())
-                        .all(decoding: SubjectTest.self, Subject.self)
+                    conn.select()
+                        .all(table: SubjectTest.DatabaseModel.self)
+                        .all(table: Subject.DatabaseModel.self)
+                        .from(SubjectTest.DatabaseModel.self)
+                        .join(\SubjectTest.DatabaseModel.subjectID, to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.DatabaseModel.subjectID, to: \Subject.DatabaseModel.id)
+                        .where(\SubjectTest.DatabaseModel.openedAt != nil)
+                        .where(\User.ActiveSubject.userID == user.id)
+                        .all(decoding: SubjectTest.DatabaseModel.self, Subject.self)
                         .flatMap { tests in
                             guard let test = tests.first(where: { $0.0.isOpen }) else {
                                 return conn.future(nil)
                             }
                             return try conn.select()
-                                .all(table: TestSession.self)
-                                .from(TestSession.self)
-                                .join(\TestSession.id, to: \TaskSession.id)
-                                .where(\TaskSession.userID == user.requireID())
-                                .where(\TestSession.testID == test.0.requireID())
+                                .all(table: TestSession.DatabaseModel.self)
+                                .from(TestSession.DatabaseModel.self)
+                                .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
+                                .where(\TaskSession.userID == user.id)
+                                .where(\TestSession.DatabaseModel.testID == test.0.requireID())
                                 .limit(1)
                                 .first(decoding: TestSession?.self)
                                 .map { session in
-                                    SubjectTest.OverviewResponse(
-                                        test: test.0,
+                                    try SubjectTest.UserOverview(
+                                        test: test.0.content(),
                                         subjectName: test.1.name,
-                                        subjectID: test.1.id ?? 0,
+                                        subjectID: test.1.id,
                                         hasSubmitted: session?.hasSubmitted ?? false,
                                         testSessionID: session?.id
                                     )
@@ -457,38 +468,40 @@ extension SubjectTest {
             }
         }
 
-        public func currentlyOpenTest(in subject: Subject, user: User) throws -> EventLoopFuture<SubjectTest.OverviewResponse?> {
+        public func currentlyOpenTest(in subject: Subject, user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?> {
 
             return conn.databaseConnection(to: .psql)
                 .flatMap { conn in
 
-                    try conn.select()
-                        .all(table: SubjectTest.self)
-                        .all(table: Subject.self)
-                        .from(SubjectTest.self)
-                        .join(\SubjectTest.subjectID, to: \User.ActiveSubject.subjectID)
-                        .join(\SubjectTest.subjectID, to: \Subject.id)
-                        .where(\SubjectTest.openedAt != nil)
-                        .where(\User.ActiveSubject.userID == user.requireID())
-                        .where(\SubjectTest.subjectID == subject.requireID())
-                        .all(decoding: SubjectTest.self, Subject.self)
+                    conn.select()
+                        .all(table: SubjectTest.DatabaseModel.self)
+                        .all(table: Subject.DatabaseModel.self)
+                        .from(SubjectTest.DatabaseModel.self)
+                        .join(\SubjectTest.DatabaseModel.subjectID, to: \User.ActiveSubject.subjectID)
+                        .join(\SubjectTest.DatabaseModel.subjectID, to: \Subject.DatabaseModel.id)
+                        .where(\SubjectTest.DatabaseModel.openedAt != nil)
+                        .where(\User.ActiveSubject.userID == user.id)
+                        .where(\SubjectTest.DatabaseModel.subjectID == subject.id)
+                        .all(decoding: SubjectTest.DatabaseModel.self, Subject.self)
                         .flatMap { tests in
                             guard let test = tests.first(where: { $0.0.isOpen }) else {
                                 return conn.future(nil)
                             }
                             return try conn.select()
-                                .all(table: TestSession.self)
-                                .from(TestSession.self)
-                                .join(\TestSession.id, to: \TaskSession.id)
-                                .where(\TaskSession.userID == user.requireID())
-                                .where(\TestSession.testID == test.0.requireID())
+                                .all(table: TestSession.DatabaseModel.self)
+                                .from(TestSession.DatabaseModel.self)
+                                .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
+                                .where(\TaskSession.userID == user.id)
+                                .where(\TestSession.DatabaseModel.testID == test.0.requireID())
                                 .limit(1)
                                 .first(decoding: TestSession?.self)
-                                .map { session in
-                                    SubjectTest.OverviewResponse(
-                                        test: test.0,
+                                .map(to: SubjectTest.UserOverview?.self) { session in
+
+//                                    throw Abort(.notImplemented)
+                                    try SubjectTest.UserOverview(
+                                        test: test.0.content(),
                                         subjectName: test.1.name,
-                                        subjectID: test.1.id ?? 0,
+                                        subjectID: test.1.id,
                                         hasSubmitted: session?.hasSubmitted ?? false,
                                         testSessionID: session?.id
                                     )
@@ -500,13 +513,16 @@ extension SubjectTest {
         public func all(in subject: Subject, for user: User) throws -> EventLoopFuture<[SubjectTest]> {
 
             try userRepository
-                .isModerator(user: user, subjectID: subject.requireID())
+                .isModerator(user: user, subjectID: subject.id)
                 .flatMap {
 
-                    try SubjectTest.query(on: self.conn)
-                        .filter(\.subjectID == subject.requireID())
+                    SubjectTest.DatabaseModel.query(on: self.conn)
+                        .filter(\.subjectID == subject.id)
                         .sort(\.scheduledAt, .descending)
                         .all()
+                        .map {
+                            try $0.map { try $0.content() }
+                    }
             }
         }
 
@@ -520,7 +536,7 @@ extension SubjectTest {
             }
         }
 
-        public func firstTaskID(testID: SubjectTest.ID) throws -> EventLoopFuture<SubjectTest.Pivot.Task.ID?> {
+        public func firstTaskID(testID: SubjectTest.ID) throws -> EventLoopFuture<Int?> {
 
             SubjectTest.Pivot.Task
                 .query(on: conn)
@@ -544,20 +560,25 @@ extension SubjectTest {
             return try userRepository
                 .isModerator(user: user, subjectID: test.subjectID)
                 .flatMap {
-                    test.endedAt = .now
-                    return test.save(on: self.conn)
-                        .flatMap { _ in
-                            try self.createResults(in: test)
+                    SubjectTest.DatabaseModel
+                        .find(test.id, on: self.conn)
+                        .unwrap(or: Abort(.badRequest))
+                        .flatMap { test in
+                            test.endedAt = .now
+                            return test.save(on: self.conn)
+                                .flatMap { _ in
+                                    try self.createResults(in: test.content())
+                            }
                     }
             }
         }
 
         func createResults(in test: SubjectTest) throws -> EventLoopFuture<Void> {
 
-            try TestSession.query(on: conn)
-                .join(\TaskSession.id, to: \TestSession.id)
-                .filter(\TestSession.testID == test.requireID())
-                .filter(\TestSession.submittedAt == nil)
+            TestSession.DatabaseModel.query(on: conn)
+                .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
+                .filter(\TestSession.DatabaseModel.testID == test.id)
+                .filter(\TestSession.DatabaseModel.submittedAt == nil)
                 .alsoDecode(TaskSession.self)
                 .all()
                 .flatMap { sessions in
@@ -595,20 +616,20 @@ extension SubjectTest {
                     self.conn.databaseConnection(to: .psql)
                         .flatMap { conn in
 
-                            try conn.select()
+                            conn.select()
                                 .column(.count(\SubjectTest.Pivot.Task.id), as: "taskCount")
                                 .from(SubjectTest.Pivot.Task.self)
-                                .where(\SubjectTest.Pivot.Task.testID == test.requireID())
+                                .where(\SubjectTest.Pivot.Task.testID == test.id)
                                 .first(decoding: TestCountQueryResult.self)
                                 .unwrap(or: Abort(.badRequest))
                                 .flatMap { count in
 
-                                    try conn.select()
+                                    conn.select()
                                         .column(\TaskResult.resultScore, as: "score")
-                                        .column(\TestSession.id, as: "sessionID")
-                                        .from(TestSession.self)
-                                        .join(\TestSession.id, to: \TaskResult.sessionID)
-                                        .where(\TestSession.testID == test.requireID())
+                                        .column(\TestSession.DatabaseModel.id, as: "sessionID")
+                                        .from(TestSession.DatabaseModel.self)
+                                        .join(\TestSession.DatabaseModel.id, to: \TaskResult.sessionID)
+                                        .where(\TestSession.DatabaseModel.testID == test.id)
                                         .all(decoding: HistogramQueryResult.self)
                                         .map { results in
                                             self.calculateHistogram(from: results, maxScore: count.taskCount)
@@ -659,15 +680,15 @@ extension SubjectTest {
                     self.conn.databaseConnection(to: .psql)
                         .flatMap { conn in
 
-                            try conn.select()
-                                .column(\User.email, as: "userEmail")
-                                .column(\User.id, as: "userID")
+                            conn.select()
+                                .column(\User.DatabaseModel.email, as: "userEmail")
+                                .column(\User.DatabaseModel.id, as: "userID")
                                 .column(\TaskResult.resultScore, as: "score")
                                 .from(TaskResult.self)
                                 .join(\TaskResult.sessionID, to: \TaskSession.id)
-                                .join(\TaskSession.userID, to: \User.id)
-                                .join(\TaskSession.id, to: \TestSession.id)
-                                .where(\TestSession.testID == test.requireID())
+                                .join(\TaskSession.userID, to: \User.DatabaseModel.id)
+                                .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
+                                .where(\TestSession.DatabaseModel.testID == test.id)
                                 .all(decoding: UserResultQueryResult.self)
                                 .map { users in
 
@@ -690,24 +711,24 @@ extension SubjectTest {
         }
 
         public func isOpen(testID: SubjectTest.ID) -> EventLoopFuture<Bool> {
-            SubjectTest.find(testID, on: conn)
+            SubjectTest.DatabaseModel.find(testID, on: conn)
                 .unwrap(or: Abort(.badRequest))
                 .map { $0.isOpen }
         }
 
         public func stats(for subject: Subject) throws -> EventLoopFuture<[SubjectTest.DetailedResult]> {
-            return try SubjectTest.query(on: conn)
-                .filter(\.subjectID == subject.requireID())
+            return SubjectTest.DatabaseModel.query(on: conn)
+                .filter(\.subjectID == subject.id)
                 .filter(\.endedAt != nil)
                 .sort(\.openedAt, .ascending)
                 .all()
                 .flatMap { tests in
 
-                    var lastTest: SubjectTest?
+                    var lastTest: SubjectTest.DatabaseModel?
 
                     return try tests.map { test in
                         defer { lastTest = test }
-                        return try self.results(for: test, lastTest: lastTest)
+                        return try self.results(for: test.content(), lastTest: lastTest?.content())
                     }
                     .flatten(on: self.conn)
             }
@@ -715,14 +736,14 @@ extension SubjectTest {
 
         func results(for test: SubjectTest, lastTest: SubjectTest? = nil) throws -> EventLoopFuture<SubjectTest.DetailedResult> {
 
-            try SubjectTest.Pivot.Task.query(on: conn)
-                .filter(\.testID == test.requireID())
+            SubjectTest.Pivot.Task.query(on: conn)
+                .filter(\.testID == test.id)
                 .count()
                 .flatMap { numberOfTasks in
 
-                    try TestSession.query(on: self.conn)
-                        .join(\TaskResult.sessionID, to: \TestSession.id)
-                        .filter(\.testID == test.requireID())
+                    TestSession.DatabaseModel.query(on: self.conn)
+                        .join(\TaskResult.sessionID, to: \TestSession.DatabaseModel.id)
+                        .filter(\.testID == test.id)
                         .decode(TaskResult.self)
                         .all()
                         .flatMap { testResults in
@@ -732,10 +753,10 @@ extension SubjectTest {
                             var query = PracticeSession.Pivot.Task.query(on: self.conn, withSoftDeleted: true)
                                 .join(\TaskResult.sessionID, to: \PracticeSession.Pivot.Task.sessionID)
                                 .join(\Task.id, to: \TaskResult.taskID)
-                                .join(\Subtopic.id, to: \Task.subtopicID)
-                                .join(\Topic.id, to: \Subtopic.topicId)
+                                .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                                .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
                                 .filter(\PracticeSession.Pivot.Task.isCompleted == true)
-                                .filter(\Topic.subjectId == test.subjectID)
+                                .filter(\Topic.DatabaseModel.subjectId == test.subjectID)
                                 .filter(\PracticeSession.Pivot.Task.createdAt < endedAt)
                                 .decode(TaskResult.self)
 
@@ -746,7 +767,7 @@ extension SubjectTest {
                             return query.all()
                                 .map { practiceResults in
                                     DetailedResult(
-                                        testID: test.id ?? 0,
+                                        testID: test.id,
                                         testTitle: test.title,
                                         maxScore: Double(numberOfTasks),
                                         results: self.calculateStats(testResults: testResults, practiceResults: practiceResults)
@@ -797,3 +818,59 @@ extension Array {
         return sorted(by: sortFunction)
     }
 }
+
+//extension SubjectTest.MultipleChoiseTaskContent {
+//    init(test: SubjectTest, task: Task, multipleChoiseTask: KognitaCore.MultipleChoiseTask, choises: [MultipleChoiseTaskChoise], selectedChoises: [MultipleChoiseTaskAnswer], testTasks: [SubjectTest.Pivot.Task]) {
+//        self.init(
+//            test: test,
+//            task: MultipleChoiceTask(task: task, multipleChoiceTask: multipleChoiseTask),
+//            choises: choises.compactMap { choise in
+//                try? Choise(
+//                    id: choise.requireID(),
+//                    choise: choise.choise,
+//                    isCorrect: choise.isCorrect,
+//                    isSelected: selectedChoises.contains(where: { $0.choiseID == choise.id })
+//                )
+//            },
+//            testTasks: testTasks.compactMap { testTask in
+//                guard let testTaskID = testTask.id else {
+//                    return nil
+//                }
+//                return SubjectTest.AssignedTask(
+//                    testTaskID: testTaskID,
+//                    isCurrent: testTask.taskID == task.id
+//                )
+//            }
+//        )
+//    }
+//}
+
+//extension SubjectTest.MultipleChoiceTask {
+//    public init(task: Task, multipleChoiceTask: KognitaCore.MultipleChoiseTask) {
+//        self.init(
+//            test: test,
+//            id: <#T##Int#>,
+//            subtopicID: <#T##Subtopic.ID#>,
+//            description: <#T##String?#>,
+//            question: <#T##String#>,
+//            creatorID: <#T##User.ID?#>,
+//            examType: <#T##ExamTaskType?#>,
+//            examYear: <#T##Int?#>,
+//            isTestable: <#T##Bool#>,
+//            createdAt: <#T##Date?#>,
+//            updatedAt: <#T##Date?#>,
+//            editedTaskID: <#T##Int?#>,
+//            isMultipleSelect: <#T##Bool#>,
+//            choises: <#T##[Choise]#>,
+//            tasks: <#T##[SubjectTest.AssignedTask]#>
+//        )
+//        self.init(
+//            id: task.id ?? 0,
+//            subtopicID: task.subtopicID,
+//            question: task.question,
+//            isTestable: task.isTestable,
+//            isMultipleSelect: multipleChoiceTask.isMultipleSelect,
+//            choises: []
+//        )
+//    }
+//}

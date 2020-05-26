@@ -30,7 +30,7 @@ extension TaskResult {
 
         let submitResult = try TaskSubmitResult(submit: submit, result: practiceResult, taskID: task.requireID())
 
-        return try TaskResult(result: submitResult, userID: user.requireID(), sessionID: sessionID)
+        return try TaskResult(result: submitResult, userID: user.id, sessionID: sessionID)
             .save(on: conn)
             .wait()
     }

@@ -26,7 +26,7 @@ extension Task {
         let usedSubtopic = try subtopic ?? Subtopic.create(on: conn)
 
         return try create(creator: usedCreator,
-                          subtopicId: usedSubtopic.requireID(),
+                          subtopicId: usedSubtopic.id,
                           description: description,
                           question: question,
                           explenation: explenation,
@@ -49,7 +49,7 @@ extension Task {
         return try Task(subtopicID: subtopicId,
                         description: description,
                         question: question,
-                        creatorID: creator.requireID(),
+                        creatorID: creator.id,
                         isTestable: isTestable)
 
             .save(on: conn)

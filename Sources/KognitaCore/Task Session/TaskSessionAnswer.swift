@@ -37,6 +37,8 @@ extension TaskSessionAnswer {
 
     public struct DatabaseRepository: TaskSessionAnswerRepository, DatabaseConnectableRepository {
 
+        typealias DatabaseModel = TaskSessionAnswer
+
         public let conn: DatabaseConnectable
 
         public func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {

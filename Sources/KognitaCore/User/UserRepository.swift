@@ -13,7 +13,7 @@ public protocol UserRepository: CreateModelRepository,
     RetriveModelRepository
     where
     CreateData      == User.Create.Data,
-    CreateResponse  == User.Response,
+    CreateResponse  == User,
     Model           == User {
     func first(with email: String) -> EventLoopFuture<User?>
 
@@ -30,6 +30,7 @@ public protocol UserRepository: CreateModelRepository,
 
 extension User {
     public struct DatabaseRepository: DatabaseConnectableRepository {
+
         public let conn: DatabaseConnectable
     }
 }
@@ -46,6 +47,13 @@ extension String {
 }
 
 extension User.DatabaseRepository: UserRepository {
+
+    public func find(_ id: Int) -> EventLoopFuture<User?> {
+        findDatabaseModel(User.DatabaseModel.self, withID: id)
+    }
+    public func find(_ id: Int, or error: Error) -> EventLoopFuture<User> {
+        findDatabaseModel(User.DatabaseModel.self, withID: id, or: Abort(.badRequest))
+    }
 
     public enum Errors: LocalizedError {
         case passwordMismatch
@@ -71,13 +79,13 @@ extension User.DatabaseRepository: UserRepository {
 
     public func login(with user: User, conn: DatabaseConnectable) throws -> Future<User.Login.Token> {
         // create new token for this user
-        let token = try User.Login.Token.create(userID: user.requireID())
+        let token = try User.Login.Token.DatabaseModel.create(userID: user.id)
 
         // save and return token
-        return token.save(on: conn)
+        return token.save(on: conn).map { try $0.content() }
     }
 
-    public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User.Response> {
+    public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User> {
 
         guard content.acceptedTerms else {
             throw Errors.missingInput
@@ -99,13 +107,13 @@ extension User.DatabaseRepository: UserRepository {
         // hash user's password using BCrypt
         let hash = try BCrypt.hash(content.password)
         // save new user
-        let newUser = User(
+        let newUser = User.DatabaseModel(
             username: content.username,
             email: content.email,
             passwordHash: hash
         )
 
-        return User.query(on: conn)
+        return User.DatabaseModel.query(on: conn)
             .filter(\.email == newUser.email.lowercased())
             .first()
             .flatMap { existingUser in
@@ -125,19 +133,20 @@ extension User.DatabaseRepository: UserRepository {
     }
 
     public func first(with email: String) -> EventLoopFuture<User?> {
-        User.query(on: conn)
+        User.DatabaseModel.query(on: conn)
             .filter(\.email == email)
             .first()
+            .map { try $0?.content() }
     }
 
     public func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void> {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try User.ModeratorPrivilege
+        return User.ModeratorPrivilege
             .query(on: conn)
             .filter(\.subjectID == subjectID)
-            .filter(\User.ModeratorPrivilege.userID == user.requireID())
+            .filter(\User.ModeratorPrivilege.userID == user.id)
             .first()
             .unwrap(or: Abort(.forbidden))
             .transform(to: ())
@@ -147,11 +156,11 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try Subtopic.query(on: conn)
+        return Subtopic.DatabaseModel.query(on: conn)
             .filter(\.id == subtopicID)
-            .filter(\User.ModeratorPrivilege.userID == user.requireID())
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .filter(\User.ModeratorPrivilege.userID == user.id)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)
             .first()
             .unwrap(or: Abort(.forbidden))
             .transform(to: ())
@@ -161,12 +170,12 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try Task.query(on: conn, withSoftDeleted: true)
+        return Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == taskID)
-            .filter(\User.ModeratorPrivilege.userID == user.requireID())
-            .join(\Subtopic.id, to: \Task.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .filter(\User.ModeratorPrivilege.userID == user.id)
+            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)
             .first()
             .unwrap(or: Abort(.forbidden))
             .transform(to: ())
@@ -176,10 +185,10 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try Topic.query(on: conn)
+        return try Topic.DatabaseModel.query(on: conn)
             .filter(\.id == topicID)
-            .filter(\User.ModeratorPrivilege.userID == user.requireID())
-            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.subjectId)
+            .filter(\User.ModeratorPrivilege.userID == user.id)
+            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)
             .first()
             .unwrap(or: Abort(.forbidden))
             .transform(to: ())
@@ -192,8 +201,8 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isEmailVerified else {
             throw Abort(.forbidden)
         }
-        return try User.ActiveSubject.query(on: conn)
-            .filter(\.userID == user.requireID())
+        return User.ActiveSubject.query(on: conn)
+            .filter(\.userID == user.id)
             .filter(\.subjectID == subjectID)
             .filter(\.canPractice == true)
             .first()
@@ -206,16 +215,21 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isEmailVerified == false else {
             return conn.future()
         }
-        return try User.VerifyEmail.Token
-            .query(on: conn)
-            .filter(\.token == token.token)
-            .filter(\.userID == user.requireID())
-            .first()
+        return User.DatabaseModel
+            .find(user.id, on: self.conn)
             .unwrap(or: Abort(.badRequest))
-            .flatMap { _ in
-                user.isEmailVerified = true
-                return user.save(on: self.conn)
-                    .transform(to: ())
+            .flatMap { user in
+                try User.VerifyEmail.Token
+                    .query(on: self.conn)
+                    .filter(\.token == token.token)
+                    .filter(\.userID == user.requireID())
+                    .first()
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { _ in
+                        user.isEmailVerified = true
+                        return user.save(on: self.conn)
+                            .transform(to: ())
+                }
         }
     }
 

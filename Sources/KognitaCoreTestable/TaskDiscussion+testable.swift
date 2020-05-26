@@ -5,7 +5,7 @@ import FluentPostgreSQL
 extension TaskDiscussion {
     public static func create(description: String = "Some description", userID: User.ID? = nil, taskID: Task.ID? = nil, on conn: PostgreSQLConnection) throws -> TaskDiscussion.DatabaseModel {
 
-        let creatorUserID = try userID ?? User.create(on: conn).requireID()
+        let creatorUserID = try userID ?? User.create(on: conn).id
         let taskOneID = try taskID ?? Task.create(on: conn).requireID()
 
         let data = TaskDiscussion.Create.Data(
