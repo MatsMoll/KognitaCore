@@ -161,7 +161,7 @@ extension MultipleChoiseTask.DatabaseRepository {
             .flatMap { savedTask -> EventLoopFuture<MultipleChoiseTask> in
 
                 if let solution = taskContent.task.solution {
-                    return try TaskSolution(
+                    return try TaskSolution.DatabaseModel(
                         data: TaskSolution.Create.Data(
                             solution: solution,
                             presentUser: true,
@@ -325,12 +325,12 @@ extension MultipleChoiseTask.DatabaseRepository {
                 conn.select()
                     .all(table: Task.self)
                     .all(table: MultipleChoiseTask.self)
-                    .all(table: TaskSolution.self)
+                    .all(table: TaskSolution.DatabaseModel.self)
                     .from(Task.self)
                     .join(\Task.id, to: \MultipleChoiseTask.id)
-                    .join(\Task.id, to: \TaskSolution.taskID)
+                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
                     .where(\Task.id, .equal, taskID)
-                    .first(decoding: Task.self, MultipleChoiseTask.self, TaskSolution.self)
+                    .first(decoding: Task.self, MultipleChoiseTask.self, TaskSolution.DatabaseModel.self)
                     .unwrap(or: Abort(.badRequest))
                     .flatMap { taskContent in
 
@@ -354,7 +354,7 @@ extension MultipleChoiseTask.DatabaseRepository {
                                                 try MultipleChoiseTask.ModifyContent(
                                                     task: Task.ModifyContent(
                                                         task: taskContent.0,
-                                                        solution: taskContent.2
+                                                        solution: taskContent.2.solution
                                                     ),
                                                     subject: subject.content(),
                                                     topics: topics,

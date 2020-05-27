@@ -139,7 +139,7 @@ extension FlashCardTask.DatabaseRepository {
 
     public func importTask(from task: Task.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
-        return try Task(
+        return Task(
             subtopicID: subtopic.id,
             description: task.description,
             question: task.question,
@@ -154,7 +154,7 @@ extension FlashCardTask.DatabaseRepository {
                     .create(on: self.conn)
                     .flatMap { _ in
                         if let solution = task.solution {
-                            return try TaskSolution(
+                            return try TaskSolution.DatabaseModel(
                                 data: TaskSolution.Create.Data(
                                     solution: solution,
                                     presentUser: true,
@@ -224,9 +224,9 @@ extension FlashCardTask.DatabaseRepository {
 
         Task.query(on: conn)
             .join(\FlashCardTask.id, to: \Task.id)
-            .join(\TaskSolution.taskID, to: \Task.id)
+            .join(\TaskSolution.DatabaseModel.taskID, to: \Task.id)
             .filter(\Task.id == taskID)
-            .alsoDecode(TaskSolution.self)
+            .alsoDecode(TaskSolution.DatabaseModel.self)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .flatMap { taskInfo in
@@ -245,7 +245,7 @@ extension FlashCardTask.DatabaseRepository {
                                 try FlashCardTask.ModifyContent(
                                     task: Task.ModifyContent(
                                         task: taskInfo.0,
-                                        solution: taskInfo.1
+                                        solution: taskInfo.1.solution
                                     ),
                                     subject: subject.content(),
                                     topics: topics

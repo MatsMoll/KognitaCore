@@ -381,7 +381,7 @@ extension Subject.DatabaseRepository {
 
                         var query = conn.select()
                             .column(\Task.question)
-                            .column(\TaskSolution.solution)
+                            .column(\TaskSolution.DatabaseModel.solution)
                             .column(\Topic.DatabaseModel.name, as: "topicName")
                             .column(\Topic.DatabaseModel.id, as: "topicID")
                             .column(\Topic.DatabaseModel.chapter, as: "topicChapter")
@@ -391,7 +391,7 @@ extension Subject.DatabaseRepository {
                             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
                             .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                             .join(\Task.id, to: \FlashCardTask.id) // Only flash card tasks
-                            .join(\Task.id, to: \TaskSolution.taskID)
+                            .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
                             .where(\Task.description == nil)
                             .where(\Task.deletedAt == nil)
                             .where(\Topic.DatabaseModel.subjectId == subjectID)

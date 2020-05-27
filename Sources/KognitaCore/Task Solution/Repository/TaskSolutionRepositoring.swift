@@ -6,9 +6,9 @@ public protocol TaskSolutionRepositoring: CreateModelRepository,
     where
     Model           == TaskSolution,
     CreateData      == TaskSolution.Create.Data,
-    CreateResponse  == TaskSolution.Create.Response,
+    CreateResponse  == TaskSolution,
     UpdateData      == TaskSolution.Update.Data,
-    UpdateResponse  == TaskSolution.Update.Response {
+    UpdateResponse  == TaskSolution {
     func solutions(for taskID: Task.ID, for user: User) -> EventLoopFuture<[TaskSolution.Response]>
 
     /// Upvote a solution

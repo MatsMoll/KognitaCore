@@ -28,7 +28,7 @@ extension TaskSolution.Pivot.Vote: PostgreSQLMigration {
             try addProperties(to: builder)
 
             builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.solutionID, to: \TaskSolution.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.solutionID, to: \TaskSolution.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
             builder.unique(on: \.solutionID, \.userID)
         }
     }

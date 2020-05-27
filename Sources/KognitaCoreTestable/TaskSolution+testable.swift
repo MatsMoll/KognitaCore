@@ -29,7 +29,7 @@ extension TaskSolution {
                               taskID: Task.ID,
                               on conn: PostgreSQLConnection) throws -> TaskSolution {
 
-        return try TaskSolution(
+        return try TaskSolution.DatabaseModel(
             data: .init(
                 solution: solution,
                 presentUser: presentUser,
@@ -37,6 +37,8 @@ extension TaskSolution {
             ),
             creatorID: creatorId
         )
-            .save(on: conn).wait()
+            .save(on: conn)
+            .map { try $0.content() }
+            .wait()
     }
 }

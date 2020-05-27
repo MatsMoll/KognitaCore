@@ -246,7 +246,7 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public func exportTasks(in topic: Topic) throws -> EventLoopFuture<TopicExportContent> {
-        return try Subtopic.DatabaseModel.query(on: conn)
+        return Subtopic.DatabaseModel.query(on: conn)
             .filter(\.topicId == topic.id)
             .all()
             .flatMap { subtopics in
@@ -271,12 +271,12 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .all(table: Task.self)
                     .all(table: MultipleChoiseTask.self)
                     .all(table: MultipleChoiseTaskChoise.self)
-                    .column(\TaskSolution.solution, as: "solution")
+                    .column(\TaskSolution.DatabaseModel.solution, as: "solution")
                     .from(Task.self)
                     .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
                     .join(\Task.id, to: \FlashCardTask.id, method: .left)
                     .join(\MultipleChoiseTask.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
-                    .join(\Task.id, to: \TaskSolution.taskID, method: .left)
+                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID, method: .left)
                     .where(\Task.subtopicID == subtopic.id)
                     .all(decoding: Task.BetaFormat.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
                     .map { tasks in
