@@ -2,7 +2,7 @@ import Vapor
 import FluentPostgreSQL
 
 extension TaskSolution {
-    public enum Pivot {
+    enum Pivot {
         final class Vote: PostgreSQLModel {
 
             public static var entity: String = "TaskSolution.Pivot.Vote"
