@@ -42,7 +42,7 @@ public class DatabaseMigrations {
         migrations.add(model: PracticeSession.Pivot.Task.self, database: .psql)
         migrations.add(model: PracticeSession.Pivot.Subtopic.self, database: .psql)
         migrations.add(model: FlashCardTask.self, database: .psql)
-        migrations.add(model: TaskResult.self, database: .psql)
+        migrations.add(model: TaskResult.DatabaseModel.self, database: .psql)
         migrations.add(model: TaskAnswer.self, database: .psql)
         migrations.add(model: MultipleChoiseTaskAnswer.self, database: .psql)
         migrations.add(model: FlashCardAnswer.self, database: .psql)

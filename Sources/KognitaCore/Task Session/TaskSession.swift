@@ -1,7 +1,7 @@
 import FluentPostgreSQL
 import Vapor
 
-public final class TaskSession: PostgreSQLModel, Migration {
+final class TaskSession: PostgreSQLModel, Migration {
 
     public typealias Database = PostgreSQLDatabase
 
@@ -20,7 +20,7 @@ public final class TaskSession: PostgreSQLModel, Migration {
 
 extension TaskSession {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         PostgreSQLDatabase.create(TaskSession.self, on: conn) { builder in
             try addProperties(to: builder)
         }.flatMap {
@@ -32,12 +32,12 @@ extension TaskSession {
         }
     }
 
-    public static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         PostgreSQLDatabase.delete(TaskSession.self, on: conn)
     }
 }
 
-extension TaskSession {
+extension PracticeSession {
     public struct PracticeParameter: ModelParameterRepresentable, Content, PracticeSessionRepresentable {
 
         let session: TaskSession
@@ -53,12 +53,12 @@ extension TaskSession {
         public typealias ParameterModel = PracticeParameter
         public typealias ResolvedParameter = EventLoopFuture<PracticeParameter>
 
-        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.PracticeParameter.ParameterModel> {
+        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<PracticeParameter> {
             guard let id = Int(parameter) else {
                 return conn.future(error: Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`."))
             }
             return TaskSession.query(on: conn)
-                .join(\PracticeSession.id, to: \TaskSession.id)
+                .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
                 .filter(\TaskSession.id == id)
                 .alsoDecode(PracticeSession.DatabaseModel.self)
                 .first()
@@ -67,7 +67,7 @@ extension TaskSession {
                     PracticeParameter(session: $0.0, practiceSession: $0.1)
             }
         }
-        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<TaskSession.PracticeParameter> {
+        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<PracticeParameter> {
             throw Abort(.notImplemented)
         }
 
@@ -77,7 +77,7 @@ extension TaskSession {
             return practiceSession.save(on: conn)
                 .map { practiceSession in
 
-                    TaskSession.PracticeParameter(
+                    PracticeSession.PracticeParameter(
                         session: session,
                         practiceSession: practiceSession
                     )

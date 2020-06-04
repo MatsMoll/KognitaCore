@@ -16,7 +16,7 @@ extension TestSession {
 
     public struct HighOverview: Content {
 
-        public let id: TaskSession.ID
+        public let id: TestSession.ID
         public let createdAt: Date
         public let endedAt: Date
         public let subjectName: String

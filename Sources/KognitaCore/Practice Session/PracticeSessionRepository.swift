@@ -237,7 +237,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
     public func currentTaskIndex(in session: PracticeSessionRepresentable) throws -> EventLoopFuture<Int> {
 
-        return try TaskResult.query(on: conn)
+        return try TaskResult.DatabaseModel.query(on: conn)
             .filter(\.sessionID == session.requireID())
             .count()
     }
@@ -245,7 +245,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
     public func currentActiveTask(in session: PracticeSession) throws -> EventLoopFuture<TaskType> {
 
         conn.databaseConnection(to: .psql).flatMap { conn in
-            try conn.select()
+            conn.select()
                 .all(table: Task.self)
                 .all(table: MultipleChoiseTask.self)
                 .from(PracticeSession.Pivot.Task.self)
@@ -335,7 +335,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>> {
 
-        guard try user.id == session.userID else {
+        guard user.id == session.userID else {
             throw Abort(.forbidden)
         }
 
@@ -388,15 +388,15 @@ extension PracticeSession.DatabaseRepository {
 
     public func update(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable) throws -> EventLoopFuture<Void> {
         try PracticeSession.Pivot.Task.query(on: conn)
-            .filter(\TaskResult.sessionID                   == session.requireID())
+            .filter(\TaskResult.DatabaseModel.sessionID     == session.requireID())
             .filter(\PracticeSession.Pivot.Task.sessionID   == session.requireID())
             .filter(\PracticeSession.Pivot.Task.index       == submit.taskIndex)
             .join(\TaskResult.taskID, to: \PracticeSession.Pivot.Task.taskID)
             .join(\FlashCardTask.id, to: \TaskResult.taskID)
-            .decode(TaskResult.self)
+            .decode(TaskResult.DatabaseModel.self)
             .first()
             .unwrap(or: Abort(.badRequest))
-            .flatMap { (result: TaskResult) in
+            .flatMap { (result: TaskResult.DatabaseModel) in
                 result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
                 result.isSetManually = true
                 return result.save(on: self.conn)
@@ -438,7 +438,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable> {
 
-        guard try session.userID == user.id else {
+        guard session.userID == user.id else {
             throw Abort(.forbidden)
         }
 
@@ -484,18 +484,18 @@ extension PracticeSession.DatabaseRepository {
                     .column(\Topic.DatabaseModel.name, as: "topicName")
                     .column(\Topic.DatabaseModel.id, as: "topicID")
                     .column(\PracticeSession.Pivot.Task.index, as: "taskIndex")
-                    .column(\TaskResult.createdAt, as: "date")
+                    .column(\TaskResult.DatabaseModel.createdAt, as: "date")
                     .column(\Task.question, as: "question")
-                    .column(\TaskResult.resultScore, as: "score")
-                    .column(\TaskResult.timeUsed, as: "timeUsed")
-                    .column(\TaskResult.revisitDate, as: "revisitDate")
-                    .column(\TaskResult.isSetManually, as: "isSetManually")
+                    .column(\TaskResult.DatabaseModel.resultScore, as: "score")
+                    .column(\TaskResult.DatabaseModel.timeUsed, as: "timeUsed")
+                    .column(\TaskResult.DatabaseModel.revisitDate, as: "revisitDate")
+                    .column(\TaskResult.DatabaseModel.isSetManually, as: "isSetManually")
                     .from(PracticeSession.Pivot.Task.self)
                     .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
                     .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
                     .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
-                    .join(\Task.id, to: \TaskResult.taskID)
-                    .where(\TaskResult.sessionID == sessionID)
+                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
+                    .where(\TaskResult.DatabaseModel.sessionID == sessionID)
                     .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
                     .all(decoding: PracticeSession.TaskResult.self)
         }
@@ -503,7 +503,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func getAllSessions(by user: User) throws -> EventLoopFuture<[PracticeSession]> {
 
-        return try PracticeSession.DatabaseModel
+        return PracticeSession.DatabaseModel
             .query(on: conn)
             .join(\TaskSession.id, to: \PracticeSession.DatabaseModel.id)
             .filter(\TaskSession.userID == user.id)
@@ -552,7 +552,7 @@ extension PracticeSession.DatabaseRepository {
         conn.databaseConnection(to: .psql)
             .flatMap { conn in
 
-                try conn.select()
+                conn.select()
                     .column(\Subject.DatabaseModel.name, as: "subjectName")
                     .column(\Subject.DatabaseModel.id, as: "subjectID")
                     .column(\PracticeSession.DatabaseModel.id, as: "id")
@@ -596,7 +596,7 @@ extension PracticeSession.DatabaseRepository {
             .all()
             .flatMap { sessions in
                 sessions.map { session in
-                    TaskResult.query(on: self.conn)
+                    TaskResult.DatabaseModel.query(on: self.conn)
                         .filter(\.sessionID == session.id)
                         .sort(\.createdAt, .descending)
                         .first()

@@ -368,10 +368,10 @@ extension TestSession {
 
             return try TestSession.DatabaseModel.query(on: conn)
                 .join(\SubjectTest.DatabaseModel.id, to: \TestSession.DatabaseModel.testID)
-                .join(\TaskResult.sessionID, to: \TestSession.DatabaseModel.id)
+                .join(\TaskResult.DatabaseModel.sessionID, to: \TestSession.DatabaseModel.id)
                 .filter(\TestSession.DatabaseModel.id == session.requireID())
                 .decode(SubjectTest.DatabaseModel.self)
-                .alsoDecode(TaskResult.self)
+                .alsoDecode(TaskResult.DatabaseModel.self)
                 .all()
                 .flatMap { results in
 

@@ -48,22 +48,22 @@ extension PracticeSession {
 }
 
 extension PracticeSession {
-    func representable(on conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.PracticeParameter> {
-        TaskSession.PracticeParameter.resolveParameter("\(id)", conn: conn)
+    func representable(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSession.PracticeParameter> {
+        PracticeSession.PracticeParameter.resolveParameter("\(id)", conn: conn)
     }
 }
 
 extension PracticeSession.DatabaseModel {
 
     func representable(with session: TaskSession) -> PracticeSessionRepresentable {
-        TaskSession.PracticeParameter(session: session, practiceSession: self)
+        PracticeSession.PracticeParameter(session: session, practiceSession: self)
     }
 
     func representable(on conn: DatabaseConnectable) throws -> EventLoopFuture<PracticeSessionRepresentable> {
         let session = self
         return try TaskSession.find(requireID(), on: conn)
             .unwrap(or: Abort(.internalServerError))
-            .map { TaskSession.PracticeParameter(session: $0, practiceSession: session) }
+            .map { PracticeSession.PracticeParameter(session: $0, practiceSession: session) }
     }
 
     func numberOfCompletedTasks(with conn: DatabaseConnectable) throws -> EventLoopFuture<Int> {
@@ -130,12 +130,12 @@ public struct TaskType: Content {
 extension PracticeSession {
     public struct CurrentTask: Content {
 
-        public let session: TaskSession.PracticeParameter
+        public let session: PracticeSession.PracticeParameter
         public let task: TaskType
         public let index: Int
         public let user: User
 
-        public init(session: TaskSession.PracticeParameter, task: TaskType, index: Int, user: User) {
+        public init(session: PracticeSession.PracticeParameter, task: TaskType, index: Int, user: User) {
             self.session = session
             self.task = task
             self.index = index

@@ -5,8 +5,8 @@ extension TaskSolution {
     enum Pivot {
         final class Vote: PostgreSQLModel {
 
-            public static var entity: String = "TaskSolution.Pivot.Vote"
-            public static var name: String = "TaskSolution.Pivot.Vote"
+            public static var entity: String = "TaskSolution.Vote"
+            public static var name: String = "TaskSolution.Vote"
 
             var id: Int?
 

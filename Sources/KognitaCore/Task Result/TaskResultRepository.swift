@@ -32,11 +32,11 @@ extension TaskResult.DatabaseRepository {
         case incompleateSqlStatment
     }
 
-    public struct SpaceRepetitionTask: Codable {
-        public let taskID: Task.ID
-        public let revisitDate: Date
-        public let createdAt: Date
-        public let sessionID: TaskSession.ID?
+    struct SpaceRepetitionTask: Codable {
+        let taskID: Task.ID
+        let revisitDate: Date
+        let createdAt: Date
+        let sessionID: TaskSession.ID?
     }
 
     private struct SubqueryResult: Codable {
@@ -111,9 +111,9 @@ extension TaskResult.DatabaseRepository {
                     .column(.count(.all, as: "resultCount"))
                     .column(.keyPath(\User.DatabaseModel.id, as: "userID"))
                     .column(.keyPath(\User.DatabaseModel.username, as: "username"))
-                    .column(.function("sum", [.expression(.column(\TaskResult.resultScore))]), as: "totalScore")
+                    .column(.function("sum", [.expression(.column(\TaskResult.DatabaseModel.resultScore))]), as: "totalScore")
                     .from(User.DatabaseModel.self)
-                    .join(\User.DatabaseModel.id, to: \TaskResult.userID)
+                    .join(\User.DatabaseModel.id, to: \TaskResult.DatabaseModel.userID)
                     .groupBy(\User.DatabaseModel.id)
                     .all(decoding: UserResultOverview.self)
         }
@@ -125,13 +125,13 @@ extension TaskResult.DatabaseRepository {
             .flatMap { psqlConn in
 
                 psqlConn.select()
-                    .all(table: TaskResult.self)
+                    .all(table: TaskResult.DatabaseModel.self)
                     .where(
-                        .column(.keyPath(\TaskResult.id)),
+                        .column(.keyPath(\TaskResult.DatabaseModel.id)),
                         .in,
                         .subquery(.raw(Query.taskResults.rawQuery, binds: [userId]))
                     )
-                    .orderBy(\TaskResult.revisitDate)
+                    .orderBy(\TaskResult.DatabaseModel.revisitDate)
                     .all(decoding: TaskResult.self)
         }
     }
@@ -171,21 +171,22 @@ extension TaskResult.DatabaseRepository {
 
                 let ids = result.map { $0.id }
 
-                var query = TaskResult.query(on: conn)
+                var query = TaskResult.DatabaseModel.query(on: conn)
                     .filter(\.id ~~ ids)
                     .filter(filter)
                     .sort(\.revisitDate)
-                    .join(\Task.id, to: \TaskResult.taskID)
+                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
                     .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
 
                 if let maxRevisitDays = maxRevisitDays,
                     let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
                     query = query
-                        .filter(\TaskResult.revisitDate < maxRevisitDaysDate)
+                        .filter(\TaskResult.DatabaseModel.revisitDate < maxRevisitDaysDate)
                 }
 
                 return query.all()
+                    .map { try $0.map { try $0.content() } }
         }
     }
 
@@ -200,10 +201,10 @@ extension TaskResult.DatabaseRepository {
             .flatMap { result in
 
                 let ids = result.map { $0.id }
-                return TaskResult.query(on: conn)
+                return TaskResult.DatabaseModel.query(on: conn)
                     .filter(\.id ~~ ids)
                     .sort(\.revisitDate, .ascending)
-                    .join(\Task.id, to: \TaskResult.taskID)
+                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
                     .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
                     .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
@@ -220,9 +221,9 @@ extension TaskResult.DatabaseRepository {
                             let topic = content.0.1
 
                             if let response = try responses[topic.requireID()] {
-                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result], topic: topic.content(), subject: content.1.content())
+                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result.content()], topic: topic.content(), subject: content.1.content())
                             } else {
-                                try responses[topic.requireID()] = TopicResultContent(results: [result], topic: topic.content(), subject: content.1.content())
+                                try responses[topic.requireID()] = TopicResultContent(results: [result.content()], topic: topic.content(), subject: content.1.content())
                             }
                         }
                         return responses.map { $0.value }
@@ -236,13 +237,13 @@ extension TaskResult.DatabaseRepository {
         let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
 
-        return try conn.select()
-            .column(.count(\TaskResult.id), as: "numberOfTasksCompleted")
-            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "year")
-            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
-            .from(TaskResult.self)
-            .where(\TaskResult.userID == user.id)
-            .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
+        return conn.select()
+            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
+            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
+            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
+            .from(TaskResult.DatabaseModel.self)
+            .where(\TaskResult.DatabaseModel.userID == user.id)
+            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
             .groupBy(.column(.column(nil, "year")))
             .groupBy(.column(.column(nil, "week")))
             .all(decoding: TaskResult.History.self)
@@ -292,16 +293,16 @@ extension TaskResult.DatabaseRepository {
         let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
             Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
 
-        return try conn.select()
-            .column(.count(\TaskResult.id), as: "numberOfTasksCompleted")
-            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "year")
-            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.createdAt)))]), as: "week")
-            .from(TaskResult.self)
-            .join(\TaskResult.taskID, to: \Task.id)
+        return conn.select()
+            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
+            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
+            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
+            .from(TaskResult.DatabaseModel.self)
+            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
             .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
-            .where(\TaskResult.userID == user.id)
-            .where(\TaskResult.createdAt, .greaterThanOrEqual, dateThreshold)
+            .where(\TaskResult.DatabaseModel.userID == user.id)
+            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
             .where(\Topic.DatabaseModel.subjectId == subjectId)
             .groupBy(.column(.column(nil, "year")))
             .groupBy(.column(.column(nil, "week")))
@@ -348,8 +349,9 @@ extension TaskResult.DatabaseRepository {
     }
 
     static func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskResult> {
-        return TaskResult(result: result, userID: userID, sessionID: sessionID)
+        return TaskResult.DatabaseModel(result: result, userID: userID, sessionID: sessionID)
             .save(on: conn)
+            .map { try $0.content() }
     }
 
     public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: DatabaseConnectable) throws -> EventLoopFuture<[User.TopicLevel]> {
@@ -365,11 +367,11 @@ extension TaskResult.DatabaseRepository {
                         let ids = result.map { $0.id }
 
                         return psqlConn.select()
-                            .column(.column(\TaskResult.resultScore), as: "resultScore")
+                            .column(.column(\TaskResult.DatabaseModel.resultScore), as: "resultScore")
                             .column(.column(\Topic.DatabaseModel.id), as: "topicID")
-                            .from(TaskResult.self)
-                            .where(\TaskResult.id, .in, ids)
-                            .join(\TaskResult.taskID, to: \Task.id)
+                            .from(TaskResult.DatabaseModel.self)
+                            .where(\TaskResult.DatabaseModel.id, .in, ids)
+                            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
                             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
                             .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
                             .all(decoding: UserLevelScore.self)
@@ -413,7 +415,7 @@ extension TaskResult.DatabaseRepository {
                             )
                         }
 
-                        return TaskResult.query(on: psqlConn)
+                        return TaskResult.DatabaseModel.query(on: psqlConn)
                             .filter(\.id ~~ ids)
                             .sum(\.resultScore)
                             .flatMap { score in
@@ -437,11 +439,12 @@ extension TaskResult.DatabaseRepository {
     }
 
     public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult?> {
-        return TaskResult.query(on: conn)
-            .filter(\TaskResult.taskID == taskID)
-            .filter(\TaskResult.userID == userId)
+        return TaskResult.DatabaseModel.query(on: conn)
+            .filter(\TaskResult.DatabaseModel.taskID == taskID)
+            .filter(\TaskResult.DatabaseModel.userID == userId)
             .sort(\.createdAt, .descending)
             .first()
+            .map { try $0?.content() }
     }
 
     public static func exportResults(on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult.Answer]> {

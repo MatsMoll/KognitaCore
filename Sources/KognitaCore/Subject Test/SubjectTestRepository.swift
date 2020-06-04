@@ -97,7 +97,7 @@ extension SubjectTest {
 
         public enum Errors: Error {
             case testIsClosed
-            case alreadyEntered(sessionID: TaskSession.ID)
+            case alreadyEntered(sessionID: TestSession.ID)
             case incorrectPassword
             case testHasNotBeenHeldYet
             case alreadyEnded
@@ -625,10 +625,10 @@ extension SubjectTest {
                                 .flatMap { count in
 
                                     conn.select()
-                                        .column(\TaskResult.resultScore, as: "score")
+                                        .column(\TaskResult.DatabaseModel.resultScore, as: "score")
                                         .column(\TestSession.DatabaseModel.id, as: "sessionID")
                                         .from(TestSession.DatabaseModel.self)
-                                        .join(\TestSession.DatabaseModel.id, to: \TaskResult.sessionID)
+                                        .join(\TestSession.DatabaseModel.id, to: \TaskResult.DatabaseModel.sessionID)
                                         .where(\TestSession.DatabaseModel.testID == test.id)
                                         .all(decoding: HistogramQueryResult.self)
                                         .map { results in
@@ -683,9 +683,9 @@ extension SubjectTest {
                             conn.select()
                                 .column(\User.DatabaseModel.email, as: "userEmail")
                                 .column(\User.DatabaseModel.id, as: "userID")
-                                .column(\TaskResult.resultScore, as: "score")
-                                .from(TaskResult.self)
-                                .join(\TaskResult.sessionID, to: \TaskSession.id)
+                                .column(\TaskResult.DatabaseModel.resultScore, as: "score")
+                                .from(TaskResult.DatabaseModel.self)
+                                .join(\TaskResult.DatabaseModel.sessionID, to: \TaskSession.id)
                                 .join(\TaskSession.userID, to: \User.DatabaseModel.id)
                                 .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
                                 .where(\TestSession.DatabaseModel.testID == test.id)
@@ -742,23 +742,23 @@ extension SubjectTest {
                 .flatMap { numberOfTasks in
 
                     TestSession.DatabaseModel.query(on: self.conn)
-                        .join(\TaskResult.sessionID, to: \TestSession.DatabaseModel.id)
+                        .join(\TaskResult.DatabaseModel.sessionID, to: \TestSession.DatabaseModel.id)
                         .filter(\.testID == test.id)
-                        .decode(TaskResult.self)
+                        .decode(TaskResult.DatabaseModel.self)
                         .all()
                         .flatMap { testResults in
 
                             guard let endedAt = test.endedAt else { throw Abort(.badRequest) }
 
                             var query = PracticeSession.Pivot.Task.query(on: self.conn, withSoftDeleted: true)
-                                .join(\TaskResult.sessionID, to: \PracticeSession.Pivot.Task.sessionID)
+                                .join(\TaskResult.DatabaseModel.sessionID, to: \PracticeSession.Pivot.Task.sessionID)
                                 .join(\Task.id, to: \TaskResult.taskID)
                                 .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
                                 .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
                                 .filter(\PracticeSession.Pivot.Task.isCompleted == true)
                                 .filter(\Topic.DatabaseModel.subjectId == test.subjectID)
                                 .filter(\PracticeSession.Pivot.Task.createdAt < endedAt)
-                                .decode(TaskResult.self)
+                                .decode(TaskResult.DatabaseModel.self)
 
                             if let lastTest = lastTest, let lastEndedAt = lastTest.endedAt {
                                 query = query.filter(\PracticeSession.Pivot.Task.createdAt > lastEndedAt)
@@ -777,11 +777,11 @@ extension SubjectTest {
             }
         }
 
-        func calculateStats(testResults: [TaskResult], practiceResults: [TaskResult]) -> [SubjectTest.UserStats] {
+        func calculateStats(testResults: [TaskResult.DatabaseModel], practiceResults: [TaskResult.DatabaseModel]) -> [SubjectTest.UserStats] {
 
             let groupedTestResults = testResults.group(by: \.userID.unsafelyUnwrapped)
             let groupedPracticeResults = practiceResults.group(by: \.userID.unsafelyUnwrapped)
-                .mapValues { results in results.sorted(by: \TaskResult.timeUsed.unsafelyUnwrapped) }
+                .mapValues { results in results.sorted(by: \TaskResult.DatabaseModel.timeUsed.unsafelyUnwrapped) }
 
             let testScores = groupedTestResults.mapValues { $0.reduce(0) { $0 + $1.resultScore } }
             let timePracticed = groupedPracticeResults.mapValues { $0.reduce(0) { $0 + ($1.timeUsed ?? 0) } }

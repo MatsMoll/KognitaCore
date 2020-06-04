@@ -3,7 +3,7 @@ import Foundation
 import NIO
 import Vapor
 
-public final class TaskSessionAnswer: KognitaPersistenceModel {
+final class TaskSessionAnswer: KognitaPersistenceModel {
 
     public static var tableName: String = "TaskSessionAnswer"
 
