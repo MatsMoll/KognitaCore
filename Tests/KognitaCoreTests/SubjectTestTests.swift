@@ -119,8 +119,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             XCTAssertEqual(sessionOne.testID, test.id)
             XCTAssertEqual(sessionOne.userID, userOne.id)
@@ -132,7 +132,7 @@ class SubjectTestTests: VaporTestCase {
                     .enter(test: test, with: enterRequest, by: userOne).wait()
             )
 
-            let sessions = try TestSession.query(on: conn).all().wait()
+            let sessions = try TestSession.DatabaseModel.query(on: conn).all().wait()
             XCTAssertEqual(sessions.count, 2)
         } catch {
             XCTFail(error.localizedDescription)
@@ -150,8 +150,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             var status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
@@ -196,8 +196,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
@@ -356,10 +356,10 @@ class SubjectTestTests: VaporTestCase {
 
     func testResultStatisticsTaskWithMultipleCorrectAnswers() {
         do {
-            let choises: [MultipleChoiseTaskChoise.Create.Data] = [
-                .init(choise: "first", isCorrect: false),
-                .init(choise: "correct", isCorrect: true),
-                .init(choise: "yeah", isCorrect: true)
+            let choises: [MultipleChoiceTaskChoice.Create.Data] = [
+                .init(choice: "first", isCorrect: false),
+                .init(choice: "correct", isCorrect: true),
+                .init(choice: "yeah", isCorrect: true)
             ]
 
             let test = try setupTestWithTasks(choises: choises)
@@ -470,10 +470,10 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
-    func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiseTask.Submit]) throws {
+    func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiceTask.Submit]) throws {
         let sessionEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
 
-        let session = try sessionEntry.representable(on: conn).wait()
+        let session = try TaskSession.TestParameter.resolveParameter("\(sessionEntry.id)", conn: conn).wait()
 
         try submittions.forEach {
             try testSessionRepository.submit(content: $0, for: session, by: user).wait()
@@ -482,9 +482,9 @@ class SubjectTestTests: VaporTestCase {
         try testSessionRepository.submit(test: session, by: user).wait()
     }
 
-    func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
+    func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiceTask.Submit {
         let choises = try choisesAt(index: index, for: test)
-        return try MultipleChoiseTask.Submit(
+        return try MultipleChoiceTask.Submit(
             timeUsed: .seconds(20),
             choises: choises.filter { $0.isCorrect == isCorrect }.map { try $0.requireID() },
             taskIndex: index
@@ -495,7 +495,7 @@ class SubjectTestTests: VaporTestCase {
         try SubjectTest.Pivot.Task
             .query(on: conn)
             .sort(\.createdAt)
-            .filter(\.testID, .equal, test.requireID())
+            .filter(\.testID, .equal, test.id)
             .filter(\.id, .equal, index)
             .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
             .decode(MultipleChoiseTaskChoise.self)
@@ -511,7 +511,7 @@ class SubjectTestTests: VaporTestCase {
             .wait()
     }
 
-    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.ID]) -> MultipleChoiseTask.Submit {
+    func multipleChoiseAnswer(with choises: [MultipleChoiceTaskChoice.ID]) -> MultipleChoiceTask.Submit {
         .init(
             timeUsed: .seconds(20),
             choises: choises,
@@ -519,7 +519,7 @@ class SubjectTestTests: VaporTestCase {
         )
     }
 
-    func setupTestWithTasks(with taskIDs: [MultipleChoiseTask.ID], subjectID: Subject.ID, scheduledAt: Date = .now, duration: TimeInterval = .minutes(10)) throws -> SubjectTest {
+    func setupTestWithTasks(with taskIDs: [MultipleChoiceTask.ID], subjectID: Subject.ID, scheduledAt: Date = .now, duration: TimeInterval = .minutes(10)) throws -> SubjectTest {
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
@@ -540,23 +540,23 @@ class SubjectTestTests: VaporTestCase {
         }
     }
 
-    func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3, choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard) throws -> SubjectTest {
+    func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3, choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard) throws -> SubjectTest {
         let topic = try Topic.create(on: conn)
         let subtopic = try Subtopic.create(topic: topic, on: conn)
         let isMultipleSelect = choises.filter({ $0.isCorrect }).count > 1
         let taskIds = try (0..<numberOfTasks).map { _ in
-            try MultipleChoiseTask.create(subtopic: subtopic, isMultipleSelect: isMultipleSelect, choises: choises, on: conn)
-                .requireID()
+            try MultipleChoiceTask.create(subtopic: subtopic, isMultipleSelect: isMultipleSelect, choises: choises, on: conn)
+                .id
         }
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
 
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
             tasks: taskIds,
-            subjectID: topic.subjectId,
+            subjectID: topic.subjectID,
             duration: duration,
             scheduledAt: scheduledAt,
             password: "password",

@@ -94,7 +94,7 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable     = content.isTestable
         self.creatorID      = creator.id
-        self.examPaperSemester = content.examPaperSemester
+        self.examPaperSemester = nil
         self.examPaperYear  = content.examPaperYear
         if description?.isEmpty == true {
             self.description = nil

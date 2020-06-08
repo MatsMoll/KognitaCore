@@ -42,7 +42,7 @@ extension FlashCardTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        try content.validate()
+//        try content.validate()
         return subtopicRepository
             .find(content.subtopicId)
             .unwrap(or: Task.Create.Errors.invalidTopic)
@@ -75,7 +75,7 @@ extension FlashCardTask.DatabaseRepository {
         guard let task = flashCard.task else {
             throw Abort(.internalServerError)
         }
-        try content.validate()
+//        try content.validate()
 
         return try userRepository
             .isModerator(user: user, taskID: flashCard.requireID())

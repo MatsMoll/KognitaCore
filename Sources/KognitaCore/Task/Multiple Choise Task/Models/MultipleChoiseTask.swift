@@ -8,47 +8,69 @@
 import Vapor
 import FluentPostgreSQL
 
-public final class MultipleChoiseTask: KognitaCRUDModel {
+extension MultipleChoiceTask {
+    final class DatabaseModel: KognitaCRUDModel {
 
-    public static var tableName: String = "MultipleChoiceTask"
+        public static var tableName: String = "MultipleChoiseTask"
 
-    public var id: Int?
+        public var id: Int?
 
-    /// A bool indicating if the user should be able to select one or more choises
-    public var isMultipleSelect: Bool
+        /// A bool indicating if the user should be able to select one or more choises
+        public var isMultipleSelect: Bool
 
-    public var createdAt: Date?
+        public var createdAt: Date?
 
-    public var updatedAt: Date?
+        public var updatedAt: Date?
 
-    public convenience init(isMultipleSelect: Bool, task: Task) throws {
-        try self.init(isMultipleSelect: isMultipleSelect,
-                      taskID: task.requireID())
+        public convenience init(isMultipleSelect: Bool, task: Task) throws {
+            try self.init(isMultipleSelect: isMultipleSelect,
+                          taskID: task.requireID())
+        }
+
+        public var actionDescription: String {
+            return isMultipleSelect ? "Velg ett eller flere alternativer" : "Velg ett alternativ"
+        }
+
+        public init(isMultipleSelect: Bool, taskID: Task.ID) {
+            self.isMultipleSelect = isMultipleSelect
+            self.id = taskID
+        }
+
+        public static func addTableConstraints(to builder: SchemaCreator<MultipleChoiceTask.DatabaseModel>) {
+            builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+        }
+
     }
-
-    public var actionDescription: String {
-        return isMultipleSelect ? "Velg ett eller flere alternativer" : "Velg ett alternativ"
-    }
-
-    public init(isMultipleSelect: Bool, taskID: Task.ID) {
-        self.isMultipleSelect = isMultipleSelect
-        self.id = taskID
-    }
-
-    public static func addTableConstraints(to builder: SchemaCreator<MultipleChoiseTask>) {
-        builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-    }
-
 }
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask {
+    init(task: Task, isMultipleSelect: Bool, choises: [MultipleChoiseTaskChoise]) {
+        self.init(
+            id: task.id ?? 0,
+            subtopicID: task.subtopicID,
+            description: task.description,
+            question: task.question,
+            creatorID: task.creatorID,
+            examType: nil,
+            examYear: task.examPaperYear,
+            isTestable: task.isTestable,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            editedTaskID: task.editedTaskID,
+            isMultipleSelect: isMultipleSelect,
+            choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choise: $0.choise, isCorrect: $0.isCorrect) }
+        )
+    }
+}
+
+extension MultipleChoiceTask.DatabaseModel {
 
     /// Fetches the relevant data used to present a task to the user
     ///
     /// - Parameter conn: A connection to the database
     /// - Returns: A `MultipleChoiseTaskContent` object
     /// - Throws: If there is no relation to a `Task` object or a database error
-    func content(on conn: DatabaseConnectable) throws -> Future<MultipleChoiseTask.Data> {
+    func content(on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiceTask> {
 
         return try choises
             .query(on: conn)
@@ -56,9 +78,9 @@ extension MultipleChoiseTask {
             .flatMap { choises in
                 Task.find(self.id ?? 0, on: conn)
                     .unwrap(or: Abort(.internalServerError)).map { task in
-                        MultipleChoiseTask.Data(
+                        MultipleChoiceTask(
                             task: task,
-                            multipleTask: self,
+                            isMultipleSelect: self.isMultipleSelect,
                             choises: choises.shuffled()
                         )
                 }
@@ -84,33 +106,33 @@ extension MultipleChoiseTask {
 //    }
 }
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask.DatabaseModel {
 
-    var choises: Children<MultipleChoiseTask, MultipleChoiseTaskChoise> {
+    var choises: Children<MultipleChoiceTask.DatabaseModel, MultipleChoiseTaskChoise> {
         return children(\.taskId)
     }
 
-    var task: Parent<MultipleChoiseTask, Task>? {
+    var task: Parent<MultipleChoiceTask.DatabaseModel, Task>? {
         return parent(\.id)
     }
 
-    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiseTask]> {
+    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiceTask.DatabaseModel]> {
         return Task.query(on: conn)
             .filter(\.subtopicID == subtopic.id)
-            .join(\MultipleChoiseTask.id, to: \Task.id)
-            .decode(MultipleChoiseTask.self)
+            .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
+            .decode(MultipleChoiceTask.DatabaseModel.self)
             .all()
     }
 
-    static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiseTask]> {
+    static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiceTask.DatabaseModel]> {
         return Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
             .filter(\Subtopic.DatabaseModel.topicId == topic.id)
-            .join(\MultipleChoiseTask.id, to: \Task.id)
-            .decode(MultipleChoiseTask.self)
+            .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
+            .decode(MultipleChoiceTask.DatabaseModel.self)
             .all()
     }
 }
 
-extension MultipleChoiseTask: ModelParameterRepresentable { }
-extension MultipleChoiseTask: Content { }
+//extension MultipleChoiceTask: ModelParameterRepresentable { }
+extension MultipleChoiceTask: Content { }

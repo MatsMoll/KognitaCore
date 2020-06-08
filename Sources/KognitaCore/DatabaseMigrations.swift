@@ -35,7 +35,7 @@ public class DatabaseMigrations {
         migrations.add(model: TaskDiscussionResponse.DatabaseModel.self, database: .psql)
         migrations.add(model: TaskSolution.DatabaseModel.self, database: .psql)
         migrations.add(model: TaskSolution.Pivot.Vote.self, database: .psql)
-        migrations.add(model: MultipleChoiseTask.self, database: .psql)
+        migrations.add(model: MultipleChoiceTask.DatabaseModel.self, database: .psql)
         migrations.add(model: MultipleChoiseTaskChoise.self, database: .psql)
         migrations.add(model: TaskSession.self, database: .psql)
         migrations.add(model: PracticeSession.DatabaseModel.self, database: .psql)

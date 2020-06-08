@@ -20,8 +20,8 @@ class TopicTests: VaporTestCase {
         let user = try User.create(on: conn)
         let subject = try Subject.create(on: conn)
 
-        let topicData = try Topic.Create.Data(
-            subjectId: subject.requireID(),
+        let topicData = Topic.Create.Data(
+            subjectID: subject.id,
             name: "Test",
             chapter: 1
         )
@@ -34,7 +34,7 @@ class TopicTests: VaporTestCase {
             .wait()
 
         XCTAssertEqual(topic.name, topicData.name)
-        XCTAssertEqual(topic.subjectId, topicData.subjectId)
+        XCTAssertEqual(topic.subjectID, topicData.subjectID)
         XCTAssertEqual(topic.chapter, topicData.chapter)
         XCTAssertEqual(topic.name, topicData.name)
         XCTAssertEqual(subtopics.count, 1)

@@ -20,8 +20,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             try XCTAssertNotEqual(sessionOne.requireID(), sessionTwo.requireID())
             XCTAssertEqual(sessionOne.testID, test.id)
@@ -81,7 +81,7 @@ class TestSessionTests: VaporTestCase {
             let test = try setupTestWithTasks()
 
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
 
             let firstSubmittion             = try submittionAt(index: 1, for: test)
             let secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
@@ -119,8 +119,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -136,14 +136,14 @@ class TestSessionTests: VaporTestCase {
 
             try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
 
-            var results = try TaskResult.query(on: conn).all().wait()
+            var results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
             XCTAssertEqual(results.count, 3)
             XCTAssertNotNil(sessionOneEntry.submittedAt)
             XCTAssertNil(sessionTwoEntry.submittedAt)
 
             try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
-            results = try TaskResult.query(on: conn).all().wait()
+            results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
             XCTAssertEqual(results.count, 5)
             XCTAssertNotNil(sessionOneEntry.submittedAt)
@@ -176,8 +176,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -227,8 +227,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try sessionOneEntry.representable(on: conn).wait()
-            let sessionTwo = try sessionTwoEntry.representable(on: conn).wait()
+            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -259,9 +259,9 @@ class TestSessionTests: VaporTestCase {
         }
     }
 
-    func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiseTask.Submit {
+    func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiceTask.Submit {
         let choises = try choisesAt(index: index, for: test)
-        return try MultipleChoiseTask.Submit(
+        return try MultipleChoiceTask.Submit(
             timeUsed: .seconds(20),
             choises: choises.filter { $0.isCorrect == isCorrect }.map { try $0.requireID() },
             taskIndex: index
@@ -272,7 +272,7 @@ class TestSessionTests: VaporTestCase {
         try SubjectTest.Pivot.Task
             .query(on: conn)
             .sort(\.createdAt)
-            .filter(\.testID, .equal, test.requireID())
+            .filter(\.testID, .equal, test.id)
             .filter(\.id, .equal, index)
             .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
             .decode(MultipleChoiseTaskChoise.self)
@@ -280,7 +280,7 @@ class TestSessionTests: VaporTestCase {
             .wait()
     }
 
-    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.ID]) -> MultipleChoiseTask.Submit {
+    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.ID]) -> MultipleChoiceTask.Submit {
         .init(
             timeUsed: .seconds(20),
             choises: choises,
@@ -292,18 +292,17 @@ class TestSessionTests: VaporTestCase {
         let topic = try Topic.create(on: conn)
         let subtopic = try Subtopic.create(topic: topic, on: conn)
         let taskIds = try (0..<numberOfTasks).map { _ in
-            try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-                .requireID()
+            try MultipleChoiceTask.create(subtopic: subtopic, on: conn).id
         }
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
 
         let user = try User.create(on: conn)
 
         let data = SubjectTest.Create.Data(
             tasks: taskIds,
-            subjectID: topic.subjectId,
+            subjectID: topic.subjectID,
             duration: duration,
             scheduledAt: scheduledAt,
             password: "password",

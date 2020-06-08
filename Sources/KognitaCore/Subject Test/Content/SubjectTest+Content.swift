@@ -25,10 +25,10 @@ extension SubjectTest {
         }
 
         public init(test: SubjectTest, taskIDs: [Task.ID]) {
-            self.id = test.id ?? 0
+            self.id = test.id
             self.subjectID = test.subjectID
             self.title = test.title
-            self.createdAt = test.createdAt ?? .now
+            self.createdAt = test.createdAt
             self.scheduledAt = test.scheduledAt
             self.duration = test.duration
             self.openedAt = test.openedAt

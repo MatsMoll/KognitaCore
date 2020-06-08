@@ -87,9 +87,7 @@ extension User.DatabaseRepository: UserRepository {
 
     public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User> {
 
-        guard content.acceptedTerms else {
-            throw Errors.missingInput
-        }
+        guard content.hasAcceptedTerms else { throw Errors.missingInput }
         guard !content.username.isEmpty, !content.email.isEmpty, !content.password.isEmpty else {
             throw Errors.missingInput
         }
@@ -185,7 +183,7 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return conn.future()
         }
-        return try Topic.DatabaseModel.query(on: conn)
+        return Topic.DatabaseModel.query(on: conn)
             .filter(\.id == topicID)
             .filter(\User.ModeratorPrivilege.userID == user.id)
             .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)

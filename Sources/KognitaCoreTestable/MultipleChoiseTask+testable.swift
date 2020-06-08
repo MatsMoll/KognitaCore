@@ -10,17 +10,17 @@ import FluentPostgreSQL
 import XCTest
 @testable import KognitaCore
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask {
 
     public static func create(
         creator: User?       = nil,
         subtopic: Subtopic?   = nil,
         task: Task?       = nil,
         isMultipleSelect: Bool        = true,
-        choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
+        choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
         isTestable: Bool        = false,
         on conn: PostgreSQLConnection
-    ) throws -> MultipleChoiseTask {
+    ) throws -> MultipleChoiceTask {
 
         let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, isTestable: isTestable, on: conn)
 
@@ -33,28 +33,29 @@ extension MultipleChoiseTask {
     public static func create(
         taskId: Task.ID,
         isMultipleSelect: Bool        = true,
-        choises: [MultipleChoiseTaskChoise.Create.Data] = MultipleChoiseTaskChoise.Create.Data.standard,
+        choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
         on conn: PostgreSQLConnection
-    ) throws -> MultipleChoiseTask {
+    ) throws -> MultipleChoiceTask {
 
-        return try MultipleChoiseTask(isMultipleSelect: isMultipleSelect, taskID: taskId)
+        return try MultipleChoiceTask.DatabaseModel(isMultipleSelect: isMultipleSelect, taskID: taskId)
             .create(on: conn)
             .flatMap { task in
                 try choises.map {
-                    try MultipleChoiseTaskChoise(content: $0, task: task)
+                    try MultipleChoiseTaskChoise(content: $0, taskID: task.requireID())
                         .create(on: conn)
                 }
                 .flatten(on: conn)
                 .transform(to: task)
         }
-            .wait()
+        .flatMap { try $0.content(on: conn) }
+        .wait()
     }
 }
 
-extension MultipleChoiseTaskChoise.Create.Data {
-    public static let standard: [MultipleChoiseTaskChoise.Create.Data] = [
-        .init(choise: "not", isCorrect: false),
-        .init(choise: "yes", isCorrect: true),
-        .init(choise: "not again", isCorrect: false)
+extension MultipleChoiceTaskChoice.Create.Data {
+    public static let standard: [MultipleChoiceTaskChoice.Create.Data] = [
+        .init(choice: "not", isCorrect: false),
+        .init(choice: "yes", isCorrect: true),
+        .init(choice: "not again", isCorrect: false)
     ]
 }

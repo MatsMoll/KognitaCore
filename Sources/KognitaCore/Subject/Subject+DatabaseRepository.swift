@@ -36,7 +36,7 @@ extension Subject {
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
-        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiseTask.DatabaseRepository(conn: conn) }
+        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
     }
 }
 
@@ -162,7 +162,7 @@ extension Subject.DatabaseRepository {
 
                                         return try tasks.map { task in
                                             try self.multipleChoiseRepository.create(
-                                                from: MultipleChoiseTask.Create.Data(
+                                                from: MultipleChoiceTask.Create.Data(
                                                     subtopicId: subtopic.id,
                                                     description: nil,
                                                     question: task.question,
@@ -488,15 +488,25 @@ extension TaskSolution {
         public let question: String
         public let solution: String
 
-        public let choises: [MultipleChoiseTaskChoise.Data]
+        public let choises: [MultipleChoiceTaskChoice]
 
-        init(task: Task, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) {
-            self.taskID = task.id ?? 0
-            self.solutionID = solution.id ?? 0
+        init(task: Task, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) throws {
+            self.taskID = try task.requireID()
+            self.solutionID = solution.id
             self.description = task.description
             self.question = task.question
             self.solution = solution.solution
-            self.choises = choises.map { .init(choise: $0) }
+            self.choises = try choises.map { try .init(choice: $0) }
         }
+    }
+}
+
+extension MultipleChoiceTaskChoice {
+    init(choice: MultipleChoiseTaskChoise) throws {
+        try self.init(
+            id: choice.requireID(),
+            choise: choice.choise,
+            isCorrect: choice.isCorrect
+        )
     }
 }

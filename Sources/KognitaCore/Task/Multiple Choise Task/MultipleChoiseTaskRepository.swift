@@ -13,25 +13,23 @@ public protocol MultipleChoiseTaskRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
-    Model           == MultipleChoiseTask,
-    CreateData      == MultipleChoiseTask.Create.Data,
-    CreateResponse  == MultipleChoiseTask.Create.Response,
-    UpdateData      == MultipleChoiseTask.Edit.Data,
-    UpdateResponse  == MultipleChoiseTask.Edit.Response {
-    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiseTask.ModifyContent>
-    func create(answer submit: MultipleChoiseTask.Submit, sessionID: TaskSession.ID) -> EventLoopFuture<[TaskAnswer]>
-    func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], for task: MultipleChoiseTask) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
-    func importTask(from taskContent: MultipleChoiseTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
-    func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, sessionID: TaskSession.ID) -> EventLoopFuture<TaskAnswer>
-    func choisesFor(taskID: MultipleChoiseTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]>
+    Model           == MultipleChoiceTask,
+    CreateData      == MultipleChoiceTask.Create.Data,
+    CreateResponse  == MultipleChoiceTask.Create.Response,
+    UpdateData      == MultipleChoiceTask.Update.Data,
+    UpdateResponse  == MultipleChoiceTask.Update.Response {
+    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details>
+    func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]>
+    func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
+    func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
+    func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, sessionID: TestSession.ID) -> EventLoopFuture<TaskAnswer>
+    func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]>
     func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]>
     func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], agenst correctChoises: [MultipleChoiseTaskChoise]) throws -> TaskSessionResult<[MultipleChoiseTaskChoise.Result]>
 }
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask {
     public struct DatabaseRepository: MultipleChoiseTaskRepository, DatabaseConnectableRepository {
-
-        typealias DatabaseModel = MultipleChoiseTask
 
         public let conn: DatabaseConnectable
 
@@ -42,14 +40,14 @@ extension MultipleChoiseTask {
     }
 }
 
-extension MultipleChoiseTask.DatabaseRepository {
+extension MultipleChoiceTask.DatabaseRepository {
 
-    public func create(from content: MultipleChoiseTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiseTask> {
+    public func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask> {
 
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        try content.validate()
+//        try content.validate()
         return subtopicRepository
             .find(content.subtopicId)
             .unwrap(or: Task.Create.Errors.invalidTopic)
@@ -60,7 +58,7 @@ extension MultipleChoiseTask.DatabaseRepository {
                     try self
                         .taskRepository
                         .create(
-                            from: .init(
+                            from: Task.Create.Data(
                                 content: content,
                                 subtopicID: subtopic.id,
                                 solution: content.solution
@@ -69,50 +67,51 @@ extension MultipleChoiseTask.DatabaseRepository {
                         )
                         .flatMap { task in
 
-                            try MultipleChoiseTask(
+                            try MultipleChoiceTask.DatabaseModel(
                                 isMultipleSelect: content.isMultipleSelect,
                                 task: task
                             )
                                 .create(on: conn)
                         }
                     .flatMap { (task) in
-                            try content.choises.map { choise in
-                                try MultipleChoiseTaskChoise(content: choise, task: task)
-                                    .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
-                                }
-                                .flatten(on: conn)
-                                .transform(to: task)
+                        try content.choises.map { choise in
+                            try MultipleChoiseTaskChoise(content: choise, taskID: task.requireID())
+                                .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
+                            }
+                            .flatten(on: conn)
+                            .flatMap { _ in
+                                try task.content(on: conn)
+                        }
                     }
                 }
         }
     }
 
-    public func update(model: MultipleChoiseTask, to data: MultipleChoiseTask.Edit.Data, by user: User) throws -> EventLoopFuture<MultipleChoiseTask> {
+    public func update(model: MultipleChoiceTask, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
 
-        guard let task = model.task else {
-            throw Abort(.internalServerError)
-        }
         return try userRepository
-            .isModerator(user: user, taskID: model.requireID())
+            .isModerator(user: user, taskID: model.id)
             .flatMap {
-                try self.update(task: task, to: data, by: user)
+                try self.update(taskID: model.id, to: data, by: user)
         }
         .catchFlatMap { _ in
-            task.get(on: self.conn).flatMap { taskModel in
-                guard taskModel.creatorID == user.id else {
-                    throw Abort(.forbidden)
-                }
-                return try self.update(task: task, to: data, by: user)
+            Task.find(model.id, on: self.conn)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { taskModel in
+                    guard taskModel.creatorID == user.id else {
+                        throw Abort(.forbidden)
+                    }
+                    return try self.update(taskID: model.id, to: data, by: user)
             }
         }
     }
 
-    private func update(task: Parent<MultipleChoiseTask, Task>, to data: MultipleChoiseTask.Edit.Data, by user: User) throws -> EventLoopFuture<MultipleChoiseTask> {
-        try self
-            .create(from: data, by: user)
+    private func update(taskID: Task.ID, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
+        try create(from: data, by: user)
             .flatMap { newTask in
 
-                task.get(on: self.conn)
+                Task.find(taskID, on: self.conn)
+                    .unwrap(or: Abort(.badRequest))
                     .flatMap { task in
                         task.deletedAt = Date() // Equilent to .delete(on: conn)
                         task.editedTaskID = newTask.id
@@ -123,20 +122,18 @@ extension MultipleChoiseTask.DatabaseRepository {
         }
     }
 
-    public func delete(model: MultipleChoiseTask, by user: User?) throws -> EventLoopFuture<Void> {
+    public func delete(model: MultipleChoiceTask, by user: User?) throws -> EventLoopFuture<Void> {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
         return try userRepository
-            .isModerator(user: user, taskID: model.requireID())
+            .isModerator(user: user, taskID: model.id)
             .map { true }
             .catchMap { _ in false }
             .flatMap { isModerator in
 
-                guard let task = model.task else {
-                    throw Abort(.internalServerError)
-                }
-                return task.get(on: self.conn)
+                Task.find(model.id, on: self.conn)
+                    .unwrap(or: Abort(.badRequest))
                     .flatMap { task in
 
                         guard isModerator || task.creatorID == user.id else {
@@ -149,7 +146,7 @@ extension MultipleChoiseTask.DatabaseRepository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiseTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
+    public func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
         return Task(
             subtopicID: subtopic.id,
@@ -158,7 +155,7 @@ extension MultipleChoiseTask.DatabaseRepository {
             creatorID: 1
         )
             .create(on: conn)
-            .flatMap { savedTask -> EventLoopFuture<MultipleChoiseTask> in
+            .flatMap { savedTask -> EventLoopFuture<MultipleChoiceTask.DatabaseModel> in
 
                 if let solution = taskContent.task.solution {
                     return try TaskSolution.DatabaseModel(
@@ -170,14 +167,14 @@ extension MultipleChoiseTask.DatabaseRepository {
                     )
                         .create(on: self.conn)
                         .flatMap { _ in
-                            try MultipleChoiseTask(
+                            try MultipleChoiceTask.DatabaseModel(
                                 isMultipleSelect: taskContent.isMultipleSelect,
                                 taskID: savedTask.requireID()
                             )
                                 .create(on: self.conn)
                     }
                 } else {
-                    return try MultipleChoiseTask(
+                    return try MultipleChoiceTask.DatabaseModel(
                         isMultipleSelect: taskContent.isMultipleSelect,
                         taskID: savedTask.requireID()
                     )
@@ -195,60 +192,64 @@ extension MultipleChoiseTask.DatabaseRepository {
         }
     }
 
-    public func get(task: MultipleChoiseTask) throws -> EventLoopFuture<MultipleChoiseTask.Data> {
+    public func get(task: MultipleChoiceTask) throws -> EventLoopFuture<MultipleChoiceTask> {
 
-        return try task.choises
-            .query(on: conn)
+        MultipleChoiceTask.DatabaseModel.query(on: conn)
+            .join(\MultipleChoiseTaskChoise.taskId, to: \MultipleChoiceTask.DatabaseModel.id)
             .join(\Task.id, to: \MultipleChoiseTaskChoise.taskId)
+            .filter(\MultipleChoiceTask.DatabaseModel.id == task.id)
             .alsoDecode(Task.self)
+            .alsoDecode(MultipleChoiseTaskChoise.self)
             .all()
             .map { choises in
                 guard let first = choises.first else {
                     throw Abort(.noContent, reason: "Missing choises in task")
                 }
-                return MultipleChoiseTask.Data(
-                    task: first.1,
-                    multipleTask: task,
-                    choises: choises.map { $0.0 }.shuffled())
+                return MultipleChoiceTask(
+                    task: first.0.1,
+                    isMultipleSelect: first.0.0.isMultipleSelect,
+                    choises: choises.map { $0.1 }.shuffled()
+                )
         }
     }
 
-    public func content(for multiple: MultipleChoiseTask) throws -> EventLoopFuture<(TaskPreviewContent, MultipleChoiseTask.Data)> {
+    public func content(for multiple: MultipleChoiceTask) throws -> EventLoopFuture<(TaskPreviewContent, MultipleChoiceTask)> {
 
-        return try multiple
-            .content(on: conn)
-            .flatMap { content in
-
-                Task.query(on: self.conn, withSoftDeleted: true)
-                    .filter(\Task.id == multiple.id)
-                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
-                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
-                    .alsoDecode(Topic.DatabaseModel.self)
-                    .alsoDecode(Subject.DatabaseModel.self)
-                    .first()
-                    .unwrap(or: Abort(.internalServerError))
-                    .map { preview in
-
-                        // Returning a tupple
-                        try (
-                            TaskPreviewContent(
-                                subject: preview.1.content(),
-                                topic: preview.0.1.content(),
-                                task: preview.0.0,
-                                actionDescription: multiple.actionDescription
-                            ),
-                            content
-                        )
-                }
-        }
+        throw Abort(.notImplemented)
+//        return try multiple
+//            .content(on: conn)
+//            .flatMap { content in
+//
+//                Task.query(on: self.conn, withSoftDeleted: true)
+//                    .filter(\Task.id == multiple.id)
+//                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+//                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+//                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+//                    .alsoDecode(Topic.DatabaseModel.self)
+//                    .alsoDecode(Subject.DatabaseModel.self)
+//                    .first()
+//                    .unwrap(or: Abort(.internalServerError))
+//                    .map { preview in
+//
+//                        // Returning a tupple
+//                        try (
+//                            TaskPreviewContent(
+//                                subject: preview.1.content(),
+//                                topic: preview.0.1.content(),
+//                                task: preview.0.0,
+//                                actionDescription: multiple.actionDescription
+//                            ),
+//                            content
+//                        )
+//                }
+//        }
     }
 
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
-    public func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], for task: MultipleChoiseTask) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    public func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
-        return try task.choises
-            .query(on: conn)
+        return MultipleChoiseTaskChoise.query(on: conn)
+            .filter(\.taskId == taskID)
             .filter(\.isCorrect == true)
             .all()
             .map { correctChoises in
@@ -287,7 +288,7 @@ extension MultipleChoiseTask.DatabaseRepository {
         )
     }
 
-    public func create(answer submit: MultipleChoiseTask.Submit, sessionID: TaskSession.ID) -> EventLoopFuture<[TaskAnswer]> {
+    public func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]> {
 
         submit.choises.map { choise in
             self.createAnswer(choiseID: choise, sessionID: sessionID)
@@ -295,7 +296,7 @@ extension MultipleChoiseTask.DatabaseRepository {
         .flatten(on: conn)
     }
 
-    public func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, sessionID: TaskSession.ID) -> EventLoopFuture<TaskAnswer> {
+    public func createAnswer(choiseID: MultipleChoiseTaskChoise.ID, sessionID: TestSession.ID) -> EventLoopFuture<TaskAnswer> {
         TaskAnswer()
             .save(on: conn)
             .flatMap { answer in
@@ -317,60 +318,61 @@ extension MultipleChoiseTask.DatabaseRepository {
             .all()
     }
 
-    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiseTask.ModifyContent> {
+    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { conn in
-
-                conn.select()
-                    .all(table: Task.self)
-                    .all(table: MultipleChoiseTask.self)
-                    .all(table: TaskSolution.DatabaseModel.self)
-                    .from(Task.self)
-                    .join(\Task.id, to: \MultipleChoiseTask.id)
-                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
-                    .where(\Task.id, .equal, taskID)
-                    .first(decoding: Task.self, MultipleChoiseTask.self, TaskSolution.DatabaseModel.self)
-                    .unwrap(or: Abort(.badRequest))
-                    .flatMap { taskContent in
-
-                        MultipleChoiseTaskChoise.query(on: conn)
-                            .filter(\MultipleChoiseTaskChoise.taskId, .equal, taskID)
-                            .all()
-                            .flatMap { choises in
-
-                                Subject.DatabaseModel.query(on: conn)
-                                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
-                                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
-                                    .filter(\Subtopic.DatabaseModel.id, .equal, taskContent.0.subtopicID)
-                                    .first()
-                                    .unwrap(or: Abort(.internalServerError))
-                                    .flatMap { subject in
-
-                                        try self.topicRepository
-                                            .getTopicResponses(in: subject.content())
-                                            .map { topics in
-
-                                                try MultipleChoiseTask.ModifyContent(
-                                                    task: Task.ModifyContent(
-                                                        task: taskContent.0,
-                                                        solution: taskContent.2.solution
-                                                    ),
-                                                    subject: subject.content(),
-                                                    topics: topics,
-                                                    multiple: taskContent.1,
-                                                    choises: choises.map { .init(choise: $0) }
-                                                )
-                                        }
-
-                                }
-                        }
-                }
-        }
+        throw Abort(.notImplemented)
+//        return conn.databaseConnection(to: .psql)
+//            .flatMap { conn in
+//
+//                conn.select()
+//                    .all(table: Task.self)
+//                    .all(table: MultipleChoiceTask.DatabaseModel.self)
+//                    .all(table: TaskSolution.DatabaseModel.self)
+//                    .from(Task.self)
+//                    .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id)
+//                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
+//                    .where(\Task.id, .equal, taskID)
+//                    .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel.self, TaskSolution.DatabaseModel.self)
+//                    .unwrap(or: Abort(.badRequest))
+//                    .flatMap { taskContent in
+//
+//                        MultipleChoiseTaskChoise.query(on: conn)
+//                            .filter(\MultipleChoiseTaskChoise.taskId, .equal, taskID)
+//                            .all()
+//                            .flatMap { choises in
+//
+//                                Subject.DatabaseModel.query(on: conn)
+//                                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
+//                                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+//                                    .filter(\Subtopic.DatabaseModel.id, .equal, taskContent.0.subtopicID)
+//                                    .first()
+//                                    .unwrap(or: Abort(.internalServerError))
+//                                    .flatMap { subject in
+//
+//                                        try self.topicRepository
+//                                            .getTopicResponses(in: subject.content())
+//                                            .map { topics in
+//
+//                                                try MultipleChoiceTask.ModifyContent(
+//                                                    task: Task.ModifyContent(
+//                                                        task: taskContent.0,
+//                                                        solution: taskContent.2.solution
+//                                                    ),
+//                                                    subject: subject.content(),
+//                                                    topics: topics,
+//                                                    multiple: taskContent.1,
+//                                                    choises: choises.map { .init(choise: $0) }
+//                                                )
+//                                        }
+//
+//                                }
+//                        }
+//                }
+//        }
 
     }
 
-    public func choisesFor(taskID: MultipleChoiseTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]> {
+    public func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]> {
         MultipleChoiseTaskChoise.query(on: conn, withSoftDeleted: true)
             .filter(\.taskId == taskID)
             .all()

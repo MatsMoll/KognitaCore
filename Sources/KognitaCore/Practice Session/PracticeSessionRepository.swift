@@ -15,7 +15,7 @@ public protocol PracticeSessionRepository: CreateModelRepository
     CreateResponse == PracticeSession.Create.Response {
     func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
     func extend(session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<Void>
-    func submit(_ submit: MultipleChoiseTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
+    func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
     func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>>
     func currentActiveTask(in session: PracticeSession) throws -> EventLoopFuture<TaskType>
     func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable>
@@ -29,7 +29,7 @@ extension PracticeSession {
         public let conn: DatabaseConnectable
 
         private var flashCardRepository: some FlashCardTaskRepository { FlashCardTask.DatabaseRepository(conn: conn) }
-        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiseTask.DatabaseRepository(conn: conn) }
+        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
         private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
@@ -112,7 +112,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         }
         return conn.transaction(on: .psql) { conn in
 
-            try TaskSession(userID: user.id)
+            TaskSession(userID: user.id)
                 .create(on: conn)
                 .flatMap { superSession in
 
@@ -247,13 +247,13 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         conn.databaseConnection(to: .psql).flatMap { conn in
             conn.select()
                 .all(table: Task.self)
-                .all(table: MultipleChoiseTask.self)
+                .all(table: MultipleChoiceTask.DatabaseModel.self)
                 .from(PracticeSession.Pivot.Task.self)
                 .where(\PracticeSession.Pivot.Task.sessionID == session.id)
                 .orderBy(\PracticeSession.Pivot.Task.index, .descending)
                 .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
-                .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
-                .first(decoding: Task.self, MultipleChoiseTask?.self)
+                .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+                .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
                 .unwrap(or: Abort(.internalServerError))
                 .map { taskContent in
                     TaskType(content: taskContent)
@@ -265,14 +265,14 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
         return conn.select()
             .all(table: Task.self)
-            .all(table: MultipleChoiseTask.self)
+            .all(table: MultipleChoiceTask.DatabaseModel.self)
             .from(PracticeSession.Pivot.Task.self)
             .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
             .where(\PracticeSession.Pivot.Task.index == index)
             .orderBy(\PracticeSession.Pivot.Task.index, .descending)
             .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
-            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
-            .first(decoding: Task.self, MultipleChoiseTask?.self)
+            .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
             .unwrap(or: Abort(.badRequest))
             .map { taskContent in
                 TaskType(content: taskContent)
@@ -293,13 +293,13 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
 extension PracticeSession.DatabaseRepository {
 
-    public func submit(_ submit: MultipleChoiseTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    public func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
 
         guard user.id == session.userID else {
             throw Abort(.forbidden)
         }
 
-        return try get(MultipleChoiseTask.self, at: submit.taskIndex, for: session).flatMap { task in
+        return try get(MultipleChoiceTask.DatabaseModel.self, at: submit.taskIndex, for: session).flatMap { task in
 
             try self
                 .multipleChoiseRepository
@@ -308,7 +308,7 @@ extension PracticeSession.DatabaseRepository {
 
                     try self
                         .multipleChoiseRepository
-                        .evaluate(submit.choises, for: task)
+                        .evaluate(submit.choises, for: task.requireID())
                         .flatMap { result in
 
                             let submitResult = try TaskSubmitResult(

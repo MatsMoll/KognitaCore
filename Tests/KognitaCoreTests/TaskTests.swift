@@ -41,14 +41,15 @@ class TaskTests: VaporTestCase {
             let secondUser = try User.create(isAdmin: false, on: conn)
             let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
             let secondSolution = try TaskSolution.create(task: task, on: conn)
+            let secondSolutionDB = try TaskSolution.DatabaseModel.find(secondSolution.id, on: conn).unwrap(or: Errors.badTest).wait()
             _ = try TaskSolution.create(on: conn)
 
-            secondSolution.isApproved = true
-            secondSolution.approvedBy = try user.requireID()
-            _ = try secondSolution.save(on: conn).wait()
+            secondSolutionDB.isApproved = true
+            secondSolutionDB.approvedBy = user.id
+            _ = try secondSolutionDB.save(on: conn).wait()
 
-            try taskSolutionRepository.upvote(for: firstSolution.requireID(), by: user).wait()
-            try taskSolutionRepository.upvote(for: firstSolution.requireID(), by: secondUser).wait()
+            try taskSolutionRepository.upvote(for: firstSolution.id, by: user).wait()
+            try taskSolutionRepository.upvote(for: firstSolution.id, by: secondUser).wait()
 
             let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
 
@@ -72,8 +73,8 @@ class TaskTests: VaporTestCase {
         failableTest {
             let subtopic = try Subtopic.create(on: conn)
             let user = try User.create(on: conn)
-            let xssData = try FlashCardTask.Create.Data(
-                subtopicId: subtopic.requireID(),
+            let xssData = FlashCardTask.Create.Data(
+                subtopicId: subtopic.id,
                 description: "Test",
                 question: "Some question",
                 solution: "",
@@ -94,8 +95,8 @@ class TaskTests: VaporTestCase {
         failableTest {
             let subtopic = try Subtopic.create(on: conn)
             let user = try User.create(on: conn)
-            let xssData = try FlashCardTask.Create.Data(
-                subtopicId: subtopic.requireID(),
+            let xssData = FlashCardTask.Create.Data(
+                subtopicId: subtopic.id,
                 description: "Test",
                 question: "Some question",
                 solution:
@@ -124,8 +125,8 @@ Dette er flere linjer
         do {
             let subtopic = try Subtopic.create(on: conn)
             let user = try User.create(on: conn)
-            let xssData = try FlashCardTask.Create.Data(
-                subtopicId: subtopic.requireID(),
+            let xssData = FlashCardTask.Create.Data(
+                subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
                 question: "Some question",
                 solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
@@ -152,8 +153,8 @@ Dette er flere linjer
         do {
             let subtopic = try Subtopic.create(on: conn)
             let user = try User.create(on: conn)
-            let xssData = try FlashCardTask.Create.Data(
-                subtopicId: subtopic.requireID(),
+            let xssData = FlashCardTask.Create.Data(
+                subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
                 question: "Some question",
                 solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
@@ -182,8 +183,8 @@ Dette er flere linjer
         do {
             let subtopic = try Subtopic.create(on: conn)
             let user = try User.create(on: conn)
-            let xssData = try FlashCardTask.Create.Data(
-                subtopicId: subtopic.requireID(),
+            let xssData = FlashCardTask.Create.Data(
+                subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
                 question: "Some question",
                 solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
@@ -197,9 +198,9 @@ Dette er flere linjer
                 solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
                 presentUser: false
             )
-            let solution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
-            _ = try taskSolutionRepository.update(model: solution, to: solutionUpdateDate, by: user).wait()
-            let updatedSolution = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+            let solution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+            _ = try taskSolutionRepository.update(model: solution.content(), to: solutionUpdateDate, by: user).wait()
+            let updatedSolution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
 
             XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
         } catch {
@@ -261,16 +262,16 @@ Dette er flere linjer
             let user = try User.create(on: conn)
             let task = try Task.create(on: conn)
 
-            let solutions = try TaskSolution.query(on: conn).filter(\.taskID == task.requireID()).all().wait()
+            let solutions = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).all().wait()
 
             XCTAssertEqual(solutions.count, 1)
             let solution = try XCTUnwrap(solutions.first)
 
             throwsError(of: TaskSolutionRepositoryError.self) {
-                try taskSolutionRepository.delete(model: solution, by: user).wait()
+                try taskSolutionRepository.delete(model: solution.content(), by: user).wait()
             }
             throwsError(of: Abort.self) {
-                try taskSolutionRepository.delete(model: solution, by: nil).wait()
+                try taskSolutionRepository.delete(model: solution.content(), by: nil).wait()
             }
         }
     }

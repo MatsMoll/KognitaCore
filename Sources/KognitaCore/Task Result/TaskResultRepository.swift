@@ -26,17 +26,17 @@ public protocol PracticeSessionRepresentable: Codable {
     func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
 }
 
+public struct SpaceRepetitionTask: Codable {
+    let taskID: Task.ID
+    let revisitDate: Date
+    let createdAt: Date
+    let sessionID: TaskSession.ID?
+}
+
 extension TaskResult.DatabaseRepository {
 
     enum Errors: Error {
         case incompleateSqlStatment
-    }
-
-    struct SpaceRepetitionTask: Codable {
-        let taskID: Task.ID
-        let revisitDate: Date
-        let createdAt: Date
-        let sessionID: TaskSession.ID?
     }
 
     private struct SubqueryResult: Codable {

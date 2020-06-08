@@ -22,20 +22,20 @@ protocol TaskRepository: CreateModelRepository,
 
 extension Task {
 
-    public enum Create {
-        public struct Data {
+    enum Create {
+        struct Data {
             let content: TaskCreationContentable
             let subtopicID: Subtopic.ID
             let solution: String
         }
-        public typealias Response = Task
+        typealias Response = Task
 
-        public enum Errors: Error {
+        enum Errors: Error {
             case invalidTopic
         }
     }
 
-    public struct DatabaseRepository: TaskRepository, DatabaseConnectableRepository {
+    struct DatabaseRepository: TaskRepository, DatabaseConnectableRepository {
 
         typealias DatabaseModel = Task
 
@@ -152,7 +152,7 @@ extension Task.DatabaseRepository {
                     .join(\User.id, to: \Task.creatorID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
                     .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
-                    .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
+                    .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id, method: .left)
                     .filter(\Topic.DatabaseModel.subjectId == subjectId)
                     .alsoDecode(User.DatabaseModel.self)
                     .alsoDecode(Topic.DatabaseModel.self)
@@ -196,7 +196,7 @@ extension Task.DatabaseRepository {
 
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == id)
-            .join(\MultipleChoiseTask.id, to: \Task.id, method: .left)
+            .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id, method: .left)
             .decode(data: MultipleChoiseTaskKey.self, "MultipleChoiseTask")
             .first()
             .unwrap(or: Abort(.internalServerError))
@@ -228,15 +228,19 @@ extension Task.DatabaseRepository {
             .all(decoding: TaskCreators.self)
     }
 
-    public func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> EventLoopFuture<(Task, MultipleChoiseTask?)?> {
+    public func taskType(with id: Task.ID, on conn: PostgreSQLConnection) -> EventLoopFuture<TaskType?> {
 
         return conn.select()
             .all(table: Task.self)
-            .all(table: MultipleChoiseTask.self)
+            .all(table: MultipleChoiceTask.DatabaseModel.self)
             .from(Task.self)
             .where(\Task.id == id)
-            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
-            .first(decoding: Task.self, MultipleChoiseTask?.self)
+            .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
+            .map { task in
+                guard let task = task else { return nil }
+                return TaskType(content: task)
+        }
     }
 
     public func taskWith(
@@ -246,10 +250,10 @@ extension Task.DatabaseRepository {
 
         return conn.select()
             .all(table: Task.self)
-            .all(table: MultipleChoiseTask.self)
+            .all(table: MultipleChoiceTask.DatabaseModel.self)
             .from(Task.self)
-            .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
-            .first(decoding: Task.self, MultipleChoiseTask?.self)
+            .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+            .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
             .unwrap(or: Abort(.badRequest))
             .map { taskContent in
                 TaskType(content: taskContent)

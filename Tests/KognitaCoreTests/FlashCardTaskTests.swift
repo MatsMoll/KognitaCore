@@ -20,8 +20,8 @@ class FlashCardTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(on: conn)
 
-        let taskData = try FlashCardTask.Create.Data(
-            subtopicId: subtopic.requireID(),
+        let taskData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
             description: nil,
             question: "Test",
             solution: "Some solution",
@@ -53,8 +53,8 @@ class FlashCardTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: conn)
         let user = try User.create(isAdmin: false, on: conn)
 
-        let taskData = try FlashCardTask.Create.Data(
-            subtopicId: subtopic.requireID(),
+        let taskData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
             description: nil,
             question: "Test",
             solution: "Some solution",
@@ -129,11 +129,9 @@ class FlashCardTaskTests: VaporTestCase {
         let firstTask = try FlashCardTask.create(subtopic: subtopic, on: conn)
         let secondTask = try FlashCardTask.create(subtopic: subtopic, on: conn)
 
-        let create = try PracticeSession.Create.Data(
+        let create = PracticeSession.Create.Data(
             numberOfTaskGoal: 2,
-            subtopicsIDs: [
-                subtopic.requireID()
-            ],
+            subtopicsIDs: [subtopic.id],
             topicIDs: nil
         )
 

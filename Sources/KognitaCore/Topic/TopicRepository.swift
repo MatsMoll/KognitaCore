@@ -82,7 +82,7 @@ extension Topic {
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
         private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
         private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
-        private var multipeChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiseTask.DatabaseRepository(conn: conn) }
+        private var multipeChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
         private var typingTaskRepository: some FlashCardTaskRepository { FlashCardTask.DatabaseRepository(conn: conn) }
     }
 }
@@ -269,19 +269,19 @@ extension Topic.DatabaseRepository: TopicRepository {
 
                 psqlConn.select()
                     .all(table: Task.self)
-                    .all(table: MultipleChoiseTask.self)
+                    .all(table: MultipleChoiceTask.DatabaseModel.self)
                     .all(table: MultipleChoiseTaskChoise.self)
                     .column(\TaskSolution.DatabaseModel.solution, as: "solution")
                     .from(Task.self)
-                    .join(\Task.id, to: \MultipleChoiseTask.id, method: .left)
+                    .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
                     .join(\Task.id, to: \FlashCardTask.id, method: .left)
-                    .join(\MultipleChoiseTask.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
+                    .join(\MultipleChoiceTask.DatabaseModel.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
                     .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID, method: .left)
                     .where(\Task.subtopicID == subtopic.id)
-                    .all(decoding: Task.BetaFormat.self, MultipleChoiseTask?.self, MultipleChoiseTaskChoise?.self)
+                    .all(decoding: Task.BetaFormat.self, MultipleChoiceTask.DatabaseModel?.self, MultipleChoiseTaskChoise?.self)
                     .map { tasks in
 
-                        var multipleTasks = [Int: MultipleChoiseTask.BetaFormat]()
+                        var multipleTasks = [Int: MultipleChoiceTask.BetaFormat]()
                         var flashTasks = [Task.BetaFormat]()
 
                         for task in tasks {
@@ -290,13 +290,13 @@ extension Topic.DatabaseRepository: TopicRepository {
                                 let choise = task.2
                             {
                                 if let earlierTask = multipleTasks[multiple.id ?? 0] {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.BetaFormat(
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
                                         task: task.0,
                                         choises: earlierTask.choises + [choise],
                                         isMultipleSelect: multiple.isMultipleSelect
                                     )
                                 } else {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiseTask.BetaFormat(
+                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
                                         task: task.0,
                                         choises: [choise],
                                         isMultipleSelect: multiple.isMultipleSelect
@@ -433,7 +433,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
 public struct SubtopicExportContent: Content {
     let subtopic: Subtopic
-    let multipleChoiseTasks: [MultipleChoiseTask.BetaFormat]
+    let multipleChoiseTasks: [MultipleChoiceTask.BetaFormat]
     let flashCards: [Task.BetaFormat]
 }
 
@@ -447,7 +447,7 @@ public struct SubjectExportContent: Content {
     let topics: [TopicExportContent]
 }
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask {
     public struct BetaFormat: Content {
 
         let task: Task.BetaFormat

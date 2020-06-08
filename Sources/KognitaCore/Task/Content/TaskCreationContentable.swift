@@ -39,3 +39,7 @@ extension TaskCreationContentable {
         }
     }
 }
+
+extension MultipleChoiceTask.Create.Data: TaskCreationContentable {
+    public var examPaperSemester: Task.ExamSemester? { nil }
+}

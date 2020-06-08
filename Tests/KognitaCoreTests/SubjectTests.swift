@@ -27,11 +27,11 @@ class SubjectTests: VaporTestCase {
             let subtopicOne = try Subtopic.create(topic: topic, on: conn)
             let subtopicTwo = try Subtopic.create(topic: topic, on: conn)
 
-            _ = try MultipleChoiseTask.create(subtopic: subtopicOne, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopicOne, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopicOne, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopicOne, on: conn)
             _ = try FlashCardTask.create(subtopic: subtopicOne, on: conn)
 
-            _ = try MultipleChoiseTask.create(subtopic: subtopicTwo, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopicTwo, on: conn)
             _ = try FlashCardTask.create(subtopic: subtopicTwo, on: conn)
 
             let subjectExport = try topicRepository
@@ -53,7 +53,7 @@ class SubjectTests: VaporTestCase {
             _ = try subjectRepository.importContent(subjectExport).wait()
 
             XCTAssertEqual(try taskRepository.all().wait().count, 10)
-            XCTAssertEqual(try TaskSolution.query(on: conn).all().wait().count, 10)
+            XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: conn).all().wait().count, 10)
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -66,19 +66,19 @@ class SubjectTests: VaporTestCase {
             let subject = try Subject.create(on: conn)
 
             XCTAssertThrowsError(
-                try userRepository.isModerator(user: user, subjectID: subject.requireID()).wait()
+                try userRepository.isModerator(user: user, subjectID: subject.id).wait()
             )
-            try subjectRepository.grantModeratorPrivilege(for: user.requireID(), in: subject.requireID(), by: admin).wait()
+            try subjectRepository.grantModeratorPrivilege(for: user.id, in: subject.id, by: admin).wait()
             XCTAssertNoThrow(
-                try userRepository.isModerator(user: user, subjectID: subject.requireID()).wait()
+                try userRepository.isModerator(user: user, subjectID: subject.id).wait()
             )
             // Throw if the user tries to revoke it's own privilege
             XCTAssertThrowsError(
-                try subjectRepository.revokeModeratorPrivilege(for: user.requireID(), in: subject.requireID(), by: user).wait()
+                try subjectRepository.revokeModeratorPrivilege(for: user.id, in: subject.id, by: user).wait()
             )
-            try subjectRepository.revokeModeratorPrivilege(for: user.requireID(), in: subject.requireID(), by: admin).wait()
+            try subjectRepository.revokeModeratorPrivilege(for: user.id, in: subject.id, by: admin).wait()
             XCTAssertThrowsError(
-                try userRepository.isModerator(user: user, subjectID: subject.requireID()).wait()
+                try userRepository.isModerator(user: user, subjectID: subject.id).wait()
             )
         } catch {
             XCTFail(error.localizedDescription)
@@ -95,7 +95,7 @@ class SubjectTests: VaporTestCase {
             let activeSubjects = try subjectRepository.allActive(for: user).wait()
             XCTAssertEqual(activeSubjects.count, 1)
             let activeSubject = try XCTUnwrap(activeSubjects.first)
-            try XCTAssertEqual(activeSubject.id, firstSubject.requireID())
+            XCTAssertEqual(activeSubject.id, firstSubject.id)
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -125,16 +125,16 @@ class SubjectTests: VaporTestCase {
             let task = try Task.create(subtopic: subtopic, question: "Kognita?", on: conn)
             _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
             _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, task: task, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, task: task, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, isTestable: true, on: conn)
 
-            let tasks = try taskRepository.getTasks(in: topic.subjectId, user: user, query: nil, maxAmount: nil, withSoftDeleted: true).wait()
+            let tasks = try taskRepository.getTasks(in: topic.subjectID, user: user, query: nil, maxAmount: nil, withSoftDeleted: true).wait()
 
             XCTAssertFalse(tasks.contains(where: { $0.task.isTestable == true }))
             XCTAssertEqual(tasks.count, 3)
 
-            let filteredTasks = try taskRepository.getTasks(in: topic.subjectId, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true).wait()
+            let filteredTasks = try taskRepository.getTasks(in: topic.subjectID, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true).wait()
             XCTAssertEqual(filteredTasks.count, 1)
             XCTAssertTrue(tasks.contains(where: { $0.task.question == task.question }))
         }
@@ -148,21 +148,21 @@ class SubjectTests: VaporTestCase {
             let topic = try Topic.create(on: conn)
             let subtopic = try Subtopic.create(topic: topic, on: conn)
 
-            try subjectRepository.grantModeratorPrivilege(for: user.requireID(), in: topic.subjectId, by: admin).wait()
+            try subjectRepository.grantModeratorPrivilege(for: user.id, in: topic.subjectID, by: admin).wait()
 
             let task = try Task.create(subtopic: subtopic, question: "Kognita?", on: conn)
             _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
             _ = try FlashCardTask.create(subtopic: subtopic, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, task: task, isTestable: true, on: conn)
-            _ = try MultipleChoiseTask.create(subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, task: task, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: subtopic, isTestable: true, on: conn)
 
-            let tasks = try taskRepository.getTasks(in: topic.subjectId, user: user, query: nil, maxAmount: nil, withSoftDeleted: true).wait()
+            let tasks = try taskRepository.getTasks(in: topic.subjectID, user: user, query: nil, maxAmount: nil, withSoftDeleted: true).wait()
 
             XCTAssertTrue(tasks.contains(where: { $0.task.isTestable == true }))
             XCTAssertEqual(tasks.count, 5)
 
-            let filteredTasks = try taskRepository.getTasks(in: topic.subjectId, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true).wait()
+            let filteredTasks = try taskRepository.getTasks(in: topic.subjectID, user: user, query: .init(taskQuestion: "kog", topics: []), maxAmount: nil, withSoftDeleted: true).wait()
             XCTAssertEqual(filteredTasks.count, 1)
             XCTAssertTrue(tasks.contains(where: { $0.task.question == task.question }))
             XCTAssertTrue(tasks.contains(where: { $0.task.isTestable == true }))
@@ -178,12 +178,12 @@ class SubjectTests: VaporTestCase {
 
             _ = try FlashCardTask.create(creator: admin, subtopic: subtopic, on: conn) // Verified as the creator is Admin and therefore a moderator
             _ = try FlashCardTask.create(creator: user, subtopic: subtopic, on: conn)
-            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, on: conn)
-            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
-            _ = try MultipleChoiseTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(creator: user, subtopic: subtopic, on: conn)
+            _ = try MultipleChoiceTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
+            _ = try MultipleChoiceTask.create(creator: user, subtopic: subtopic, isTestable: true, on: conn)
 
-            let notModeratorSolutions = try taskSolutionRepository.unverifiedSolutions(in: topic.subjectId, for: user).wait()
-            let solutions = try taskSolutionRepository.unverifiedSolutions(in: topic.subjectId, for: admin).wait()
+            let notModeratorSolutions = try taskSolutionRepository.unverifiedSolutions(in: topic.subjectID, for: user).wait()
+            let solutions = try taskSolutionRepository.unverifiedSolutions(in: topic.subjectID, for: admin).wait()
 
             XCTAssertEqual(notModeratorSolutions.count, 0)
             XCTAssertEqual(solutions.count, 4)
@@ -201,16 +201,16 @@ class SubjectTests: VaporTestCase {
             _ = try Task.create(on: conn)
 
             let subject = try Task.query(on: conn)
-                .join(\Subtopic.id, to: \Task.subtopicID)
-                .join(\Topic.id, to: \Subtopic.id)
-                .join(\Subject.id, to: \Topic.subjectId)
+                .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+                .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.id)
+                .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
                 .filter(\Task.id == task.requireID())
-                .decode(Subject.self)
+                .decode(Subject.DatabaseModel.self)
                 .first()
                 .unwrap(or: Errors.badTest)
                 .wait()
 
-            try subjectRepository.mark(active: subject, canPractice: true, for: userTwo).wait()
+            try subjectRepository.mark(active: subject.content(), canPractice: true, for: userTwo).wait()
 
             let subjects = try subjectRepository.allSubjects(for: user).wait()
             XCTAssertEqual(subjects.count, 4)
@@ -224,14 +224,14 @@ class SubjectTests: VaporTestCase {
             let firstSubtopic = try Subtopic.create(topic: topic, on: conn)
             let secondSubtopic = try Subtopic.create(topic: topic, on: conn)
 
-            _ = try MultipleChoiseTask.create(subtopic: firstSubtopic, on: conn)
+            _ = try MultipleChoiceTask.create(subtopic: firstSubtopic, on: conn)
             _ = try FlashCardTask.create(subtopic: firstSubtopic, on: conn)
             _ = try FlashCardTask.create(subtopic: secondSubtopic, on: conn)
             _ = try FlashCardTask.create(subtopic: secondSubtopic, on: conn)
 
-            let compendium = try subjectRepository.compendium(for: subject.requireID(), filter: SubjectCompendiumFilter(subtopicIDs: nil)).wait()
-            let noContent = try subjectRepository.compendium(for: subject.requireID(), filter: SubjectCompendiumFilter(subtopicIDs: [3])).wait()
-            let filteredContent = try subjectRepository.compendium(for: subject.requireID(), filter: SubjectCompendiumFilter(subtopicIDs: [firstSubtopic.requireID()])).wait()
+            let compendium = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: nil)).wait()
+            let noContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [3])).wait()
+            let filteredContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [firstSubtopic.id])).wait()
 
             XCTAssertEqual(compendium.topics.count, 1)
             XCTAssertEqual(noContent.topics.count, 0)
@@ -253,10 +253,10 @@ class SubjectTests: VaporTestCase {
             let taskTwo = try Task.create(on: conn)
 
             let subjectIDOne = try subjectRepository.subjectIDFor(subtopicIDs: [taskOne.subtopicID]).wait()
-            let subjectOne = try Subject.find(subjectIDOne, on: conn).unwrap(or: Errors.badTest).wait()
+            let subjectOne = try Subject.DatabaseModel.find(subjectIDOne, on: conn).unwrap(or: Errors.badTest).wait()
 
             let subjectIDTwo = try subjectRepository.subjectIDFor(subtopicIDs: [taskTwo.subtopicID]).wait()
-            let subjectTwo = try Subject.find(subjectIDTwo, on: conn).unwrap(or: Errors.badTest).wait()
+            let subjectTwo = try Subject.DatabaseModel.find(subjectIDTwo, on: conn).unwrap(or: Errors.badTest).wait()
 
             XCTAssertNotEqual(subjectTwo.id, subjectOne.id)
 

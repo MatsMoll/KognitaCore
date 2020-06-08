@@ -249,12 +249,12 @@ extension SubjectTest {
             return SubjectTest.Pivot.Task
                 .query(on: conn)
                 .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
-                .join(\MultipleChoiseTask.id, to: \Task.id)
-                .join(\MultipleChoiseTaskChoise.taskId, to: \MultipleChoiseTask.id)
+                .join(\KognitaContent.MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
+                .join(\MultipleChoiseTaskChoise.taskId, to: \KognitaContent.MultipleChoiceTask.DatabaseModel.id)
                 .filter(\SubjectTest.Pivot.Task.testID == session.testID)
                 .filter(\SubjectTest.Pivot.Task.id == id)
                 .decode(Task.self)
-                .alsoDecode(MultipleChoiseTask.self)
+                .alsoDecode(KognitaContent.MultipleChoiceTask.DatabaseModel.self)
                 .alsoDecode(MultipleChoiseTaskChoise.self)
                 .all()
                 .flatMap { taskContent in

@@ -21,17 +21,17 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
     public var isCorrect: Bool
 
     /// The id of the taks this choise relates to
-    public var taskId: MultipleChoiseTask.ID
+    public var taskId: MultipleChoiceTask.ID
 
-    public init(choise: String, isCorrect: Bool, taskId: MultipleChoiseTask.ID) {
+    public init(choise: String, isCorrect: Bool, taskId: MultipleChoiceTask.ID) {
         self.choise = choise
         self.isCorrect = isCorrect
         self.taskId = taskId
     }
 
-    public init(content: MultipleChoiseTaskChoise.Create.Data, task: MultipleChoiseTask) throws {
-        self.taskId = try task.requireID()
-        self.choise = content.choise
+    public init(content: MultipleChoiceTaskChoice.Create.Data, taskID: MultipleChoiceTask.ID) {
+        self.taskId = taskID
+        self.choise = content.choice
         self.isCorrect = content.isCorrect
 
         self.choise.makeHTMLSafe()
@@ -39,18 +39,18 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
 }
 
 extension MultipleChoiseTaskChoise: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.create(MultipleChoiseTaskChoise.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.choise)
             builder.field(for: \.isCorrect)
             builder.field(for: \.taskId)
 
-            builder.reference(from: \.taskId, to: \MultipleChoiseTask.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.taskId, to: \MultipleChoiceTask.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
+    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return PostgreSQLDatabase.delete(MultipleChoiseTaskChoise.self, on: connection)
     }
 }

@@ -119,9 +119,9 @@ extension PracticeSession: Content {}
 public struct TaskType: Content {
 
     public let task: Task
-    public let multipleChoise: MultipleChoiseTask?
+    let multipleChoise: MultipleChoiceTask.DatabaseModel?
 
-    init(content: (task: Task, chosie: MultipleChoiseTask?)) {
+    init(content: (task: Task, chosie: MultipleChoiceTask.DatabaseModel?)) {
         self.task = content.task
         self.multipleChoise = content.chosie
     }

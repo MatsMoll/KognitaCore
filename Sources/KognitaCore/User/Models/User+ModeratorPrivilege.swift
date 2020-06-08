@@ -1,7 +1,7 @@
 import FluentPostgreSQL
 
 extension User {
-    public final class ModeratorPrivilege: KognitaPersistenceModel {
+    final class ModeratorPrivilege: KognitaPersistenceModel {
 
         public static var tableName: String = "User.ModeratorPrivilege"
 
