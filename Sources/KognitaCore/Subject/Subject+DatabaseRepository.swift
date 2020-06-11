@@ -86,14 +86,13 @@ extension Subject.DatabaseRepository {
     public func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject> {
         PracticeSession.DatabaseModel.query(on: conn)
             .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.DatabaseModel.id)
-            .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Subtopic.DatabaseModel.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
             .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
             .filter(\PracticeSession.DatabaseModel.id == session.id)
-            .decode(Subject.DatabaseModel.self)
+            .decode(data: Subject.self, Subject.DatabaseModel.tableName)
             .first()
             .unwrap(or: Abort(.internalServerError))
-            .map { try $0.content() }
     }
 
     public func getSubjectWith(id: Subject.ID) -> EventLoopFuture<Subject> {
@@ -209,7 +208,7 @@ extension Subject.DatabaseRepository {
                     .column(\Topic.DatabaseModel.subjectId)
                     .from(Task.self)
                     .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
                     .where(\Task.id, .in, taskIDs)
                     .groupBy(\Topic.DatabaseModel.subjectId)
                     .all(decoding: SubjectID.self)
@@ -256,7 +255,7 @@ extension Subject.DatabaseRepository {
                 conn.select()
                     .column(\Topic.DatabaseModel.subjectId)
                     .from(Subtopic.DatabaseModel.self)
-                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
                     .where(\Subtopic.DatabaseModel.id, .in, subtopicIDs)
                     .groupBy(\Topic.DatabaseModel.subjectId)
                     .all(decoding: SubjectID.self)
@@ -389,7 +388,7 @@ extension Subject.DatabaseRepository {
                             .column(\Subtopic.DatabaseModel.id, as: "subtopicID")
                             .from(Task.self)
                             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-                            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
                             .join(\Task.id, to: \FlashCardTask.id) // Only flash card tasks
                             .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
                             .where(\Task.description == nil)

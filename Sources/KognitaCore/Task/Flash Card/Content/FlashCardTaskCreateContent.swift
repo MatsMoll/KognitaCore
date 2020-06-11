@@ -26,16 +26,6 @@ extension FlashCardTask {
             public var examPaperSemester: Task.ExamSemester?
 
             public var examPaperYear: Int?
-
-            public mutating func validate() throws {
-                guard !question.isEmpty else {
-                    throw Abort(.badRequest)
-                }
-                guard !solution.isEmpty else {
-                    throw Abort(.badRequest)
-                }
-                isTestable = false
-            }
         }
 
         public typealias Response = Task

@@ -207,7 +207,7 @@ extension TaskSolution {
                     Task.query(on: self.conn)
                         .join(\TaskSolution.DatabaseModel.taskID, to: \Task.id)
                         .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                         .filter(\Topic.DatabaseModel.subjectId == subjectID)
                         .filter(\TaskSolution.DatabaseModel.approvedBy == nil)
                         .range(0..<10)

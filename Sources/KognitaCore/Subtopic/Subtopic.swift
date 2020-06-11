@@ -17,29 +17,29 @@ extension Subtopic {
 
         public var name: String
 
-        public var topicId: Topic.ID
+        public var topicID: Topic.ID
 
         public var createdAt: Date?
 
         public var updatedAt: Date?
 
-        init(name: String, topicId: Topic.ID) {
+        init(name: String, topicID: Topic.ID) {
             self.name = name
-            self.topicId = topicId
+            self.topicID = topicID
         }
 
         init(content: Create.Data) {
             self.name = content.name
-            self.topicId = content.topicId
+            self.topicID = content.topicId
         }
 
         public func updateValues(with content: Create.Data) {
             self.name = content.name
-            self.topicId = content.topicId
+            self.topicID = content.topicId
         }
 
         public static func addTableConstraints(to builder: SchemaCreator<Subtopic.DatabaseModel>) {
-            builder.reference(from: \.topicId, to: \Topic.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+            builder.reference(from: \.topicID, to: \Topic.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
         }
     }
 }
@@ -49,7 +49,7 @@ extension Subtopic.DatabaseModel: ContentConvertable {
         try .init(
             id: requireID(),
             name: name,
-            topicID: topicId
+            topicID: topicID
         )
     }
 }

@@ -40,10 +40,28 @@ extension MultipleChoiceTask {
     }
 }
 
+extension MultipleChoiceTask.Create.Data: Validatable {
+    public static func validations() throws -> Validations<MultipleChoiceTask.Create.Data> {
+        var validations = try basicValidations()
+        validations.add(\.self, at: ["choices"], "Contains choices") { data in
+            guard data.isMultipleSelect == false else { return }
+            guard data.choises.filter({ $0.isCorrect }).count == 1 else {
+                throw BasicValidationError("Need to set a correct answer")
+            }
+        }
+        validations.add(\.choises, at: ["choices"], "Unique choices") { (choices) in
+            guard Set(choices.map { $0.choice }).count == choices.count else {
+                throw BasicValidationError("Some choices contain the same description")
+            }
+        }
+        return validations
+    }
+}
+
 extension MultipleChoiceTask.DatabaseRepository {
 
     public func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask> {
-
+        try content.validate()
         guard let user = user else {
             throw Abort(.unauthorized)
         }
@@ -89,6 +107,7 @@ extension MultipleChoiceTask.DatabaseRepository {
 
     public func update(model: MultipleChoiceTask, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
 
+        try data.validate()
         return try userRepository
             .isModerator(user: user, taskID: model.id)
             .flatMap {

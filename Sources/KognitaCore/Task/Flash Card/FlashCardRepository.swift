@@ -190,7 +190,7 @@ extension FlashCardTask.DatabaseRepository {
         return Task.query(on: conn, withSoftDeleted: true)
             .filter(\Task.id == flashCard.id)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
             .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
             .alsoDecode(Topic.DatabaseModel.self)
             .alsoDecode(Subject.DatabaseModel.self)
@@ -233,7 +233,7 @@ extension FlashCardTask.DatabaseRepository {
 
                 Subject.DatabaseModel.query(on: self.conn)
                     .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
-                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
                     .filter(\Subtopic.DatabaseModel.id == taskInfo.0.subtopicID)
                     .first()
                     .unwrap(or: Abort(.internalServerError))

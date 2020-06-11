@@ -386,7 +386,7 @@ extension TestSession {
                     return try SubjectTest.Pivot.Task.query(on: self.conn)
                         .join(\Task.id, to: \SubjectTest.Pivot.Task.taskID)
                         .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                         .filter(\.testID == test.requireID())
                         .alsoDecode(Task.self)
                         .alsoDecode(Topic.DatabaseModel.self)

@@ -15,7 +15,7 @@ extension PracticeSession {
 extension PracticeSession.Pivot {
     final class Subtopic: PostgreSQLPivot {
 
-        public static var name: String = "PracticeSession.Subtopic"
+        public static var name: String = "PracticeSession_Subtopic"
 
         public typealias Database = PostgreSQLDatabase
 

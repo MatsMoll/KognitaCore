@@ -116,7 +116,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                             .flatMap { topic in
                                 try Subtopic.DatabaseModel(
                                     name: "Generelt",
-                                    topicId: topic.requireID()
+                                    topicID: topic.requireID()
                                 )
                                 .save(on: self.conn)
                                 .map { _ in try topic.content() }
@@ -128,14 +128,14 @@ extension Topic.DatabaseRepository: TopicRepository {
     public func numberOfTasks(in topic: Topic) throws -> EventLoopFuture<Int> {
         return Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
-            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
+            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
             .count()
     }
 
     public func tasks(in topic: Topic) throws -> EventLoopFuture<[Task]> {
         return Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
-            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
+            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
             .all()
     }
 
@@ -180,7 +180,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     .all(table: Topic.DatabaseModel.self)
                     .from(Topic.DatabaseModel.self)
                     .column(.count(\Task.id), as: "taskCount")
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
                     .groupBy(\Topic.DatabaseModel.id)
                     .where(\Topic.DatabaseModel.subjectId == subject.id)
@@ -210,7 +210,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
     public func getTopic(for task: Task) -> EventLoopFuture<Topic> {
         return Topic.DatabaseModel.query(on: conn)
-            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
             .filter(\Subtopic.DatabaseModel.id == task.subtopicID)
             .first()
             .unwrap(or: Abort(.internalServerError))
@@ -226,7 +226,7 @@ extension Topic.DatabaseRepository: TopicRepository {
             .column(.count(\Task.id), as: "numberOfTasks")
             .from(Subject.DatabaseModel.self)
             .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId, method: .left)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID, method: .left)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID, method: .left)
             .where(\Task.deletedAt == nil)
             .groupBy(\Topic.DatabaseModel.id)
@@ -247,7 +247,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
     public func exportTasks(in topic: Topic) throws -> EventLoopFuture<TopicExportContent> {
         return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicId == topic.id)
+            .filter(\.topicID == topic.id)
             .all()
             .flatMap { subtopics in
                 try subtopics.map {
@@ -338,7 +338,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
         return Subtopic.DatabaseModel(
             name: content.subtopic.name,
-            topicId: content.subtopic.topicID
+            topicID: content.subtopic.topicID
             )
             .create(on: conn)
             .flatMap { subtopic in

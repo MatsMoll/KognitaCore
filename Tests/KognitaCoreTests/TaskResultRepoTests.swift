@@ -188,8 +188,8 @@ class TaskResultRepoTests: VaporTestCase {
             XCTAssertEqual(subjectProgress.correctScore, 2)
             XCTAssertEqual(subjectProgress.maxScore, 3)
             XCTAssertEqual(topicProgress.count, 2)
-            try topicProgress.forEach { result in
-                if try result.topicID == topic.id {
+            topicProgress.forEach { result in
+                if result.topicID == topic.id {
                     XCTAssertEqual(result.correctScore, 1)
                     XCTAssertEqual(result.maxScore, 2)
                 } else {

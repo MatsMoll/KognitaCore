@@ -75,7 +75,7 @@ extension Task.DatabaseRepository {
     public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
 
         return Topic.DatabaseModel.query(on: conn)
-            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
             .join(\User.DatabaseModel.id, to: \Task.creatorID)
             .filter(\.subjectId == subject.id)
@@ -100,7 +100,7 @@ extension Task.DatabaseRepository {
     public func getTasks(in topic: Topic) throws -> EventLoopFuture<[Task]> {
         return Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
+            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
             .all()
     }
 
@@ -108,7 +108,7 @@ extension Task.DatabaseRepository {
 
         return Task.query(on: conn, withSoftDeleted: withSoftDeleted)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
             .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
             .join(\User.DatabaseModel.id, to: \Task.creatorID)
             .filter(filter)
@@ -149,9 +149,9 @@ extension Task.DatabaseRepository {
 
                 let useSoftDeleted = isModerator ? withSoftDeleted : false
                 var dbQuery = Task.query(on: self.conn, withSoftDeleted: useSoftDeleted)
-                    .join(\User.id, to: \Task.creatorID)
+                    .join(\User.DatabaseModel.id, to: \Task.creatorID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                     .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id, method: .left)
                     .filter(\Topic.DatabaseModel.subjectId == subjectId)
                     .alsoDecode(User.DatabaseModel.self)
@@ -263,7 +263,7 @@ extension Task.DatabaseRepository {
     public func examTasks(subjectID: Subject.ID) -> EventLoopFuture<[Task]> {
         Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
             .filter(\.isTestable == true)
             .filter(\Topic.DatabaseModel.subjectId == subjectID)
             .all()

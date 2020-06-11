@@ -119,8 +119,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            var sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            var sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -138,16 +138,22 @@ class TestSessionTests: VaporTestCase {
 
             var results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
+            sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+
             XCTAssertEqual(results.count, 3)
-            XCTAssertNotNil(sessionOneEntry.submittedAt)
-            XCTAssertNil(sessionTwoEntry.submittedAt)
+            XCTAssertNotNil(sessionOne.submittedAt)
+            XCTAssertNil(sessionTwo.submittedAt)
 
             try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
             results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
+            sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+
             XCTAssertEqual(results.count, 5)
-            XCTAssertNotNil(sessionOneEntry.submittedAt)
-            XCTAssertNotNil(sessionTwoEntry.submittedAt)
+            XCTAssertNotNil(sessionOne.submittedAt)
+            XCTAssertNotNil(sessionTwo.submittedAt)
             XCTAssertEqual(results.filter({ $0.sessionID == sessionOneEntry.id }).count, 3)
             XCTAssertEqual(results.filter({ $0.sessionID == sessionTwoEntry.id }).count, 2)
             XCTAssert(results.allSatisfy({ $0.resultScore == 1 }), "One or more results was not recored as 100% correct")
@@ -166,7 +172,7 @@ class TestSessionTests: VaporTestCase {
     }
 
     func testResultsAfterSubmittion() throws {
-        do {
+        failableTest {
             let test = try setupTestWithTasks()
 
             let userOne = try User.create(on: conn)
@@ -211,13 +217,11 @@ class TestSessionTests: VaporTestCase {
             XCTAssertEqual(userTwoResults.score, 2)
             XCTAssertEqual(userTwoResults.scoreProsentage, 2/3)
             XCTAssertEqual(userTwoResults.maximumScore, 3)
-        } catch {
-            XCTFail(error.localizedDescription)
         }
     }
 
-    func testOverview() throws {
-        do {
+    func testOverview() {
+        failableTest {
             let test = try setupTestWithTasks()
 
             let userOne = try User.create(on: conn)

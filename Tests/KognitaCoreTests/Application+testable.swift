@@ -123,7 +123,7 @@ private func setupDatabase(for enviroment: Environment, in services: inout Servi
 
     // Register the configured PostgreSQL database to the database config.
     var databases = DatabasesConfig()
-//    databases.enableLogging(on: .psql)
+    databases.enableLogging(on: .psql)
     databases.add(database: postgres, as: .psql)
     services.register(databases)
 }

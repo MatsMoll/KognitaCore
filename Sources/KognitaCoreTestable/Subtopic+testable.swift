@@ -33,7 +33,7 @@ extension Subtopic {
     /// - Returns: The created `Subtopic`
     public static func create(name: String = "Topic", topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
 
-        return try Subtopic.DatabaseModel(name: name, topicId: topicId)
+        return try Subtopic.DatabaseModel(name: name, topicID: topicId)
             .save(on: conn)
             .map { try $0.content() }
             .wait()

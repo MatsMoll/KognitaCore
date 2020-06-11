@@ -50,14 +50,14 @@ extension Subtopic.DatabaseRepository {
 
     public func getSubtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]> {
         return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicId == topic.id)
+            .filter(\.topicID == topic.id)
             .all()
             .map { try $0.map { try $0.content() }}
     }
 
     public func subtopics(with topicID: Topic.ID) -> EventLoopFuture<[Subtopic]> {
         return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicId == topicID)
+            .filter(\.topicID == topicID)
             .all()
             .map { try $0.map { try $0.content() }}
     }

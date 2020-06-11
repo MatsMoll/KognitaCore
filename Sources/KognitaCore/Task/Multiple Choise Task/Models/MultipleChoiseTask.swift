@@ -87,6 +87,19 @@ extension MultipleChoiceTask.DatabaseModel {
         }
     }
 
+    /// Fetches the relevant data used to present a task to the user
+    ///
+    /// - Parameter conn: A connection to the database
+    /// - Returns: A `MultipleChoiseTaskContent` object
+    /// - Throws: If there is no relation to a `Task` object or a database error
+    func content(task: Task, choices: [MultipleChoiseTaskChoise]) throws -> MultipleChoiceTask {
+        return MultipleChoiceTask(
+            task: task,
+            isMultipleSelect: isMultipleSelect,
+            choises: choices.shuffled()
+        )
+    }
+
     /// Returns the next multiple choise task if it exists
     ///
     /// - Parameter conn: The database connection
@@ -127,7 +140,7 @@ extension MultipleChoiceTask.DatabaseModel {
     static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiceTask.DatabaseModel]> {
         return Task.query(on: conn)
             .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .filter(\Subtopic.DatabaseModel.topicId == topic.id)
+            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
             .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
             .decode(MultipleChoiceTask.DatabaseModel.self)
             .all()

@@ -12,7 +12,7 @@ extension PracticeSession.Pivot {
 
     final class Task: PostgreSQLPivot {
 
-        static var name: String = "PracticeSession.Task"
+        static var name: String = "PracticeSession_Task"
 
         public typealias Database = PostgreSQLDatabase
 

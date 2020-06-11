@@ -185,7 +185,7 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func testRetrivingTaskContent() throws {
-        do {
+        failableTest {
             let test = try setupTestWithTasks(numberOfTasks: 3)
 
             XCTAssertTrue(test.isOpen)
@@ -242,8 +242,6 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertThrowsError(
                 try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userOne).wait()
             )
-        } catch {
-            XCTFail(error.localizedDescription)
         }
     }
 

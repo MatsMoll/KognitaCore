@@ -181,13 +181,40 @@ class MultipleChoiseTaskTests: VaporTestCase {
             .wait()
 
         let startingTask = try Task.query(on: conn, withSoftDeleted: true)
-            .filter(\.id == editedMultiple.id)
+            .filter(\.id == startingMultiple.id)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .wait() // refershing
 
         XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
         XCTAssertEqual(editedMultiple.id, startingTask.editedTaskID)
+    }
+
+    func testNonCorrectAnswers() {
+        failableTest {
+            _ = try MultipleChoiceTask.create(on: conn)
+            let startingMultiple = try MultipleChoiceTask.create(on: conn)
+
+            let user = try User.create(on: conn)
+
+            let content = MultipleChoiceTask.Create.Data(
+                subtopicId: startingMultiple.subtopicID,
+                description: startingMultiple.description,
+                question: startingMultiple.question,
+                solution: "Something",
+                isMultipleSelect: startingMultiple.isMultipleSelect,
+                examPaperSemester: nil,
+                examPaperYear: startingMultiple.examYear,
+                isTestable: startingMultiple.isTestable,
+                choises: (0...3).map { _ in MultipleChoiceTaskChoice.Create.Data(choice: "Test", isCorrect: false) }
+            )
+
+            XCTAssertThrowsError(
+                try multipleChoiceRepository
+                    .update(model: startingMultiple, to: content, by: user)
+                    .wait()
+            )
+        }
     }
 
     func testAnswerIsSavedOnSubmit() throws {

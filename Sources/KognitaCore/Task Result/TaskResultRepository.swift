@@ -72,9 +72,9 @@ extension TaskResult.DatabaseRepository {
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics:
-                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicId" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Topic"."id" = ANY($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Topic"."id" = ANY($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInSubject:
-                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicId" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectId" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Subject"."id" = ($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectId" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Subject"."id" = ($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
         }
 
@@ -177,7 +177,7 @@ extension TaskResult.DatabaseRepository {
                     .sort(\.revisitDate)
                     .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
 
                 if let maxRevisitDays = maxRevisitDays,
                     let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
@@ -206,7 +206,7 @@ extension TaskResult.DatabaseRepository {
                     .sort(\.revisitDate, .ascending)
                     .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                     .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
                     .alsoDecode(Topic.DatabaseModel.self)
                     .alsoDecode(Subject.DatabaseModel.self)
@@ -300,7 +300,7 @@ extension TaskResult.DatabaseRepository {
             .from(TaskResult.DatabaseModel.self)
             .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
             .where(\TaskResult.DatabaseModel.userID == user.id)
             .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
             .where(\Topic.DatabaseModel.subjectId == subjectId)
@@ -373,7 +373,7 @@ extension TaskResult.DatabaseRepository {
                             .where(\TaskResult.DatabaseModel.id, .in, ids)
                             .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
                             .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-                            .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
+                            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
                             .all(decoding: UserLevelScore.self)
                             .flatMap { scores in
 
@@ -382,7 +382,7 @@ extension TaskResult.DatabaseRepository {
 
                                     Task.query(on: psqlConn)
                                         .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                                        .filter(\Subtopic.DatabaseModel.topicId == topicID)
+                                        .filter(\Subtopic.DatabaseModel.topicID == topicID)
                                         .count()
                                         .map { maxScore in
                                             User.TopicLevel(
@@ -422,7 +422,7 @@ extension TaskResult.DatabaseRepository {
 
                                 Task.query(on: psqlConn)
                                     .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                                     .filter(\Topic.DatabaseModel.subjectId == subject.id)
                                     .count()
                                     .map { maxScore in

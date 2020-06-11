@@ -17,27 +17,29 @@ public protocol TaskCreationContentable {
 
     /// The year of the exam
     var examPaperYear: Int? { get }
-
-    mutating func validate() throws
 }
 
-extension TaskCreationContentable {
+extension TaskCreationContentable where Self: Validatable {
 
-    public func validate() throws {
-        guard !question.isEmpty else {
-            throw Abort(.badRequest)
+    public static func basicValidations() throws -> Validations<Self> {
+        var validations = Validations(Self.self)
+        validations.add(\.question, at: ["question"], "No question") { (question) in
+            guard question.isEmpty == false else { throw BasicValidationError("Missing question") }
         }
-
-        if let examYear = examPaperYear {
+        validations.add(\.self, at: ["exampPaperYear"], "Invalid exam year") { data in
             let year = Calendar.current.component(.year, from: Date())
+            guard let examYear = data.examPaperYear else { return }
             guard examYear <= year, year > 1990 else {
-                throw Abort(.badRequest)
+                throw BasicValidationError("Exam Year is either in the future or before 1990")
             }
-            guard examPaperSemester != nil else {
-                throw Abort(.badRequest)
+            guard data.examPaperSemester != nil else {
+                throw BasicValidationError("Exam semester has not been set")
             }
         }
+        return validations
     }
+
+    public static func validations() throws -> Validations<Self> { try basicValidations() }
 }
 
 extension MultipleChoiceTask.Create.Data: TaskCreationContentable {

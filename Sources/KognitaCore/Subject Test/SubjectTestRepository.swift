@@ -180,7 +180,7 @@ extension SubjectTest {
             return TestSession.DatabaseModel.query(on: conn)
                 .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
                 .filter(\TaskSession.userID == user.id)
-                .filter(\TestSession.testID == test.id)
+                .filter(\TestSession.DatabaseModel.testID == test.id)
                 .first()
                 .flatMap { session in
 
@@ -265,6 +265,7 @@ extension SubjectTest {
                     else {
                         throw Abort(.internalServerError)
                     }
+                    let choices = taskContent.map { $0.1 }
 
                     return try TaskSessionAnswer.query(on: self.conn)
                         .join(\MultipleChoiseTaskAnswer.id, to: \TaskSessionAnswer.taskAnswerID)
@@ -273,28 +274,39 @@ extension SubjectTest {
                         .filter(\MultipleChoiseTaskChoise.taskId == task.requireID())
                         .decode(MultipleChoiseTaskAnswer.self)
                         .all()
-                        .flatMap { _ in
+                        .flatMap { answers in
 
-                            SubjectTest.Pivot.Task
+                            let answeredChoices = answers.map { $0.choiseID }
+
+                            return SubjectTest.Pivot.Task
                                 .query(on: self.conn)
                                 .filter(\.testID == session.testID)
                                 .all()
-                                .flatMap { _ in
+                                .flatMap { testTasks in
 
                                     SubjectTest.DatabaseModel
                                         .find(session.testID, on: self.conn)
                                         .unwrap(or: Abort(.internalServerError))
-                                        .map { _ in
+                                        .map { test in
 
-                                            throw Abort(.notImplemented)
-//                                            try SubjectTest.MultipleChoiseTaskContent(
-//                                                test: test.content(),
-//                                                task: task,
-//                                                multipleChoiseTask: multipleChoiseTask,
-//                                                choises: taskContent.map { $0.1 },
-//                                                selectedChoises: answers,
-//                                                testTasks: testTasks
-//                                            )
+                                            try SubjectTest.MultipleChoiseTaskContent(
+                                                test: test.content(),
+                                                task: multipleChoiseTask.content(task: task, choices: choices),
+                                                choises: choices.map { choice in
+                                                    try MultipleChoiseTaskContent.Choise(
+                                                        id: choice.requireID(),
+                                                        choise: choice.choise,
+                                                        isCorrect: choice.isCorrect,
+                                                        isSelected: answeredChoices.contains(choice.requireID())
+                                                    )
+                                                },
+                                                testTasks: testTasks.map { testTask in
+                                                    try AssignedTask(
+                                                        testTaskID: testTask.requireID(),
+                                                        isCurrent: testTask.taskID == id
+                                                    )
+                                                }
+                                            )
                                     }
                             }
                     }
@@ -754,7 +766,7 @@ extension SubjectTest {
                                 .join(\TaskResult.DatabaseModel.sessionID, to: \PracticeSession.Pivot.Task.sessionID)
                                 .join(\Task.id, to: \TaskResult.taskID)
                                 .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                                .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicId)
+                                .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
                                 .filter(\PracticeSession.Pivot.Task.isCompleted == true)
                                 .filter(\Topic.DatabaseModel.subjectId == test.subjectID)
                                 .filter(\PracticeSession.Pivot.Task.createdAt < endedAt)
