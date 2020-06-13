@@ -2,11 +2,15 @@ import Vapor
 import FluentPostgreSQL
 
 extension TaskDiscussion {
-    struct DatabaseRepository: TaskDiscussionRepositoring, DatabaseConnectableRepository {
+    public struct DatabaseRepository: TaskDiscussionRepositoring, DatabaseConnectableRepository {
+
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
 
         typealias DatabaseModel = TaskDiscussion.DatabaseModel
 
-        let conn: DatabaseConnectable
+        public let conn: DatabaseConnectable
 
         public func getDiscussions(in taskID: Task.ID) throws -> EventLoopFuture<[TaskDiscussion]> {
             TaskDiscussion.DatabaseModel.query(on: conn)
@@ -74,7 +78,7 @@ extension TaskDiscussion {
                 .first()
         }
 
-        public func create(from content: TaskDiscussion.Create.Data, by user: User?) throws -> EventLoopFuture<Void> {
+        public func create(from content: TaskDiscussion.Create.Data, by user: User?) throws -> EventLoopFuture<NoData> {
 
             guard let user = user else {
                 throw Abort(.unauthorized)
@@ -82,17 +86,25 @@ extension TaskDiscussion {
 
             return try TaskDiscussion.DatabaseModel(data: content, userID: user.id)
                 .create(on: conn)
-                .transform(to: ())
+                .transform(to: NoData())
         }
 
-        public func update(model: TaskDiscussion.DatabaseModel, to data: TaskDiscussion.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
+        public func updateModelWith(id: Int, to data: TaskDiscussion.Update.Data, by user: User) throws -> EventLoopFuture<NoData> {
+            TaskDiscussion.DatabaseModel.find(id, on: conn)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { model in
+                    try self.update(model: model, to: data, by: user)
+            }
+        }
+
+        func update(model: TaskDiscussion.DatabaseModel, to data: TaskDiscussion.Update.Data, by user: User) throws -> EventLoopFuture<NoData> {
 
             guard user.id == model.userID else {
                 throw Abort(.forbidden)
             }
             try model.update(with: data)
             return model.save(on: conn)
-                .transform(to: ())
+                .transform(to: NoData())
         }
 
         public func respond(with response: TaskDiscussionResponse.Create.Data, by user: User) throws -> EventLoopFuture<Void> {

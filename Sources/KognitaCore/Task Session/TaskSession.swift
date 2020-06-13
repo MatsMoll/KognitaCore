@@ -38,7 +38,7 @@ extension TaskSession {
 }
 
 extension PracticeSession {
-    public struct PracticeParameter: ModelParameterRepresentable, Content, PracticeSessionRepresentable {
+    public struct PracticeParameter: Content, PracticeSessionRepresentable {
 
         let session: TaskSession
         let practiceSession: PracticeSession.DatabaseModel
@@ -53,10 +53,11 @@ extension PracticeSession {
         public typealias ParameterModel = PracticeParameter
         public typealias ResolvedParameter = EventLoopFuture<PracticeParameter>
 
-        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<PracticeParameter> {
-            guard let id = Int(parameter) else {
-                return conn.future(error: Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`."))
-            }
+        public func content() -> PracticeSession {
+            PracticeSession(model: practiceSession)
+        }
+
+        public static func resolveWith(_ id: Int, conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
             return TaskSession.query(on: conn)
                 .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
                 .filter(\TaskSession.id == id)
@@ -66,9 +67,6 @@ extension PracticeSession {
                 .map {
                     PracticeParameter(session: $0.0, practiceSession: $0.1)
             }
-        }
-        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<PracticeParameter> {
-            throw Abort(.notImplemented)
         }
 
         public func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {

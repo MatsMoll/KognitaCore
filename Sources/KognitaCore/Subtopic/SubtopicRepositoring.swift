@@ -13,6 +13,7 @@ public protocol SubtopicRepositoring: CreateModelRepository,
     DeleteModelRepository,
     RetriveModelRepository
     where
+    ID              == Int,
     Model           == Subtopic,
     CreateData      == Subtopic.Create.Data,
     CreateResponse  == Subtopic.Create.Response,

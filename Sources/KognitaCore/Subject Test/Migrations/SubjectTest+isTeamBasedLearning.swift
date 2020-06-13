@@ -3,7 +3,7 @@ import FluentPostgreSQL
 
 extension SubjectTest {
 
-    public enum Migration {
+    enum Migration {
 
         struct IsTeamBasedLearning: PostgreSQLMigration {
 

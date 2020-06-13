@@ -71,7 +71,7 @@ extension User.ResetPassword {
     }
 }
 
-protocol ResetPasswordRepositoring {
+public protocol ResetPasswordRepositoring {
     func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response>
     func reset(to content: User.ResetPassword.Data, with token: String) throws -> EventLoopFuture<Void>
 }
@@ -93,7 +93,7 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
         case incorrectOrExpiredToken
     }
 
-    func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
+    public func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
 
         return try User.ResetPassword.Token(userId: user.id)
             .save(on: conn)

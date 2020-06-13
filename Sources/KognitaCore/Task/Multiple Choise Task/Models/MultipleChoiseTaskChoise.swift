@@ -31,10 +31,8 @@ public final class MultipleChoiseTaskChoise: PostgreSQLModel {
 
     public init(content: MultipleChoiceTaskChoice.Create.Data, taskID: MultipleChoiceTask.ID) {
         self.taskId = taskID
-        self.choise = content.choice
         self.isCorrect = content.isCorrect
-
-        self.choise.makeHTMLSafe()
+        self.choise = (try? content.choice.cleanXSS(whitelist: .basicWithImages())) ?? content.choice
     }
 }
 
@@ -55,5 +53,4 @@ extension MultipleChoiseTaskChoise: Migration {
     }
 }
 
-extension MultipleChoiseTaskChoise: ModelParameterRepresentable { }
 extension MultipleChoiseTaskChoise: Content { }

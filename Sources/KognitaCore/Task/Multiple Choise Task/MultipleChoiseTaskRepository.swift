@@ -13,7 +13,7 @@ public protocol MultipleChoiseTaskRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
-    Model           == MultipleChoiceTask,
+    ID              == Int,
     CreateData      == MultipleChoiceTask.Create.Data,
     CreateResponse  == MultipleChoiceTask.Create.Response,
     UpdateData      == MultipleChoiceTask.Update.Data,
@@ -30,6 +30,10 @@ public protocol MultipleChoiseTaskRepository: CreateModelRepository,
 
 extension MultipleChoiceTask {
     public struct DatabaseRepository: MultipleChoiseTaskRepository, DatabaseConnectableRepository {
+
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
 
         public let conn: DatabaseConnectable
 
@@ -105,22 +109,21 @@ extension MultipleChoiceTask.DatabaseRepository {
         }
     }
 
-    public func update(model: MultipleChoiceTask, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
-
+    public func updateModelWith(id: Int, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
         try data.validate()
         return try userRepository
-            .isModerator(user: user, taskID: model.id)
+            .isModerator(user: user, taskID: id)
             .flatMap {
-                try self.update(taskID: model.id, to: data, by: user)
+                try self.update(taskID: id, to: data, by: user)
         }
         .catchFlatMap { _ in
-            Task.find(model.id, on: self.conn)
+            Task.find(id, on: self.conn)
                 .unwrap(or: Abort(.badRequest))
                 .flatMap { taskModel in
                     guard taskModel.creatorID == user.id else {
                         throw Abort(.forbidden)
                     }
-                    return try self.update(taskID: model.id, to: data, by: user)
+                    return try self.update(taskID: id, to: data, by: user)
             }
         }
     }
@@ -141,17 +144,17 @@ extension MultipleChoiceTask.DatabaseRepository {
         }
     }
 
-    public func delete(model: MultipleChoiceTask, by user: User?) throws -> EventLoopFuture<Void> {
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
         return try userRepository
-            .isModerator(user: user, taskID: model.id)
+            .isModerator(user: user, taskID: id)
             .map { true }
             .catchMap { _ in false }
             .flatMap { isModerator in
 
-                Task.find(model.id, on: self.conn)
+                Task.find(id, on: self.conn)
                     .unwrap(or: Abort(.badRequest))
                     .flatMap { task in
 

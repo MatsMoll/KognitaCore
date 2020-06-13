@@ -11,8 +11,10 @@ import Vapor
 public protocol TopicRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository,
+    RetriveModelRepository,
     RetriveAllModelsRepository
     where
+    ID              == Int,
     Model           == Topic,
     ResponseModel   == Topic,
     CreateData      == Topic.Create.Data,
@@ -25,6 +27,7 @@ public protocol TopicRepository: CreateModelRepository,
     func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic]>
     func importContent(from content: TopicExportContent, in subject: Subject) throws -> EventLoopFuture<Void>
     func importContent(from content: SubtopicExportContent, in topic: Topic) throws -> EventLoopFuture<Void>
+    func getTopicsWithTaskCount(in subject: Subject) throws -> EventLoopFuture<[Topic.WithTaskCount]>
 }
 
 public struct TimelyTopic: Codable {
@@ -77,6 +80,10 @@ extension Topic {
 extension Topic {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
         public let conn: DatabaseConnectable
 
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
@@ -89,15 +96,17 @@ extension Topic {
 
 extension Topic.DatabaseRepository: TopicRepository {
 
-    public func delete(model: Topic, by user: User?) throws -> EventLoopFuture<Void> {
-        deleteDatabase(Topic.DatabaseModel.self, model: model)
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Topic.DatabaseModel.self, modelID: id)
     }
 
-    public func update(model: Topic, to data: Topic.Update.Data, by user: User) throws -> EventLoopFuture<Topic> {
-        updateDatabase(Topic.DatabaseModel.self, model: model, to: data)
+    public func updateModelWith(id: Int, to data: Topic.Update.Data, by user: User) throws -> EventLoopFuture<Topic> {
+        updateDatabase(Topic.DatabaseModel.self, modelID: id, to: data)
     }
 
     public func all() throws -> EventLoopFuture<[Topic]> { all(Topic.DatabaseModel.self) }
+    public func find(_ id: Int) -> EventLoopFuture<Topic?> { findDatabaseModel(Topic.DatabaseModel.self, withID: id) }
+    public func find(_ id: Int, or error: Error) -> EventLoopFuture<Topic> { findDatabaseModel(Topic.DatabaseModel.self, withID: id, or: error) }
 
     public func create(from content: Topic.Create.Data, by user: User?) throws -> EventLoopFuture<Topic.Create.Response> {
 

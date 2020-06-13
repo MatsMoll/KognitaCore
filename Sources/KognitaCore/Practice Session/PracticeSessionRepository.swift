@@ -19,12 +19,18 @@ public protocol PracticeSessionRepository: CreateModelRepository
     func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>>
     func currentActiveTask(in session: PracticeSession) throws -> EventLoopFuture<TaskType>
     func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable>
+    func find(_ id: Int) -> EventLoopFuture<PracticeSessionRepresentable>
+    func taskID(index: Int, in sessionID: PracticeSession.ID) -> EventLoopFuture<Task.ID>
+    func getResult(for sessionID: PracticeSession.ID) throws -> EventLoopFuture<[PracticeSession.TaskResult]>
+    func taskAt(index: Int, in sessionID: PracticeSession.ID) throws -> EventLoopFuture<TaskType>
 }
 
 extension PracticeSession {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        typealias DatabaseModel = PracticeSession.DatabaseModel
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
 
         public let conn: DatabaseConnectable
 
@@ -43,6 +49,10 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         case nextTaskNotAssigned
         case incorrectTaskType
         case noMoreTasks
+    }
+
+    public func find(_ id: Int) -> EventLoopFuture<PracticeSessionRepresentable> {
+        PracticeSession.PracticeParameter.resolveWith(id, conn: conn)
     }
 
     public func create(from content: PracticeSession.Create.Data, by user: User?) throws -> EventLoopFuture<PracticeSession.Create.Response> {
@@ -261,21 +271,23 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         }
     }
 
-    public func taskAt(index: Int, in sessionID: PracticeSession.ID, on conn: PostgreSQLConnection) throws -> EventLoopFuture<TaskType> {
+    public func taskAt(index: Int, in sessionID: PracticeSession.ID) throws -> EventLoopFuture<TaskType> {
 
-        return conn.select()
-            .all(table: Task.self)
-            .all(table: MultipleChoiceTask.DatabaseModel.self)
-            .from(PracticeSession.Pivot.Task.self)
-            .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
-            .where(\PracticeSession.Pivot.Task.index == index)
-            .orderBy(\PracticeSession.Pivot.Task.index, .descending)
-            .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
-            .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
-            .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
-            .unwrap(or: Abort(.badRequest))
-            .map { taskContent in
-                TaskType(content: taskContent)
+        conn.databaseConnection(to: .psql).flatMap { conn in
+            conn.select()
+                .all(table: Task.self)
+                .all(table: MultipleChoiceTask.DatabaseModel.self)
+                .from(PracticeSession.Pivot.Task.self)
+                .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
+                .where(\PracticeSession.Pivot.Task.index == index)
+                .orderBy(\PracticeSession.Pivot.Task.index, .descending)
+                .join(\PracticeSession.Pivot.Task.taskID, to: \Task.id)
+                .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+                .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel?.self)
+                .unwrap(or: Abort(.badRequest))
+                .map { taskContent in
+                    TaskType(content: taskContent)
+            }
         }
     }
 

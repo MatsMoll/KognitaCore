@@ -4,7 +4,7 @@ public protocol TaskSolutionRepositoring: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
-    Model           == TaskSolution,
+    ID              == Int,
     CreateData      == TaskSolution.Create.Data,
     CreateResponse  == TaskSolution,
     UpdateData      == TaskSolution.Update.Data,

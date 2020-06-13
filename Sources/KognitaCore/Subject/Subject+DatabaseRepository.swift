@@ -28,6 +28,10 @@ extension String {
 
 extension Subject {
     public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
 
         typealias DatabaseModel = Subject.DatabaseModel
 
@@ -56,12 +60,12 @@ extension Subject.DatabaseRepository {
         }
     }
 
-    public func delete(model: Subject, by user: User?) throws -> EventLoopFuture<Void> {
-        deleteDatabase(Subject.DatabaseModel.self, model: model)
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Subject.DatabaseModel.self, modelID: id)
     }
 
-    public func update(model: Subject, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject> {
-        updateDatabase(Subject.DatabaseModel.self, model: model, to: data)
+    public func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject> {
+        updateDatabase(Subject.DatabaseModel.self, modelID: id, to: data)
     }
 
     public func all() throws -> EventLoopFuture<[Subject]> { all(Subject.DatabaseModel.self) }

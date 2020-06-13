@@ -10,7 +10,9 @@ import FluentSQL
 import Vapor
 
 extension TaskResult {
-    public class DatabaseRepository: TaskResultRepositoring {}
+    public class DatabaseRepository: TaskResultRepositoring {
+        public init() {}
+    }
 }
 
 public protocol PracticeSessionRepresentable: Codable {
@@ -21,6 +23,8 @@ public protocol PracticeSessionRepresentable: Codable {
     var numberOfTaskGoal: Int { get }
 
     func requireID() throws -> Int
+
+    func content() -> PracticeSession
 
     func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
     func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>

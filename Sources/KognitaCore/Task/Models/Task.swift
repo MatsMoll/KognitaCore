@@ -183,7 +183,6 @@ extension Task {
 }
 
 extension Task: Content { }
-extension Task: ModelParameterRepresentable { }
 
 extension Task {
     public struct BetaFormat: Content {

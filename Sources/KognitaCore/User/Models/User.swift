@@ -142,6 +142,17 @@ extension User.Login.Token: BearerAuthenticatable, Token {
         DatabaseModel.authenticate(using: bearer, on: connection).map { try $0?.content() }
     }
 
+    public static func bearerAuthMiddleware() -> BearerAuthenticationMiddleware<User.Login.Token> { .init() }
+}
+
+extension User {
+    public static func basicAuthMiddleware(using verifier: PasswordVerifier) -> BasicAuthenticationMiddleware<User> {
+        BasicAuthenticationMiddleware(verifier: verifier)
+    }
+
+    public static func tokenAuthMiddleware() -> TokenAuthenticationMiddleware<User> {
+        TokenAuthenticationMiddleware(bearer: User.Login.Token.bearerAuthMiddleware())
+    }
 }
 
 /// Allows `User` to be used as a dynamic parameter in route definitions.

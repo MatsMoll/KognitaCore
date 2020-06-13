@@ -9,9 +9,22 @@ import Foundation
 import Vapor
 import FluentPostgreSQL
 
-public protocol ModelParameterRepresentable: Parameter {
-    associatedtype ParameterModel
-    static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<ParameterModel>
+public protocol MayBeExpressibleByStringLiteral {
+    static func expressedBy(string: String) -> Self?
+}
+
+extension Int: MayBeExpressibleByStringLiteral {
+    public static func expressedBy(string: String) -> Int? { Int(string) }
+}
+
+public protocol ModelParameterRepresentable: Parameter where ResolvedParameter == Never {
+    associatedtype ID: MayBeExpressibleByStringLiteral
+}
+
+extension ModelParameterRepresentable {
+    public static func resolveParameter(_ parameter: String, on container: Container) throws -> Never {
+        throw Abort(.notImplemented)
+    }
 }
 
 extension PostgreSQLModel where Self: ModelParameterRepresentable {
@@ -28,11 +41,14 @@ extension PostgreSQLModel where Self: ModelParameterRepresentable {
 }
 
 extension ParametersContainer {
-    public func model<T: ModelParameterRepresentable>(_ model: T.Type, on conn: DatabaseConnectable) -> EventLoopFuture<T.ParameterModel> {
-        guard let parameter = self.rawValues(for: T.self).first else {
-            return conn.future(error: Abort(.badRequest))
+    public func modelID<T: ModelParameterRepresentable>(_ model: T.Type) throws -> T.ID {
+        guard
+            let parameter = self.rawValues(for: T.self).first,
+            let id = T.ID.expressedBy(string: parameter)
+        else {
+            throw Abort(.badRequest)
         }
-        return T.resolveParameter(parameter, conn: conn)
+        return id
     }
 }
 

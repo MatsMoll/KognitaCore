@@ -15,6 +15,9 @@ public protocol UserRepository: CreateModelRepository,
     CreateData      == User.Create.Data,
     CreateResponse  == User,
     Model           == User {
+
+    func login(with user: User) throws -> EventLoopFuture<User.Login.Token>
+
     func first(with email: String) -> EventLoopFuture<User?>
 
     func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void>
@@ -30,6 +33,10 @@ public protocol UserRepository: CreateModelRepository,
 
 extension User {
     public struct DatabaseRepository: DatabaseConnectableRepository {
+
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
 
         public let conn: DatabaseConnectable
     }
@@ -77,7 +84,7 @@ extension User.DatabaseRepository: UserRepository {
         }
     }
 
-    public func login(with user: User, conn: DatabaseConnectable) throws -> Future<User.Login.Token> {
+    public func login(with user: User) throws -> EventLoopFuture<User.Login.Token> {
         // create new token for this user
         let token = try User.Login.Token.DatabaseModel.create(userID: user.id)
 

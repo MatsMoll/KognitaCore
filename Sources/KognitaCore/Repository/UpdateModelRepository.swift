@@ -11,9 +11,9 @@ import Vapor
 public protocol UpdateModelRepository {
     associatedtype UpdateData
     associatedtype UpdateResponse
-    associatedtype Model
+    associatedtype ID
 
-    func update(model: Model, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
+    func updateModelWith(id: ID, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
 }
 
 public protocol DatabaseConnectableRepository {
@@ -22,10 +22,9 @@ public protocol DatabaseConnectableRepository {
 
 extension UpdateModelRepository
     where
-    Self: DatabaseConnectableRepository,
-    Model: Identifiable {
-    func updateDatabase<DatabaseModel: KognitaModelUpdatable>(_ type: DatabaseModel.Type, model: Model, to data: UpdateData) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: ContentConvertable, DatabaseModel.ResponseModel == UpdateResponse, Model.ID == DatabaseModel.ID, DatabaseModel.EditData == UpdateData {
-        DatabaseModel.find(model.id, on: conn)
+    Self: DatabaseConnectableRepository {
+    func updateDatabase<DatabaseModel: KognitaModelUpdatable>(_ type: DatabaseModel.Type, modelID: ID, to data: UpdateData) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: ContentConvertable, DatabaseModel.ResponseModel == UpdateResponse, ID == DatabaseModel.ID, DatabaseModel.EditData == UpdateData {
+        DatabaseModel.find(modelID, on: conn)
             .unwrap(or: Abort(.badRequest))
             .flatMap { databaseModel in
                 try databaseModel.updateValues(with: data)

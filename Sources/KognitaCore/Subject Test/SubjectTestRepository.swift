@@ -3,13 +3,15 @@ import Vapor
 
 public protocol SubjectTestRepositoring: CreateModelRepository,
     UpdateModelRepository,
-    DeleteModelRepository
+    DeleteModelRepository,
+    RetriveModelRepository
     where
+    ID              == Int,
+    Model           == SubjectTest,
     CreateData      == SubjectTest.Create.Data,
     CreateResponse  == SubjectTest.Create.Response,
     UpdateData      == SubjectTest.Update.Data,
-    UpdateResponse  == SubjectTest.Update.Response,
-    Model           == SubjectTest {
+    UpdateResponse  == SubjectTest.Update.Response {
     /// Opens a test so users can enter
     /// - Parameters:
     ///   - test: The test to open
@@ -81,12 +83,18 @@ public protocol SubjectTestRepositoring: CreateModelRepository,
     func isOpen(testID: SubjectTest.ID) -> EventLoopFuture<Bool>
 
     func detailedUserResults(for test: SubjectTest, maxScore: Double, user: User) throws -> EventLoopFuture<[SubjectTest.UserResult]>
+
+    func stats(for subject: Subject) throws -> EventLoopFuture<[SubjectTest.DetailedResult]>
 }
 
 extension SubjectTest {
 
     //swiftlint:disable type_body_length
     public struct DatabaseRepository: SubjectTestRepositoring, DatabaseConnectableRepository {
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
 
         public let conn: DatabaseConnectable
 
@@ -103,8 +111,16 @@ extension SubjectTest {
             case alreadyEnded
         }
 
-        public func delete(model: SubjectTest, by user: User?) throws -> EventLoopFuture<Void> {
-            deleteDatabase(SubjectTest.DatabaseModel.self, model: model)
+        public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+            deleteDatabase(SubjectTest.DatabaseModel.self, modelID: id)
+        }
+
+        public func find(_ id: Int) -> EventLoopFuture<SubjectTest?> {
+            findDatabaseModel(SubjectTest.DatabaseModel.self, withID: id)
+        }
+
+        public func find(_ id: Int, or error: Error) -> EventLoopFuture<SubjectTest> {
+            findDatabaseModel(SubjectTest.DatabaseModel.self, withID: id, or: error)
         }
 
         public func create(from content: SubjectTest.Create.Data, by user: User?) throws -> EventLoopFuture<SubjectTest> {
@@ -141,8 +157,7 @@ extension SubjectTest {
             }
         }
 
-        public func update(model: SubjectTest, to data: SubjectTest.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest> {
-
+        public func updateModelWith(id: Int, to data: SubjectTest.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest> {
             return subjectRepository
                 .subjectIDFor(taskIDs: data.tasks)
                 .flatMap { subjectID in
@@ -155,12 +170,12 @@ extension SubjectTest {
                         .isModerator(user: user, subjectID: subjectID)
                         .flatMap {
 
-                            self.updateDatabase(SubjectTest.DatabaseModel.self, model: model, to: data)
+                            self.updateDatabase(SubjectTest.DatabaseModel.self, modelID: id, to: data)
                                 .flatMap { test in
 
                                     try self.subjectTestTaskRepositoring
-                                        .update(
-                                            model: test,
+                                        .updateModelWith(
+                                            id: test.id,
                                             to: data.tasks,
                                             by: user
                                     )
@@ -597,7 +612,7 @@ extension SubjectTest {
 
                     try sessions.map { testSession, taskSession in
                         try self.testSessionRepository.createResult(
-                            for: TaskSession.TestParameter(
+                            for: TestSession.TestParameter(
                                 session: taskSession,
                                 testSession: testSession
                             )

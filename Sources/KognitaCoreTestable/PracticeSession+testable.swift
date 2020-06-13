@@ -19,7 +19,7 @@ extension PracticeSession {
     ///   - conn: The database connection
     /// - Throws: If the database query failes
     /// - Returns: A `TaskSession.PracticeParameter` representing a session
-    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> PracticeParameter {
+    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> PracticeSessionRepresentable {
 
         return try PracticeSession.DatabaseRepository(conn: conn)
             .create(
@@ -31,7 +31,8 @@ extension PracticeSession {
                 by: user
             )
             .flatMap { session in
-                PracticeParameter.resolveParameter("\(session.id)", conn: conn)
-        }.wait()
+                PracticeParameter.resolveWith(session.id, conn: conn)
+            }
+            .wait()
     }
 }

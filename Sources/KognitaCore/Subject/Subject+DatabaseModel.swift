@@ -73,7 +73,7 @@ extension Subject {
             guard try name.validateWith(regex: "[A-Za-z0-9 ]+") else {
                 throw Abort(.badRequest, reason: "Misformed subject name")
             }
-            description.makeHTMLSafe()
+            description = (try? description.cleanXSS(whitelist: .basicWithImages())) ?? description
         }
 
         /// Sets the values on the model

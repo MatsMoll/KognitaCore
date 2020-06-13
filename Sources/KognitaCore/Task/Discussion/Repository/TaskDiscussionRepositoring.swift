@@ -3,11 +3,11 @@ import Vapor
 public protocol TaskDiscussionRepositoring: CreateModelRepository,
     UpdateModelRepository
     where
-    Model           == TaskDiscussion.DatabaseModel,
+    ID              == Int,
     CreateData      == TaskDiscussion.Create.Data,
-    CreateResponse  == Void,
+    CreateResponse  == TaskDiscussion.Create.Response,
     UpdateData      == TaskDiscussion.Update.Data,
-    UpdateResponse  == Void {
+    UpdateResponse  == TaskDiscussion.Update.Response {
     func respond(with response: TaskDiscussionResponse.Create.Data, by user: User) throws -> EventLoopFuture<Void>
 
     func responses(to discussionID: TaskDiscussion.ID, for user: User) throws -> EventLoopFuture<[TaskDiscussionResponse]>

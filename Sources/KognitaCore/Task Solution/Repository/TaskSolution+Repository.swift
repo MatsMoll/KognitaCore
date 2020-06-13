@@ -21,6 +21,10 @@ extension TaskSolution {
 
     public struct DatabaseRepository: TaskSolutionRepositoring, DatabaseConnectableRepository {
 
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
         typealias DatabaseModel = TaskSolution
 
         public let conn: DatabaseConnectable
@@ -128,51 +132,49 @@ extension TaskSolution {
             }
         }
 
-        public func update(model: TaskSolution, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {
+        public func updateModelWith(id: Int, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {
+            TaskSolution.DatabaseModel.find(id, on: conn)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { solution in
+                    try self.update(model: solution, to: data, by: user)
+            }
+        }
+
+        func update(model: TaskSolution.DatabaseModel, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {
             if model.creatorID == user.id {
-                return TaskSolution.DatabaseModel
-                    .find(model.id, on: conn)
-                    .unwrap(or: Abort(.badRequest))
-                    .flatMap { model in
-                        try model.update(with: data)
-                        return model.save(on: self.conn)
-                            .map { try $0.content() }
-                }
+                try model.update(with: data)
+                return model.save(on: self.conn)
+                    .map { try $0.content() }
             } else {
                 return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
-                    TaskSolution.DatabaseModel
-                        .find(model.id, on: self.conn)
-                        .unwrap(or: Abort(.badRequest))
-                        .flatMap { model in
-                            try model.update(with: data)
-                            return model.save(on: self.conn)
-                                .map { try $0.content() }
-                    }
+                    try model.update(with: data)
+                    return model.save(on: self.conn)
+                        .map { try $0.content() }
                 }
             }
         }
 
-        public func delete(model: TaskSolution, by user: User?) throws -> EventLoopFuture<Void> {
+        public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
 
-            return TaskSolution.DatabaseModel.query(on: conn)
-                .filter(\.taskID == model.taskID)
-                .count()
-                .flatMap { numberOfSolutions in
+            return TaskSolution.DatabaseModel.find(id, on: conn)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { solution in
 
-                    guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
+                    TaskSolution.DatabaseModel.query(on: self.conn)
+                        .filter(\.taskID == solution.taskID)
+                        .count()
+                        .flatMap { numberOfSolutions in
 
-                    return TaskSolution.DatabaseModel
-                        .find(model.id, on: self.conn)
-                        .unwrap(or: Abort(.badRequest))
-                        .flatMap { model in
-                            if model.creatorID == user.id {
-                                return model.delete(on: self.conn)
+                            guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
+
+                            if solution.creatorID == user.id {
+                                return solution.delete(on: self.conn)
                             } else {
-                                return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
-                                    model.delete(on: self.conn)
+                                return try self.userRepository.isModerator(user: user, taskID: solution.taskID).flatMap {
+                                    solution.delete(on: self.conn)
                                 }
                             }
                     }

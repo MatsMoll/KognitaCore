@@ -55,7 +55,7 @@ internal protocol SubjectTestTaskRepositoring: CreateModelRepository,
     CreateResponse  == SubjectTest.Pivot.Task.Create.Response,
     UpdateData      == SubjectTest.Pivot.Task.Update.Data,
     UpdateResponse  == SubjectTest.Pivot.Task.Update.Response,
-    Model           == SubjectTest {}
+    ID              == Int {}
 
 extension SubjectTest.Pivot.Task {
 
@@ -88,20 +88,20 @@ extension SubjectTest.Pivot.Task {
             .flatten(on: conn)
         }
 
-        func update(model: SubjectTest, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
+        func updateModelWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
             SubjectTest.Pivot.Task
                 .query(on: conn)
-                .filter(\.testID == model.id)
+                .filter(\.testID == id)
                 .all()
                 .flatMap { (tasks: [SubjectTest.Pivot.Task]) in
 
-                    try data.changes(from: tasks.map { $0.taskID })
+                    data.changes(from: tasks.map { $0.taskID })
                         .compactMap { change in
 
                             switch change {
                             case .insert(let taskID):
-                                return try SubjectTest.Pivot.Task(
-                                    testID: model.id,
+                                return SubjectTest.Pivot.Task(
+                                    testID: id,
                                     taskID: taskID
                                 )
                                     .create(on: self.conn)

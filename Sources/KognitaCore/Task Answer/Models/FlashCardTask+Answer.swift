@@ -9,7 +9,7 @@ import Vapor
 import FluentPostgreSQL
 
 /// A submitted answer form a `FlashCardTask`
-public final class FlashCardAnswer: PostgreSQLModel, Codable {
+final class FlashCardAnswer: PostgreSQLModel, Codable {
 
     public typealias Database = PostgreSQLDatabase
 

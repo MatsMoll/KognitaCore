@@ -77,6 +77,10 @@ public enum TestSessionRepositoringError: Error {
 extension TestSession {
     public struct DatabaseRepository: TestSessionRepositoring, DatabaseConnectableRepository {
 
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
         typealias DatabaseModel = TestSession
 
         public let conn: DatabaseConnectable

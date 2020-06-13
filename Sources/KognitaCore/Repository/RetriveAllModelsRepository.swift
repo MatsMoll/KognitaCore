@@ -45,9 +45,9 @@ extension RetriveAllModelsRepository where Model: Identifiable, Self: DatabaseCo
 }
 
 public protocol RetriveModelRepository {
-    associatedtype Model
-    func find(_ id: Int, or error: Error) -> EventLoopFuture<Model>
-    func find(_ id: Int) -> EventLoopFuture<Model?>
+    associatedtype Model: Identifiable
+    func find(_ id: Model.ID, or error: Error) -> EventLoopFuture<Model>
+    func find(_ id: Model.ID) -> EventLoopFuture<Model?>
 }
 
 extension RetriveModelRepository where Model: Identifiable, Self: DatabaseConnectableRepository {

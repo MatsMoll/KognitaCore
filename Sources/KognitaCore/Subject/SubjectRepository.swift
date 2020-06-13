@@ -18,6 +18,7 @@ public protocol SubjectRepositoring: CreateModelRepository,
     RetriveAllModelsRepository,
     RetriveModelRepository
     where
+    ID              == Int,
     Model           == Subject,
     CreateData      == Subject.Create.Data,
     CreateResponse  == Subject.Create.Response,
@@ -38,4 +39,5 @@ public protocol SubjectRepositoring: CreateModelRepository,
     func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>
     func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject>
     func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
+    func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User) throws -> EventLoopFuture<Void>
 }

@@ -48,8 +48,8 @@ extension PracticeSession {
 }
 
 extension PracticeSession {
-    func representable(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSession.PracticeParameter> {
-        PracticeSession.PracticeParameter.resolveParameter("\(id)", conn: conn)
+    func representable(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
+        PracticeSession.PracticeParameter.resolveWith(id, conn: conn)
     }
 }
 
@@ -130,12 +130,12 @@ public struct TaskType: Content {
 extension PracticeSession {
     public struct CurrentTask: Content {
 
-        public let session: PracticeSession.PracticeParameter
+        public let session: PracticeSession
         public let task: TaskType
         public let index: Int
         public let user: User
 
-        public init(session: PracticeSession.PracticeParameter, task: TaskType, index: Int, user: User) {
+        public init(session: PracticeSession, task: TaskType, index: Int, user: User) {
             self.session = session
             self.task = task
             self.index = index

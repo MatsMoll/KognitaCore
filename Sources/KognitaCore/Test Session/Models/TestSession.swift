@@ -25,14 +25,14 @@ extension TestSession {
         }
 
         func representable(with session: TaskSession) -> TestSessionRepresentable {
-            TaskSession.TestParameter(session: session, testSession: self)
+            TestSession.TestParameter(session: session, testSession: self)
         }
 
         func representable(on conn: DatabaseConnectable) throws -> EventLoopFuture<TestSessionRepresentable> {
             let session = self
             return try TaskSession.find(requireID(), on: conn)
                 .unwrap(or: Abort(.internalServerError))
-                .map { TaskSession.TestParameter(session: $0, testSession: session) }
+                .map { TestSession.TestParameter(session: $0, testSession: session) }
         }
     }
 }
@@ -50,9 +50,9 @@ extension TestSession.DatabaseModel: ContentConvertable {
 
 extension TestSession: Content {}
 
-extension TaskSession {
+extension TestSession {
 
-    public struct TestParameter: ModelParameterRepresentable, Codable, TestSessionRepresentable {
+    struct TestParameter: Codable, TestSessionRepresentable {
 
         let session: TaskSession
         let testSession: TestSession.DatabaseModel
@@ -77,14 +77,7 @@ extension TaskSession {
         public typealias ResolvedParameter = EventLoopFuture<TestParameter>
         public typealias ParameterModel = TestParameter
 
-        public static func resolveParameter(_ parameter: String, on container: Container) throws -> EventLoopFuture<TaskSession.TestParameter> {
-            throw Abort(.notImplemented)
-        }
-
-        public static func resolveParameter(_ parameter: String, conn: DatabaseConnectable) -> EventLoopFuture<TaskSession.TestParameter.ParameterModel> {
-            guard let id = Int(parameter) else {
-                return conn.future(error: Abort(.badRequest, reason: "Was not able to interpret \(parameter) as `Int`."))
-            }
+        public static func resolveWith(_ id: Int, conn: DatabaseConnectable) -> EventLoopFuture<TestParameter.ParameterModel> {
             return TaskSession.query(on: conn)
                 .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
                 .filter(\TaskSession.id == id)

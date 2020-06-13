@@ -12,7 +12,7 @@ public protocol FlashCardTaskRepository: CreateModelRepository,
     UpdateModelRepository,
     DeleteModelRepository
     where
-    Model           == FlashCardTask,
+    ID              == Int,
     CreateData      == FlashCardTask.Create.Data,
     CreateResponse  == FlashCardTask.Create.Response,
     UpdateData      == FlashCardTask.Edit.Data,
@@ -24,6 +24,10 @@ public protocol FlashCardTaskRepository: CreateModelRepository,
 
 extension FlashCardTask {
     public struct DatabaseRepository: FlashCardTaskRepository, DatabaseConnectableRepository {
+
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
 
         public typealias DatabaseModel = FlashCardTask
 
@@ -70,25 +74,28 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public func update(model flashCard: FlashCardTask, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
+    public func updateModelWith(id: Int, to data: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
+        FlashCardTask.find(id, on: conn)
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { flashCard in
 
-        guard let task = flashCard.task else {
-            throw Abort(.internalServerError)
-        }
-//        try content.validate()
-
-        return try userRepository
-            .isModerator(user: user, taskID: flashCard.requireID())
-            .flatMap {
-                try self.update(task: task, to: content, by: user)
-        }
-        .catchFlatMap { _ in
-            task.get(on: self.conn).flatMap { newTask in
-                guard newTask.creatorID == user.id else {
-                    throw Abort(.forbidden)
+                guard let task = flashCard.task else {
+                    throw Abort(.internalServerError)
                 }
-                return try self.update(task: task, to: content, by: user)
-            }
+
+                return try self.userRepository
+                    .isModerator(user: user, taskID: id)
+                    .flatMap {
+                        try self.update(task: task, to: data, by: user)
+                }
+                .catchFlatMap { _ in
+                    task.get(on: self.conn).flatMap { newTask in
+                        guard newTask.creatorID == user.id else {
+                            throw Abort(.forbidden)
+                        }
+                        return try self.update(task: task, to: data, by: user)
+                    }
+                }
         }
     }
 
@@ -107,11 +114,19 @@ extension FlashCardTask.DatabaseRepository {
                                 .save(on: conn)
                                 .transform(to: newTask)
                     }
-            }
+                }
         }
     }
 
-    public func delete(model flashCard: FlashCardTask, by user: User?) throws -> EventLoopFuture<Void> {
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+        FlashCardTask.find(id, on: conn)
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { task in
+                try self.delete(model: task, by: user)
+        }
+    }
+
+    func delete(model flashCard: FlashCardTask, by user: User?) throws -> EventLoopFuture<Void> {
 
         guard let user = user else {
             throw Abort(.unauthorized)

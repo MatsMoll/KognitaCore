@@ -11,6 +11,10 @@ import FluentPostgreSQL
 extension Subtopic {
     public struct DatabaseRepository: SubtopicRepositoring, DatabaseConnectableRepository {
 
+        public init(conn: DatabaseConnectable) {
+            self.conn = conn
+        }
+
         public let conn: DatabaseConnectable
 
         private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
@@ -32,12 +36,12 @@ extension Subtopic.DatabaseRepository {
         }
     }
 
-    public func update(model: Subtopic, to data: Subtopic.Update.Data, by user: User) throws -> EventLoopFuture<Subtopic> {
-        updateDatabase(Subtopic.DatabaseModel.self, model: model, to: data)
+    public func updateModelWith(id: Int, to data: Subtopic.Update.Data, by user: User) throws -> EventLoopFuture<Subtopic> {
+        updateDatabase(Subtopic.DatabaseModel.self, modelID: id, to: data)
     }
 
-    public func delete(model: Subtopic, by user: User?) throws -> EventLoopFuture<Void> {
-        deleteDatabase(Subtopic.DatabaseModel.self, model: model)
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Subtopic.DatabaseModel.self, modelID: id)
     }
 
     public func find(_ id: Subtopic.ID) -> EventLoopFuture<Subtopic?> {
