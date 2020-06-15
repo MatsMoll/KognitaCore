@@ -48,14 +48,10 @@ extension SubjectTest.Pivot.Task: Migration {
     }
 }
 
-internal protocol SubjectTestTaskRepositoring: CreateModelRepository,
-    UpdateModelRepository
-    where
-    CreateData      == SubjectTest.Pivot.Task.Create.Data,
-    CreateResponse  == SubjectTest.Pivot.Task.Create.Response,
-    UpdateData      == SubjectTest.Pivot.Task.Update.Data,
-    UpdateResponse  == SubjectTest.Pivot.Task.Update.Response,
-    ID              == Int {}
+internal protocol SubjectTestTaskRepositoring {
+    func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<SubjectTest.Pivot.Task.Create.Response>
+    func updateModelWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest.Pivot.Task.Update.Response>
+}
 
 extension SubjectTest.Pivot.Task {
 

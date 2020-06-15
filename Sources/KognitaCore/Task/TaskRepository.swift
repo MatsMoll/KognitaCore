@@ -9,13 +9,9 @@ import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-protocol TaskRepository: CreateModelRepository,
-    RetriveAllModelsRepository
-    where
-    Model == Task,
-    CreateData == Task.Create.Data,
-    CreateResponse == Task,
-    ResponseModel == Task {
+protocol TaskRepository {
+    func all() throws -> EventLoopFuture<[Task]>
+    func create(from content: Task.Create.Data, by user: User?) throws -> EventLoopFuture<Task>
     func getTaskTypePath(for id: Task.ID) throws -> EventLoopFuture<String>
     func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]>
 }
@@ -48,6 +44,10 @@ extension Task {
 }
 
 extension Task.DatabaseRepository {
+
+    func all() throws -> EventLoopFuture<[Task]> {
+        Task.query(on: conn).all()
+    }
 
     public func create(from content: Task.Create.Data, by user: User?) throws -> EventLoopFuture<Task> {
 

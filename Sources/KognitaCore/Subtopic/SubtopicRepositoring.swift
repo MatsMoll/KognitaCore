@@ -8,18 +8,11 @@
 import Vapor
 import FluentPostgreSQL
 
-public protocol SubtopicRepositoring: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository,
-    RetriveModelRepository
-    where
-    ID              == Int,
-    Model           == Subtopic,
-    CreateData      == Subtopic.Create.Data,
-    CreateResponse  == Subtopic.Create.Response,
-    UpdateData      == Subtopic.Update.Data,
-    UpdateResponse  == Subtopic.Update.Response {
+public protocol SubtopicRepositoring: DeleteModelRepository {
+    func create(from content: Subtopic.Create.Data, by user: User?) throws -> EventLoopFuture<Subtopic.Create.Response>
+    func updateModelWith(id: Int, to data: Subtopic.Update.Data, by user: User) throws -> EventLoopFuture<Subtopic.Update.Response>
     func find(_ id: Subtopic.ID) -> EventLoopFuture<Subtopic?>
+    func find(_ id: Subtopic.ID, or error: Error) -> EventLoopFuture<Subtopic>
     func getSubtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]>
     func subtopics(with topicID: Topic.ID) -> EventLoopFuture<[Subtopic]>
 }

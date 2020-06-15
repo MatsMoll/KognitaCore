@@ -28,19 +28,21 @@ extension String {
 
 extension Subject {
     public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
-        public init(conn: DatabaseConnectable) {
+
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
+            self.userRepository = repositories.userRepository
+            self.topicRepository = repositories.topicRepository
+            self.subtopicRepository = repositories.subtopicRepository
+            self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
         }
-
-
-        typealias DatabaseModel = Subject.DatabaseModel
 
         public let conn: DatabaseConnectable
 
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
-        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
-        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
+        private let userRepository: UserRepository
+        private let topicRepository: TopicRepository
+        private let subtopicRepository: SubtopicRepositoring
+        private let multipleChoiseRepository: MultipleChoiseTaskRepository
     }
 }
 

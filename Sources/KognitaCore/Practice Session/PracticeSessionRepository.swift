@@ -9,10 +9,8 @@ import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-public protocol PracticeSessionRepository: CreateModelRepository
-    where
-    CreateData == PracticeSession.Create.Data,
-    CreateResponse == PracticeSession.Create.Response {
+public protocol PracticeSessionRepository {
+    func create(from content: PracticeSession.Create.Data, by user: User?) throws -> EventLoopFuture<PracticeSession.Create.Response>
     func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
     func extend(session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<Void>
     func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
@@ -28,17 +26,31 @@ public protocol PracticeSessionRepository: CreateModelRepository
 extension PracticeSession {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        public init(conn: DatabaseConnectable) {
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
+            self.flashCardRepository = repositories.typingTaskRepository
+            self.multipleChoiceRepository = repositories.multipleChoiceTaskRepository
+            self.subjectRepository = repositories.subjectRepository
+            self.userRepository = repositories.userRepository
+            self.subtopicRepository = repositories.subtopicRepository
+        }
+
+        init(conn: DatabaseConnectable, repository: DatabaseRepository) {
+            self.conn = conn
+            self.flashCardRepository = repository.flashCardRepository
+            self.multipleChoiceRepository = repository.multipleChoiceRepository
+            self.subjectRepository = repository.subjectRepository
+            self.userRepository = repository.userRepository
+            self.subtopicRepository = repository.subtopicRepository
         }
 
         public let conn: DatabaseConnectable
 
-        private var flashCardRepository: some FlashCardTaskRepository { FlashCardTask.DatabaseRepository(conn: conn) }
-        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
-        private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
+        private let flashCardRepository: FlashCardTaskRepository
+        private let multipleChoiceRepository: MultipleChoiseTaskRepository
+        private let subjectRepository: SubjectRepositoring
+        private let userRepository: UserRepository
+        private let subtopicRepository: SubtopicRepositoring
     }
 }
 
@@ -201,7 +213,7 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
         return conn.databaseConnection(to: .psql).flatMap { psqlConn in
 
-            let newRepo = PracticeSession.DatabaseRepository(conn: psqlConn)
+            let newRepo = PracticeSession.DatabaseRepository(conn: psqlConn, repository: self)
 
             // 1/3 chanse of assigning a random task
             if Int.random(in: 1...3) == 3 {
@@ -314,12 +326,12 @@ extension PracticeSession.DatabaseRepository {
         return try get(MultipleChoiceTask.DatabaseModel.self, at: submit.taskIndex, for: session).flatMap { task in
 
             try self
-                .multipleChoiseRepository
+                .multipleChoiceRepository
                 .create(answer: submit, sessionID: session.requireID())
                 .flatMap { _ in
 
                     try self
-                        .multipleChoiseRepository
+                        .multipleChoiceRepository
                         .evaluate(submit.choises, for: task.requireID())
                         .flatMap { result in
 
@@ -353,7 +365,7 @@ extension PracticeSession.DatabaseRepository {
 
         return try get(FlashCardTask.self, at: submit.taskIndex, for: session).flatMap { task in
 
-            FlashCardTask.DatabaseRepository(conn: self.conn)
+            self.flashCardRepository
                 .createAnswer(for: task, with: submit)
                 .flatMap { answer in
 

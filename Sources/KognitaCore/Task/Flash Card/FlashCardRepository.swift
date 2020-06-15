@@ -8,15 +8,9 @@
 import FluentPostgreSQL
 import Vapor
 
-public protocol FlashCardTaskRepository: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository
-    where
-    ID              == Int,
-    CreateData      == FlashCardTask.Create.Data,
-    CreateResponse  == FlashCardTask.Create.Response,
-    UpdateData      == FlashCardTask.Edit.Data,
-    UpdateResponse  == FlashCardTask.Edit.Response {
+public protocol FlashCardTaskRepository: DeleteModelRepository {
+    func create(from content: FlashCardTask.Create.Data, by user: User?) throws -> EventLoopFuture<FlashCardTask.Create.Response>
+    func updateModelWith(id: Int, to data: FlashCardTask.Edit.Data, by user: User) throws -> EventLoopFuture<FlashCardTask.Edit.Response>
     func importTask(from task: Task.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
     func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit) -> EventLoopFuture<TaskAnswer>
@@ -25,17 +19,28 @@ public protocol FlashCardTaskRepository: CreateModelRepository,
 extension FlashCardTask {
     public struct DatabaseRepository: FlashCardTaskRepository, DatabaseConnectableRepository {
 
-        public init(conn: DatabaseConnectable) {
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
+            self.subtopicRepository = repositories.subtopicRepository
+            self.topicRepository = repositories.topicRepository
+            self.userRepository = repositories.userRepository
+            self.taskRepository = repositories.taskRepository
         }
 
-        public typealias DatabaseModel = FlashCardTask
+        init(conn: DatabaseConnectable, repository: DatabaseRepository) {
+            self.conn = conn
+            self.subtopicRepository = repository.subtopicRepository
+            self.topicRepository = repository.topicRepository
+            self.userRepository = repository.userRepository
+            self.taskRepository = repository.taskRepository
+        }
 
         public let conn: DatabaseConnectable
-        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
-        private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var taskRepository: some TaskRepository { Task.DatabaseRepository(conn: conn) }
+
+        private let subtopicRepository: SubtopicRepositoring
+        private let topicRepository: TopicRepository
+        private let userRepository: UserRepository
+        private let taskRepository: TaskRepository
     }
 }
 
@@ -102,7 +107,7 @@ extension FlashCardTask.DatabaseRepository {
     private func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
 
         conn.transaction(on: .psql) { conn in
-            try FlashCardTask.DatabaseRepository(conn: conn)
+            try FlashCardTask.DatabaseRepository(conn: conn, repository: self)
                 .create(from: content, by: user)
                 .flatMap { newTask in
 

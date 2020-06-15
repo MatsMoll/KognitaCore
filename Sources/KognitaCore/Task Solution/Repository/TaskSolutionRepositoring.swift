@@ -1,14 +1,11 @@
 import Vapor
 
-public protocol TaskSolutionRepositoring: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository
-    where
-    ID              == Int,
-    CreateData      == TaskSolution.Create.Data,
-    CreateResponse  == TaskSolution,
-    UpdateData      == TaskSolution.Update.Data,
-    UpdateResponse  == TaskSolution {
+public protocol TaskSolutionRepositoring: DeleteModelRepository {
+
+    func create(from content: TaskSolution.Create.Data, by user: User?) throws -> EventLoopFuture<TaskSolution>
+
+    func updateModelWith(id: Int, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution>
+
     func solutions(for taskID: Task.ID, for user: User) -> EventLoopFuture<[TaskSolution.Response]>
 
     /// Upvote a solution

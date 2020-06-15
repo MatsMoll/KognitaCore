@@ -12,19 +12,11 @@ public struct SubjectCompendiumFilter: Codable {
     let subtopicIDs: Set<Subtopic.ID>?
 }
 
-public protocol SubjectRepositoring: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository,
-    RetriveAllModelsRepository,
-    RetriveModelRepository
-    where
-    ID              == Int,
-    Model           == Subject,
-    CreateData      == Subject.Create.Data,
-    CreateResponse  == Subject.Create.Response,
-    UpdateData      == Subject.Update.Data,
-    UpdateResponse  == Subject.Update.Response,
-    ResponseModel   == Subject {
+public protocol SubjectRepositoring: DeleteModelRepository {
+    func all() throws -> EventLoopFuture<[Subject]>
+    func find(_ id: Subject.ID, or error: Error) -> EventLoopFuture<Subject>
+    func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject.Create.Response>
+    func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject.Update.Response>
     func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>
     func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]>
     func allActive(for user: User) throws -> EventLoopFuture<[Subject]>

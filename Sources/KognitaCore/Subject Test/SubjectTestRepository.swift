@@ -1,17 +1,14 @@
 import FluentSQL
 import Vapor
 
-public protocol SubjectTestRepositoring: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository,
-    RetriveModelRepository
-    where
-    ID              == Int,
-    Model           == SubjectTest,
-    CreateData      == SubjectTest.Create.Data,
-    CreateResponse  == SubjectTest.Create.Response,
-    UpdateData      == SubjectTest.Update.Data,
-    UpdateResponse  == SubjectTest.Update.Response {
+public protocol SubjectTestRepositoring: DeleteModelRepository {
+
+    func find(_ id: SubjectTest.ID, or error: Error) -> EventLoopFuture<SubjectTest>
+
+    func create(from content: SubjectTest.Create.Data, by user: User?) throws -> EventLoopFuture<SubjectTest.Create.Response>
+
+    func updateModelWith(id: Int, to data: SubjectTest.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest.Update.Response>
+
     /// Opens a test so users can enter
     /// - Parameters:
     ///   - test: The test to open
@@ -91,17 +88,21 @@ extension SubjectTest {
 
     //swiftlint:disable type_body_length
     public struct DatabaseRepository: SubjectTestRepositoring, DatabaseConnectableRepository {
-        public init(conn: DatabaseConnectable) {
-            self.conn = conn
-        }
 
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
+            self.conn = conn
+            self.userRepository = repositories.userRepository
+            self.subjectRepository = repositories.subjectRepository
+            self.subjectTestTaskRepositoring = repositories.subjectTestTaskRepository
+            self.testSessionRepository = repositories.testSessionRepository
+        }
 
         public let conn: DatabaseConnectable
 
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var subjectRepository: some SubjectRepositoring { Subject.DatabaseRepository(conn: conn) }
-        private var subjectTestTaskRepositoring: some SubjectTestTaskRepositoring { SubjectTest.Pivot.Task.DatabaseRepository(conn: conn) }
-        private var testSessionRepository: some TestSessionRepositoring { TestSession.DatabaseRepository(conn: conn) }
+        private let userRepository: UserRepository
+        private let subjectRepository: SubjectRepositoring
+        private let subjectTestTaskRepositoring: SubjectTestTaskRepositoring
+        private let testSessionRepository: TestSessionRepositoring
 
         public enum Errors: Error {
             case testIsClosed

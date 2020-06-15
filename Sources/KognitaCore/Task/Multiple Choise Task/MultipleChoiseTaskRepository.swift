@@ -9,15 +9,9 @@ import FluentSQL
 import FluentPostgreSQL
 import Vapor
 
-public protocol MultipleChoiseTaskRepository: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository
-    where
-    ID              == Int,
-    CreateData      == MultipleChoiceTask.Create.Data,
-    CreateResponse  == MultipleChoiceTask.Create.Response,
-    UpdateData      == MultipleChoiceTask.Update.Data,
-    UpdateResponse  == MultipleChoiceTask.Update.Response {
+public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
+    func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask.Create.Response>
+    func updateModelWith(id: Int, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask.Update.Response>
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details>
     func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]>
     func evaluate(_ choises: [MultipleChoiseTaskChoise.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
@@ -31,16 +25,20 @@ public protocol MultipleChoiseTaskRepository: CreateModelRepository,
 extension MultipleChoiceTask {
     public struct DatabaseRepository: MultipleChoiseTaskRepository, DatabaseConnectableRepository {
 
-        public init(conn: DatabaseConnectable) {
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
+            self.subtopicRepository = repositories.subtopicRepository
+            self.userRepository = repositories.userRepository
+            self.topicRepository = repositories.topicRepository
+            self.taskRepository = repositories.taskRepository
         }
 
         public let conn: DatabaseConnectable
 
-        private var subtopicRepository: some SubtopicRepositoring { Subtopic.DatabaseRepository(conn: conn) }
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var topicRepository: some TopicRepository { Topic.DatabaseRepository(conn: conn) }
-        private var taskRepository: some TaskRepository { Task.DatabaseRepository(conn: conn) }
+        private let subtopicRepository: SubtopicRepositoring
+        private let userRepository: UserRepository
+        private let topicRepository: TopicRepository
+        private let taskRepository: TaskRepository
     }
 }
 

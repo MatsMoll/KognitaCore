@@ -9,12 +9,11 @@ import Crypto
 import FluentPostgreSQL
 import Vapor
 
-public protocol UserRepository: CreateModelRepository,
-    RetriveModelRepository
-    where
-    CreateData      == User.Create.Data,
-    CreateResponse  == User,
-    Model           == User {
+public protocol UserRepository {
+
+    func find(_ id: User.ID, or error: Error) -> EventLoopFuture<User>
+
+    func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User>
 
     func login(with user: User) throws -> EventLoopFuture<User.Login.Token>
 

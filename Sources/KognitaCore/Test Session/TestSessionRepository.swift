@@ -77,20 +77,24 @@ public enum TestSessionRepositoringError: Error {
 extension TestSession {
     public struct DatabaseRepository: TestSessionRepositoring, DatabaseConnectableRepository {
 
-        public init(conn: DatabaseConnectable) {
+        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
+            self.typingTaskRepository = repositories.typingTaskRepository
+            self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
+            self.userRepository = repositories.userRepository
+            self.taskSolutionRepository = repositories.taskSolutionRepository
+            self.taskSessionAnswerRepository = repositories.taskSessionAnswerRepository
+            self.subjectTestRepository = repositories.subjectTestRepository
         }
-
-        typealias DatabaseModel = TestSession
 
         public let conn: DatabaseConnectable
 
-        private var typingTaskRepository: some FlashCardTaskRepository { FlashCardTask.DatabaseRepository(conn: conn) }
-        private var multipleChoiseRepository: some MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(conn: conn) }
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
-        private var taskSolutionRepository: some TaskSolutionRepositoring { TaskSolution.DatabaseRepository(conn: conn) }
-        private var taskSessionAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(conn: conn) }
-        private var subjectTestRepository: some SubjectTestRepositoring { SubjectTest.DatabaseRepository(conn: conn) }
+        private let typingTaskRepository: FlashCardTaskRepository
+        private let multipleChoiseRepository: MultipleChoiseTaskRepository
+        private let userRepository: UserRepository
+        private let taskSolutionRepository: TaskSolutionRepositoring
+        private let taskSessionAnswerRepository: TaskSessionAnswerRepository
+        private let subjectTestRepository: SubjectTestRepositoring
 
         struct OverviewQuery: Codable {
             let question: String

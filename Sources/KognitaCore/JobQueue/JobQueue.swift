@@ -43,5 +43,26 @@ public func config(enviroment: Environment, in services: inout Services) {
     services.register(
         DatabaseMigrations.migrationConfig(enviroment: enviroment)
     )
+    services.register(RepositoriesRepresentable.self) { (container: Container) in
+        try DatabaseRepositories(conn: container.connectionPool(to: .psql))
+    }
     services.register(ProductionJobQueue.self)
+}
+
+extension DatabaseConnectionPool: DatabaseConnectable {
+    public func databaseConnection<Database>(to database: DatabaseIdentifier<Database>?) -> EventLoopFuture<Database.Connection> where Database: DatabaseKit.Database {
+        // swiftlint:disable force_cast
+        return requestConnection() as! EventLoopFuture<Database.Connection>
+        // swiftlint:enable force_cast
+    }
+
+    public func shutdownGracefully(queue: DispatchQueue, _ callback: @escaping (Error?) -> Void) {
+        queue.async {
+            self.shutdownGracefully(callback)
+        }
+    }
+
+    public func next() -> EventLoop {
+        eventLoop.next()
+    }
 }
