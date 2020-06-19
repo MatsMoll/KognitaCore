@@ -9,6 +9,7 @@
 import Vapor
 import XCTest
 import FluentPostgreSQL
+import KognitaCoreTestable
 
 /// A class that setups a application in a testable enviroment and creates a connection to the database
 class VaporTestCase: XCTestCase {
@@ -37,6 +38,7 @@ class VaporTestCase: XCTestCase {
             print("Error shutting down: \(error)")
         }
         conn.close()
+        TestableRepositories.reset()
     }
 
     func failableTest(line: UInt = #line, file: StaticString = #file, test: (() throws -> Void)) {

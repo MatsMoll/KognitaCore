@@ -1,9 +1,10 @@
 import XCTest
 @testable import KognitaCore
+import KognitaCoreTestable
 
 final class TaskDiscussionTests: VaporTestCase {
 
-    lazy var taskDiscussionRepository: some TaskDiscussionRepositoring = { TaskDiscussion.DatabaseRepository(conn: conn) }()
+    lazy var taskDiscussionRepository: TaskDiscussionRepositoring = { TestableRepositories.testable(with: conn).taskDiscussionRepository }()
 
     func testCreateDiscussionNotLoggedIn() {
         do {

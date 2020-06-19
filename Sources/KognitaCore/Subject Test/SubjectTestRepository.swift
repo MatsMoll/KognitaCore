@@ -93,7 +93,6 @@ extension SubjectTest {
             self.conn = conn
             self.userRepository = repositories.userRepository
             self.subjectRepository = repositories.subjectRepository
-            self.subjectTestTaskRepositoring = repositories.subjectTestTaskRepository
             self.testSessionRepository = repositories.testSessionRepository
         }
 
@@ -101,7 +100,6 @@ extension SubjectTest {
 
         private let userRepository: UserRepository
         private let subjectRepository: SubjectRepositoring
-        private let subjectTestTaskRepositoring: SubjectTestTaskRepositoring
         private let testSessionRepository: TestSessionRepositoring
 
         public enum Errors: Error {
@@ -144,8 +142,8 @@ extension SubjectTest {
                             SubjectTest.DatabaseModel(data: content)
                                 .create(on: self.conn)
                                 .flatMap { test in
-                                    try self.subjectTestTaskRepositoring
-                                        .create(
+                                    try self
+                                        .createTask(
                                             from: .init(
                                                 testID: test.requireID(),
                                                 taskIDs: content.tasks
@@ -174,8 +172,8 @@ extension SubjectTest {
                             self.updateDatabase(SubjectTest.DatabaseModel.self, modelID: id, to: data)
                                 .flatMap { test in
 
-                                    try self.subjectTestTaskRepositoring
-                                        .updateModelWith(
+                                    try self
+                                        .updateTaskWith(
                                             id: test.id,
                                             to: data.tasks,
                                             by: user
@@ -183,6 +181,44 @@ extension SubjectTest {
                                     .transform(to: test)
                             }
                     }
+            }
+        }
+
+        func createTask(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
+            content.taskIDs.map {
+                SubjectTest.Pivot.Task(
+                    testID: content.testID,
+                    taskID: $0
+                )
+                .create(on: self.conn)
+            }
+            .flatten(on: conn)
+        }
+
+        func updateTaskWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
+            SubjectTest.Pivot.Task
+                .query(on: conn)
+                .filter(\.testID == id)
+                .all()
+                .flatMap { (tasks: [SubjectTest.Pivot.Task]) in
+
+                    data.changes(from: tasks.map { $0.taskID })
+                        .compactMap { change in
+
+                            switch change {
+                            case .insert(let taskID):
+                                return SubjectTest.Pivot.Task(
+                                    testID: id,
+                                    taskID: taskID
+                                )
+                                    .create(on: self.conn)
+                                    .transform(to: ())
+                            case .remove(let taskID):
+                                return tasks.first(where: { $0.taskID == taskID })?
+                                    .delete(on: self.conn)
+                            }
+                    }
+                    .flatten(on: self.conn)
             }
         }
 

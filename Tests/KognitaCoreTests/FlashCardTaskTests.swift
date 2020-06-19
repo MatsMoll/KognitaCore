@@ -9,12 +9,13 @@ import Vapor
 import XCTest
 import FluentPostgreSQL
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class FlashCardTaskTests: VaporTestCase {
 
-    lazy var typingTaskRepository: some FlashCardTaskRepository = { FlashCardTask.DatabaseRepository(conn: conn) }()
-    lazy var practiceSessionRepository: some PracticeSessionRepository = { PracticeSession.DatabaseRepository(conn: conn) }()
-    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: conn).typingTaskRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: conn).practiceSessionRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
 
     func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
@@ -31,13 +32,16 @@ class FlashCardTaskTests: VaporTestCase {
         )
 
         do {
+            print("TypingTask")
             let flashCardTask = try typingTaskRepository
                 .create(from: taskData, by: user)
                 .wait()
 
+            print("Solution")
             let solution = try taskSolutionRepository
                 .solutions(for: flashCardTask.requireID(), for: user)
                 .wait()
+            print("Done")
 
             XCTAssertNotNil(flashCardTask.createdAt)
             XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
@@ -101,7 +105,7 @@ class FlashCardTaskTests: VaporTestCase {
             )
 
             let editedTask = try typingTaskRepository
-                .update(model: startingFlash, to: content, by: creatorStudent).wait()
+                .updateModelWith(id: startingFlash.id!, to: content, by: creatorStudent).wait()
             startingTask = try Task.query(on: conn, withSoftDeleted: true)
                 .filter(\.id == startingTask.id)
                 .first()
@@ -115,7 +119,8 @@ class FlashCardTaskTests: VaporTestCase {
 
             throwsError(of: Abort.self) {
                 _ = try typingTaskRepository
-                    .update(model: editedFlash, to: content, by: otherStudent).wait()
+                    .updateModelWith(id: editedFlash.id!, to: content, by: otherStudent)
+                    .wait()
             }
         }
     }

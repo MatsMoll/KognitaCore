@@ -6,8 +6,8 @@ import XCTest
 @available(OSX 10.15, *)
 class TestSessionTests: VaporTestCase {
 
-    lazy var subjectTestRepository: some SubjectTestRepositoring = { SubjectTest.DatabaseRepository(conn: conn) }()
-    lazy var testSessionRepository: some TestSessionRepositoring = { TestSession.DatabaseRepository(conn: conn) }()
+    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: conn).subjectTestRepository }()
+    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: conn).testSessionRepository }()
 
     func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
 
@@ -20,8 +20,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             try XCTAssertNotEqual(sessionOne.requireID(), sessionTwo.requireID())
             XCTAssertEqual(sessionOne.testID, test.id)
@@ -81,7 +81,7 @@ class TestSessionTests: VaporTestCase {
             let test = try setupTestWithTasks()
 
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
 
             let firstSubmittion             = try submittionAt(index: 1, for: test)
             let secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
@@ -119,8 +119,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            var sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            var sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            var sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            var sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -138,8 +138,8 @@ class TestSessionTests: VaporTestCase {
 
             var results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
-            sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             XCTAssertEqual(results.count, 3)
             XCTAssertNotNil(sessionOne.submittedAt)
@@ -148,8 +148,8 @@ class TestSessionTests: VaporTestCase {
             try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
             results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
 
-            sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             XCTAssertEqual(results.count, 5)
             XCTAssertNotNil(sessionOne.submittedAt)
@@ -182,8 +182,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -231,8 +231,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)

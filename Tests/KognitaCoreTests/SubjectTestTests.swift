@@ -8,8 +8,8 @@ import XCTest
 @available(OSX 10.15, *)
 class SubjectTestTests: VaporTestCase {
 
-    lazy var subjectTestRepository: some SubjectTestRepositoring = { SubjectTest.DatabaseRepository(conn: conn) }()
-    lazy var testSessionRepository: some TestSessionRepositoring = { TestSession.DatabaseRepository(conn: conn) }()
+    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: conn).subjectTestRepository }()
+    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: conn).testSessionRepository }()
 
     func testCreateTest() throws {
 
@@ -119,8 +119,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             XCTAssertEqual(sessionOne.testID, test.id)
             XCTAssertEqual(sessionOne.userID, userOne.id)
@@ -150,8 +150,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             var status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
@@ -196,8 +196,8 @@ class SubjectTestTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TaskSession.TestParameter.resolveParameter("\(sessionOneEntry.id)", conn: conn).wait()
-            let sessionTwo = try TaskSession.TestParameter.resolveParameter("\(sessionTwoEntry.id)", conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
@@ -471,7 +471,7 @@ class SubjectTestTests: VaporTestCase {
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiceTask.Submit]) throws {
         let sessionEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
 
-        let session = try TaskSession.TestParameter.resolveParameter("\(sessionEntry.id)", conn: conn).wait()
+        let session = try TestSession.TestParameter.resolveWith(sessionEntry.id, conn: conn).wait()
 
         try submittions.forEach {
             try testSessionRepository.submit(content: $0, for: session, by: user).wait()

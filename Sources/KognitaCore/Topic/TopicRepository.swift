@@ -75,7 +75,6 @@ extension Topic {
         init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
             self.userRepository = repositories.userRepository
-            self.subjectRepository = repositories.subjectRepository
             self.subtopicRepository = repositories.subtopicRepository
             self.multipeChoiseRepository = repositories.multipleChoiceTaskRepository
             self.typingTaskRepository = repositories.typingTaskRepository
@@ -84,7 +83,6 @@ extension Topic {
         public let conn: DatabaseConnectable
 
         private let userRepository: UserRepository
-        private let subjectRepository: SubjectRepositoring
         private let subtopicRepository: SubtopicRepositoring
         private let multipeChoiseRepository: MultipleChoiseTaskRepository
         private let typingTaskRepository: FlashCardTaskRepository
@@ -113,20 +111,15 @@ extension Topic.DatabaseRepository: TopicRepository {
             .isModerator(user: user, subjectID: content.subjectID)
             .flatMap { _ in
 
-                self.subjectRepository
-                    .find(content.subjectID, or: Abort(.badRequest))
-                    .flatMap { subject in
-
-                        try Topic.DatabaseModel(content: content, subject: subject, creator: user)
-                            .create(on: self.conn)
-                            .flatMap { topic in
-                                try Subtopic.DatabaseModel(
-                                    name: "Generelt",
-                                    topicID: topic.requireID()
-                                )
-                                .save(on: self.conn)
-                                .map { _ in try topic.content() }
-                        }
+                try Topic.DatabaseModel(content: content, creator: user)
+                    .create(on: self.conn)
+                    .flatMap { topic in
+                        try Subtopic.DatabaseModel(
+                            name: "Generelt",
+                            topicID: topic.requireID()
+                        )
+                        .save(on: self.conn)
+                        .map { _ in try topic.content() }
                 }
         }
     }

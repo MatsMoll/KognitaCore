@@ -8,11 +8,12 @@
 import Vapor
 import XCTest
 @testable import KognitaCore
+import KognitaCoreTestable
 
 final class PracticeSessionTests: VaporTestCase {
 
-    lazy var practiceSessionRepository: some PracticeSessionRepository = { PracticeSession.DatabaseRepository(conn: conn) }()
-    lazy var multipleChoiceRepository: some MultipleChoiseTaskRepository = { MultipleChoiceTask.DatabaseRepository(conn: conn) }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: conn).practiceSessionRepository }()
+    lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: conn).multipleChoiceTaskRepository }()
 
     func testUpdateFlashAnswer() {
         failableTest {
@@ -203,7 +204,7 @@ final class PracticeSessionTests: VaporTestCase {
             let taskThree = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
             let testTask = try Task.create(subtopic: subtopic, isTestable: true, on: conn)
 
-            _ = try multipleChoiceRepository.delete(model: taskThree, by: user).wait()
+            _ = try multipleChoiceRepository.deleteModelWith(id: taskThree.id, by: user).wait()
 
             let create = PracticeSession.Create.Data(
                 numberOfTaskGoal: 2,
@@ -363,11 +364,11 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try MultipleChoiceTask.create(on: conn)
         let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, on: conn)
 
-        let parameterSession = try PracticeSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", conn: conn).wait()
+        let parameterSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), conn: conn).wait()
 
-        XCTAssertEqual(createdSesssion.practiceSession.id, parameterSession.practiceSession.id)
-        XCTAssertEqual(createdSesssion.practiceSession.createdAt, parameterSession.practiceSession.createdAt)
-        XCTAssertEqual(createdSesssion.practiceSession.id, parameterSession.session.id)
+        XCTAssertEqual(createdSesssion.id, parameterSession.id)
+        XCTAssertEqual(createdSesssion.createdAt, parameterSession.createdAt)
+        XCTAssertEqual(createdSesssion.id, parameterSession.id)
     }
 
     func testExtendSession() {
@@ -382,7 +383,7 @@ final class PracticeSessionTests: VaporTestCase {
             _ = try MultipleChoiceTask.create(on: conn)
             let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, numberOfTaskGoal: 10, on: conn)
 
-            let parameterSession = try PracticeSession.PracticeParameter.resolveParameter("\(createdSesssion.requireID())", conn: conn).wait()
+            let parameterSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), conn: conn).wait()
 
             XCTAssertEqual(parameterSession.numberOfTaskGoal, 10)
             try practiceSessionRepository.extend(session: parameterSession, for: user).wait()

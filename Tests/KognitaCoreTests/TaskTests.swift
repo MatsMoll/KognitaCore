@@ -13,9 +13,9 @@ import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
-    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
-    lazy var taskRepository: some TaskRepository = { Task.DatabaseRepository(conn: conn) }()
-    lazy var typingTaskRepository: some FlashCardTaskRepository = { FlashCardTask.DatabaseRepository(conn: conn) }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
+    lazy var taskRepository: TaskRepository = { Task.DatabaseRepository(conn: conn) }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: conn).typingTaskRepository }()
 
     func testTasksInSubject() throws {
 
@@ -169,7 +169,7 @@ Dette er flere linjer
             XCTAssertEqual(task.description, "# XSS test")
             XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
 
-            let updatedTask = try typingTaskRepository.update(model: flashCardTask, to: xssData, by: user).wait()
+            let updatedTask = try typingTaskRepository.updateModelWith(id: flashCardTask.id!, to: xssData, by: user).wait()
             let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
             XCTAssertEqual(updatedTask.description, "# XSS test")
@@ -199,7 +199,7 @@ Dette er flere linjer
                 presentUser: false
             )
             let solution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
-            _ = try taskSolutionRepository.update(model: solution.content(), to: solutionUpdateDate, by: user).wait()
+            _ = try taskSolutionRepository.updateModelWith(id: solution.id!, to: solutionUpdateDate, by: user).wait()
             let updatedSolution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
 
             XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
@@ -268,10 +268,10 @@ Dette er flere linjer
             let solution = try XCTUnwrap(solutions.first)
 
             throwsError(of: TaskSolutionRepositoryError.self) {
-                try taskSolutionRepository.delete(model: solution.content(), by: user).wait()
+                try taskSolutionRepository.deleteModelWith(id: solution.id!, by: user).wait()
             }
             throwsError(of: Abort.self) {
-                try taskSolutionRepository.delete(model: solution.content(), by: nil).wait()
+                try taskSolutionRepository.deleteModelWith(id: solution.id!, by: nil).wait()
             }
         }
     }

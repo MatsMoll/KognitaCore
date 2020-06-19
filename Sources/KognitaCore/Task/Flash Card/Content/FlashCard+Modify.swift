@@ -1,19 +1,16 @@
 extension FlashCardTask {
     public struct ModifyContent {
         public let task: Task.ModifyContent?
-        public let subject: Subject
-        public let topics: [Topic]
+        public let subject: Subject.Overview
 
-        public init(task: Task.ModifyContent?, subject: Subject, topics: [Topic]) {
+        public init(task: Task.ModifyContent?, subject: Subject.Overview) {
             self.task = task
             self.subject = subject
-            self.topics = topics
         }
 
-        public init(subject: Subject, topics: [Topic]) {
+        public init(subject: Subject.Overview) {
             self.task = nil
             self.subject = subject
-            self.topics = topics
         }
     }
 }

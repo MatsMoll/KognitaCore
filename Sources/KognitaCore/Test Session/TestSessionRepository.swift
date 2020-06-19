@@ -79,22 +79,20 @@ extension TestSession {
 
         init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
-            self.typingTaskRepository = repositories.typingTaskRepository
-            self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
-            self.userRepository = repositories.userRepository
-            self.taskSolutionRepository = repositories.taskSolutionRepository
-            self.taskSessionAnswerRepository = repositories.taskSessionAnswerRepository
-            self.subjectTestRepository = repositories.subjectTestRepository
+            self.repositories = repositories
+            self.taskSessionAnswerRepository = TaskSessionAnswer.DatabaseRepository(conn: conn)
         }
 
         public let conn: DatabaseConnectable
+        private let repositories: RepositoriesRepresentable
 
-        private let typingTaskRepository: FlashCardTaskRepository
-        private let multipleChoiseRepository: MultipleChoiseTaskRepository
-        private let userRepository: UserRepository
-        private let taskSolutionRepository: TaskSolutionRepositoring
+        private var typingTaskRepository: FlashCardTaskRepository { repositories.typingTaskRepository }
+        private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
+        private var userRepository: UserRepository { repositories.userRepository }
+        private var taskSolutionRepository: TaskSolutionRepositoring { repositories.taskSolutionRepository }
+        private var subjectTestRepository: SubjectTestRepositoring { repositories.subjectTestRepository }
+
         private let taskSessionAnswerRepository: TaskSessionAnswerRepository
-        private let subjectTestRepository: SubjectTestRepositoring
 
         struct OverviewQuery: Codable {
             let question: String

@@ -442,6 +442,45 @@ extension Subject.DatabaseRepository {
                 }
         }
     }
+
+    public func overviewFor(id: Subject.ID) -> EventLoopFuture<Subject.Overview> {
+        Subject.DatabaseModel.query(on: conn)
+            .filter(\.id == id)
+            .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
+            .decode(data: Subject.self, Subject.DatabaseModel.tableName)
+            .alsoDecode(Topic.self, Topic.DatabaseModel.tableName)
+            .all()
+            .map { content in
+                guard let subject = content.first?.0 else { throw Abort(.badRequest) }
+                return Subject.Overview(
+                    id: subject.id,
+                    name: subject.name,
+                    description: subject.description,
+                    category: subject.description,
+                    topics: content.map { $0.1 }
+                )
+        }
+    }
+
+    public func overviewContaining(subtopicID: Subtopic.ID) -> EventLoopFuture<Subject.Overview> {
+        Subject.DatabaseModel.query(on: conn)
+            .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
+            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.id)
+            .filter(\Subtopic.DatabaseModel.id == subtopicID)
+            .decode(data: Subject.self, Subject.DatabaseModel.tableName)
+            .alsoDecode(Topic.self, Topic.DatabaseModel.tableName)
+            .all()
+            .map { content in
+                guard let subject = content.first?.0 else { throw Abort(.badRequest) }
+                return Subject.Overview(
+                    id: subject.id,
+                    name: subject.name,
+                    description: subject.description,
+                    category: subject.description,
+                    topics: content.map { $0.1 }
+                )
+        }
+    }
 }
 
 extension Subject.ListOverview {

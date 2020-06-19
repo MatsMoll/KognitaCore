@@ -30,14 +30,20 @@ extension Subject {
     }
 
     public func makeActive(for user: User, canPractice: Bool, on conn: DatabaseConnectable) throws {
-        try Subject.DatabaseRepository(conn: conn).mark(active: self, canPractice: canPractice, for: user).wait()
+        try TestableRepositories.testable(with: conn)
+            .subjectRepository
+            .mark(active: self, canPractice: canPractice, for: user).wait()
     }
 
     public func makeInactive(for user: User, on conn: DatabaseConnectable) throws {
-        try Subject.DatabaseRepository(conn: conn).mark(inactive: self, for: user).wait()
+        try TestableRepositories.testable(with: conn)
+            .subjectRepository
+            .mark(inactive: self, for: user).wait()
     }
 
     public func grantModeratorPrivilege(for userID: User.ID, by moderator: User, on conn: DatabaseConnectable) throws {
-        try Subject.DatabaseRepository(conn: conn).grantModeratorPrivilege(for: userID, in: self.id, by: moderator).wait()
+        try TestableRepositories.testable(with: conn)
+            .subjectRepository
+            .grantModeratorPrivilege(for: userID, in: self.id, by: moderator).wait()
     }
 }

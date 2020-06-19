@@ -4,11 +4,12 @@ import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
 import KognitaCoreTestable
+// swiftlint:disable force_cast
 
 class UserTests: VaporTestCase {
 
-    lazy var userRepository: some UserRepository = { User.DatabaseRepository(conn: conn) }()
-    lazy var resetPasswordRepository: ResetPasswordRepositoring = { User.DatabaseRepository(conn: conn) }()
+    lazy var userRepository: UserRepository = { TestableRepositories.testable(with: conn).userRepository }()
+    lazy var resetPasswordRepository: ResetPasswordRepositoring = { TestableRepositories.testable(with: conn).userRepository as! ResetPasswordRepositoring }()
 
     func testEmailVerificationTokenOnCreate() throws {
 

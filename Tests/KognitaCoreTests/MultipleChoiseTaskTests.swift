@@ -9,12 +9,13 @@ import Vapor
 import XCTest
 import FluentPostgreSQL
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class MultipleChoiseTaskTests: VaporTestCase {
 
-    lazy var multipleChoiceRepository: some MultipleChoiseTaskRepository = { MultipleChoiceTask.DatabaseRepository(conn: conn) }()
-    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
-    lazy var practiceSessionRepository: some PracticeSessionRepository = { PracticeSession.DatabaseRepository(conn: conn) }()
+    lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: conn).multipleChoiceTaskRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: conn).practiceSessionRepository }()
 
     func testCreateAsAdmin() throws {
         let subtopic = try Subtopic.create(on: conn)
@@ -107,7 +108,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         )
 
         let editedMultiple = try multipleChoiceRepository
-            .update(model: startingMultiple, to: content, by: user).wait()
+            .updateModelWith(id: startingMultiple.id, to: content, by: user).wait()
 
         let startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingMultiple.id)
@@ -141,7 +142,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         )
 
         let editedMultiple = try multipleChoiceRepository
-            .update(model: startingMultiple, to: content, by: creatorStudent).wait()
+            .updateModelWith(id: startingMultiple.id, to: content, by: creatorStudent).wait()
 
         let startingTask = try Task.query(on: conn, withSoftDeleted: true)
             .filter(\.id == startingMultiple.id)
@@ -154,7 +155,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
         throwsError(of: Abort.self) {
             _ = try multipleChoiceRepository
-                .update(model: editedMultiple, to: content, by: otherStudent).wait()
+                .updateModelWith(id: editedMultiple.id, to: content, by: otherStudent).wait()
         }
     }
 
@@ -177,7 +178,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         )
 
         let editedMultiple = try multipleChoiceRepository
-            .update(model: startingMultiple, to: content, by: user)
+            .updateModelWith(id: startingMultiple.id, to: content, by: user)
             .wait()
 
         let startingTask = try Task.query(on: conn, withSoftDeleted: true)
@@ -211,7 +212,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
             XCTAssertThrowsError(
                 try multipleChoiceRepository
-                    .update(model: startingMultiple, to: content, by: user)
+                    .updateModelWith(id: startingMultiple.id, to: content, by: user)
                     .wait()
             )
         }

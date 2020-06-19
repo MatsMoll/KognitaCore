@@ -15,6 +15,8 @@ public struct SubjectCompendiumFilter: Codable {
 public protocol SubjectRepositoring: DeleteModelRepository {
     func all() throws -> EventLoopFuture<[Subject]>
     func find(_ id: Subject.ID, or error: Error) -> EventLoopFuture<Subject>
+    func overviewFor(id: Subject.ID) -> EventLoopFuture<Subject.Overview>
+    func overviewContaining(subtopicID: Subtopic.ID) -> EventLoopFuture<Subject.Overview>
     func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject.Create.Response>
     func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject.Update.Response>
     func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>

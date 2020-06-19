@@ -52,8 +52,8 @@ extension Topic {
             self.subjectId      = subjectId
         }
 
-        init(content: Create.Data, subject: Subject, creator: User) throws {
-            subjectId   = subject.id
+        init(content: Create.Data, creator: User) throws {
+            subjectId   = content.subjectID
             name        = content.name
             chapter     = content.chapter
         }

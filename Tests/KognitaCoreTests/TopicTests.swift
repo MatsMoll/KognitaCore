@@ -9,11 +9,12 @@ import XCTest
 import Vapor
 import FluentPostgreSQL
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class TopicTests: VaporTestCase {
 
-    lazy var topicRepository: some TopicRepository = { Topic.DatabaseRepository(conn: conn) }()
-    lazy var subtopicRepository: some SubtopicRepositoring = { Subtopic.DatabaseRepository(conn: conn) }()
+    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: conn).topicRepository }()
+    lazy var subtopicRepository: SubtopicRepositoring = { TestableRepositories.testable(with: conn).subtopicRepository }()
 
     func testCreate() throws {
 

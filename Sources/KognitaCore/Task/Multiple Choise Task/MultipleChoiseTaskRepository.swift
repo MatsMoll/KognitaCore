@@ -29,15 +29,13 @@ extension MultipleChoiceTask {
             self.conn = conn
             self.subtopicRepository = repositories.subtopicRepository
             self.userRepository = repositories.userRepository
-            self.topicRepository = repositories.topicRepository
-            self.taskRepository = repositories.taskRepository
+            self.taskRepository = Task.DatabaseRepository(conn: conn)
         }
 
         public let conn: DatabaseConnectable
 
         private let subtopicRepository: SubtopicRepositoring
         private let userRepository: UserRepository
-        private let topicRepository: TopicRepository
         private let taskRepository: TaskRepository
     }
 }

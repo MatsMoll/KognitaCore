@@ -48,68 +48,20 @@ extension SubjectTest.Pivot.Task: Migration {
     }
 }
 
-internal protocol SubjectTestTaskRepositoring {
-    func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<SubjectTest.Pivot.Task.Create.Response>
-    func updateModelWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest.Pivot.Task.Update.Response>
-}
-
 extension SubjectTest.Pivot.Task {
 
-    public enum Create {
-        public struct Data {
+    enum Create {
+        struct Data {
             let testID: SubjectTest.ID
             let taskIDs: [Task.ID]
         }
 
-        public typealias Response = [SubjectTest.Pivot.Task]
+        typealias Response = [SubjectTest.Pivot.Task]
     }
 
-    public enum Update {
-        public typealias Data = [Task.ID]
-        public typealias Response = Void
-    }
-
-    struct DatabaseRepository: SubjectTestTaskRepositoring, DatabaseConnectableRepository {
-
-        let conn: DatabaseConnectable
-
-        func create(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
-            content.taskIDs.map {
-                SubjectTest.Pivot.Task(
-                    testID: content.testID,
-                    taskID: $0
-                )
-                .create(on: self.conn)
-            }
-            .flatten(on: conn)
-        }
-
-        func updateModelWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
-            SubjectTest.Pivot.Task
-                .query(on: conn)
-                .filter(\.testID == id)
-                .all()
-                .flatMap { (tasks: [SubjectTest.Pivot.Task]) in
-
-                    data.changes(from: tasks.map { $0.taskID })
-                        .compactMap { change in
-
-                            switch change {
-                            case .insert(let taskID):
-                                return SubjectTest.Pivot.Task(
-                                    testID: id,
-                                    taskID: taskID
-                                )
-                                    .create(on: self.conn)
-                                    .transform(to: ())
-                            case .remove(let taskID):
-                                return tasks.first(where: { $0.taskID == taskID })?
-                                    .delete(on: self.conn)
-                            }
-                    }
-                    .flatten(on: self.conn)
-            }
-        }
+    enum Update {
+        typealias Data = [Task.ID]
+        typealias Response = Void
     }
 }
 

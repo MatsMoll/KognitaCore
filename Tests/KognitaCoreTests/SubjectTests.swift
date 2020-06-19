@@ -10,14 +10,15 @@ import XCTest
 import FluentPostgreSQL
 import Crypto
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class SubjectTests: VaporTestCase {
 
-    lazy var topicRepository: some TopicRepository = { Topic.DatabaseRepository(conn: conn) }()
-    lazy var subjectRepository: some SubjectRepositoring = { Subject.DatabaseRepository(conn: conn) }()
-    lazy var taskSolutionRepository: some TaskSolutionRepositoring = { TaskSolution.DatabaseRepository(conn: conn) }()
+    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: conn).topicRepository }()
+    lazy var subjectRepository: SubjectRepositoring = { TestableRepositories.testable(with: conn).subjectRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
     lazy var taskRepository: Task.DatabaseRepository = { Task.DatabaseRepository(conn: conn) }()
-    lazy var userRepository: some UserRepository = { User.DatabaseRepository(conn: conn) }()
+    lazy var userRepository: UserRepository = { TestableRepositories.testable(with: conn).userRepository }()
 
     func testExportAndImport() throws {
 

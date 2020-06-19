@@ -21,26 +21,17 @@ extension FlashCardTask {
 
         init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
             self.conn = conn
-            self.subtopicRepository = repositories.subtopicRepository
-            self.topicRepository = repositories.topicRepository
-            self.userRepository = repositories.userRepository
-            self.taskRepository = repositories.taskRepository
-        }
-
-        init(conn: DatabaseConnectable, repository: DatabaseRepository) {
-            self.conn = conn
-            self.subtopicRepository = repository.subtopicRepository
-            self.topicRepository = repository.topicRepository
-            self.userRepository = repository.userRepository
-            self.taskRepository = repository.taskRepository
+            self.repositories = repositories
+            self.taskRepository = Task.DatabaseRepository(conn: conn)
         }
 
         public let conn: DatabaseConnectable
+        private let repositories: RepositoriesRepresentable
 
-        private let subtopicRepository: SubtopicRepositoring
-        private let topicRepository: TopicRepository
-        private let userRepository: UserRepository
+        private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
+        private var userRepository: UserRepository { repositories.userRepository }
         private let taskRepository: TaskRepository
+        private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
     }
 }
 
@@ -107,7 +98,7 @@ extension FlashCardTask.DatabaseRepository {
     private func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<Task> {
 
         conn.transaction(on: .psql) { conn in
-            try FlashCardTask.DatabaseRepository(conn: conn, repository: self)
+            try FlashCardTask.DatabaseRepository(conn: conn, repositories: self.repositories)
                 .create(from: content, by: user)
                 .flatMap { newTask in
 
@@ -251,26 +242,17 @@ extension FlashCardTask.DatabaseRepository {
             .unwrap(or: Abort(.internalServerError))
             .flatMap { taskInfo in
 
-                Subject.DatabaseModel.query(on: self.conn)
-                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
-                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-                    .filter(\Subtopic.DatabaseModel.id == taskInfo.0.subtopicID)
-                    .first()
-                    .unwrap(or: Abort(.internalServerError))
-                    .flatMap { subject in
+                self.subjectRepository
+                    .overviewContaining(subtopicID: taskInfo.0.subtopicID)
+                    .map { subject in
 
-                        try self.topicRepository.getTopicResponses(in: subject.content())
-                            .map { topics in
-
-                                try FlashCardTask.ModifyContent(
-                                    task: Task.ModifyContent(
-                                        task: taskInfo.0,
-                                        solution: taskInfo.1.solution
-                                    ),
-                                    subject: subject.content(),
-                                    topics: topics
-                                )
-                        }
+                        FlashCardTask.ModifyContent(
+                            task: Task.ModifyContent(
+                                task: taskInfo.0,
+                                solution: taskInfo.1.solution
+                            ),
+                            subject: subject
+                        )
                 }
         }
     }
