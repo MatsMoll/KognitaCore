@@ -50,6 +50,7 @@ public func config(enviroment: Environment, in services: inout Services) {
 }
 
 extension DatabaseConnectionPool: DatabaseConnectable {
+
     public func databaseConnection<Database>(to database: DatabaseIdentifier<Database>?) -> EventLoopFuture<Database.Connection> where Database: DatabaseKit.Database {
         // swiftlint:disable force_cast
         return requestConnection() as! EventLoopFuture<Database.Connection>
@@ -57,9 +58,7 @@ extension DatabaseConnectionPool: DatabaseConnectable {
     }
 
     public func shutdownGracefully(queue: DispatchQueue, _ callback: @escaping (Error?) -> Void) {
-        queue.async {
-            self.shutdownGracefully(callback)
-        }
+        eventLoop.shutdownGracefully(queue: queue, callback)
     }
 
     public func next() -> EventLoop {

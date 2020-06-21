@@ -9,7 +9,7 @@ import Crypto
 import FluentPostgreSQL
 import Vapor
 
-public protocol UserRepository {
+public protocol UserRepository: ResetPasswordRepositoring {
 
     func find(_ id: User.ID, or error: Error) -> EventLoopFuture<User>
 

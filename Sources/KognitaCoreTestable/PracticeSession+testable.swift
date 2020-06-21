@@ -11,32 +11,40 @@ import FluentPostgreSQL
 
 public class TestableRepositories: RepositoriesRepresentable {
 
-    public var topicRepository: TopicRepository { repositories.topicRepository }
+    public var topicRepository: TopicRepository
 
-    public var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
+    public var subjectRepository: SubjectRepositoring
 
-    public var subjectTestRepository: SubjectTestRepositoring { repositories.subjectTestRepository }
+    public var subjectTestRepository: SubjectTestRepositoring
 
-    public var userRepository: UserRepository { repositories.userRepository }
+    public var userRepository: UserRepository
 
-    public var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
+    public var subtopicRepository: SubtopicRepositoring
 
-    public var testSessionRepository: TestSessionRepositoring { repositories.testSessionRepository }
+    public var testSessionRepository: TestSessionRepositoring
 
-    public var practiceSessionRepository: PracticeSessionRepository { repositories.practiceSessionRepository }
+    public var practiceSessionRepository: PracticeSessionRepository
 
-    public var multipleChoiceTaskRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
+    public var multipleChoiceTaskRepository: MultipleChoiseTaskRepository
 
-    public var typingTaskRepository: FlashCardTaskRepository { repositories.typingTaskRepository }
+    public var typingTaskRepository: FlashCardTaskRepository
 
-    public var taskSolutionRepository: TaskSolutionRepositoring { repositories.taskSolutionRepository }
+    public var taskSolutionRepository: TaskSolutionRepositoring
 
-    public var taskDiscussionRepository: TaskDiscussionRepositoring { repositories.taskDiscussionRepository }
-
-    var repositories: RepositoriesRepresentable
+    public var taskDiscussionRepository: TaskDiscussionRepositoring
 
     init(repositories: RepositoriesRepresentable) {
-        self.repositories = repositories
+        self.topicRepository = repositories.topicRepository
+        self.subjectRepository = repositories.subjectRepository
+        self.subjectTestRepository = repositories.subjectTestRepository
+        self.userRepository = repositories.userRepository
+        self.subtopicRepository = repositories.subtopicRepository
+        self.testSessionRepository = repositories.testSessionRepository
+        self.practiceSessionRepository = repositories.practiceSessionRepository
+        self.multipleChoiceTaskRepository = repositories.multipleChoiceTaskRepository
+        self.typingTaskRepository = repositories.typingTaskRepository
+        self.taskSolutionRepository = repositories.taskSolutionRepository
+        self.taskDiscussionRepository = repositories.taskDiscussionRepository
     }
 
     private static var shared: TestableRepositories!
@@ -48,6 +56,11 @@ public class TestableRepositories: RepositoriesRepresentable {
     }
     public static func reset() {
         shared = nil
+    }
+
+    public static func modifyRepositories(_ modifier: @escaping (inout TestableRepositories) -> Void) {
+        guard var shared = shared else { fatalError() }
+        modifier(&shared)
     }
 }
 
