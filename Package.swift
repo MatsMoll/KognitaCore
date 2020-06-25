@@ -6,13 +6,16 @@ import Foundation
 
 var dependencies: [Package.Dependency] = [
     // 💧 A server-side Swift web framework.
-    .package(name: "Vapor", url: "https://github.com/vapor/vapor.git", from: "3.3.3"),
+    .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.10.0"),
 
     // 👤 Authentication and Authorization layer for Fluent.
-    .package(name: "Auth", url: "https://github.com/vapor/auth.git", from: "2.0.0"),
+//    .package(name: "Auth", url: "https://github.com/vapor/auth.git", from: "2.0.0"),
 
     // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
-    .package(name: "FluentPostgreSQL", url: "https://github.com/vapor/fluent-postgres-driver.git", from: "1.0.0"),
+    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0"),
+
+
+    .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
 
     // SwiftSoup for HTML sanitizing
     .package(name: "SwiftSoup", url: "https://github.com/scinfu/SwiftSoup.git", from: "2.3.0"),
@@ -57,9 +60,9 @@ let package = Package(
         .target(
             name: "KognitaCore",
             dependencies: [
-                .product(name: "Authentication", package: "Auth"),
-                .product(name: "FluentPostgreSQL", package: "FluentPostgreSQL"),
-                .product(name: "Vapor", package: "Vapor"),
+                .product(name: "Fluent", package: "fluent"),
+                .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
+                .product(name: "Vapor", package: "vapor"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "KognitaContent", package: "KognitaContent"),
             ]
@@ -73,7 +76,8 @@ let package = Package(
         .testTarget(
             name: "KognitaCoreTests",
             dependencies: [
-                .target(name: "KognitaCoreTestable")
+                .target(name: "KognitaCoreTestable"),
+                .product(name: "XCTVapor", package: "vapor")
             ]
         ),
     ]

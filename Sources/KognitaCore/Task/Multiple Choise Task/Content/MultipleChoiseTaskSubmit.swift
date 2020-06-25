@@ -16,7 +16,7 @@ extension MultipleChoiceTask {
         public let timeUsed: TimeInterval?
 
         /// The choise id's
-        public let choises: [MultipleChoiseTaskChoise.ID]
+        public let choises: [MultipleChoiceTaskChoice.ID]
 
         // FIXME: Remove and replace by url parameter
         public internal(set) var taskIndex: Int
@@ -25,7 +25,7 @@ extension MultipleChoiceTask {
 
 extension MultipleChoiseTaskChoise {
     public struct Result: Content {
-        public let id: MultipleChoiseTaskChoise.ID
+        public let id: MultipleChoiceTaskChoice.ID
         public let isCorrect: Bool
     }
 }

@@ -4,8 +4,7 @@
 //
 //  Created by Mats Mollestad on 31/03/2019.
 //
-
-import FluentPostgreSQL
+import FluentKit
 import Vapor
 
 public final class FlashCardTask: KognitaCRUDModel {
@@ -14,47 +13,41 @@ public final class FlashCardTask: KognitaCRUDModel {
 
     static let actionDescriptor = "Les spørsmålet og skriv et passende svar"
 
+    @DBID(custom: "id")
     public var id: Int?
 
+    @Timestamp(key: "createdAt", on: .create)
     public var createdAt: Date?
 
+    @Timestamp(key: "updatedAt", on: .update)
     public var updatedAt: Date?
 
     public init(taskId: Task.ID) {
         self.id = taskId
     }
 
-    public init(task: Task) throws {
+    init(task: TaskDatabaseModel) throws {
         self.id = try task.requireID()
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<FlashCardTask>) {
-        builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-    }
+    public init() {}
 }
 
 extension FlashCardTask: Content { }
 
 extension FlashCardTask {
-    var task: Parent<FlashCardTask, Task>? {
-        return parent(\.id)
-    }
+    enum Migrations {}
 }
 
-extension FlashCardTask {
-    enum Migration {
-        struct TaskIDReference: PostgreSQLMigration {
+extension FlashCardTask.Migrations {
+    struct Create: KognitaModelMigration {
 
-            static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                PostgreSQLDatabase.update(FlashCardTask.self, on: conn) { builder in
-                    builder.deleteReference(from: \.id, to: \Task.id)
-                    builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-                }
-            }
+        typealias Model = FlashCardTask
 
-            static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                conn.future()
-            }
+        var subclassSchema: String? = TaskDatabaseModel.schema
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.defaultTimestamps()
         }
     }
 }

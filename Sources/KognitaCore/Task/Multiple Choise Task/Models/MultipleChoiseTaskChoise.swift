@@ -6,50 +6,56 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
-public final class MultipleChoiseTaskChoise: PostgreSQLModel {
+public final class MultipleChoiseTaskChoise: Model {
 
-    public typealias Database = PostgreSQLDatabase
+    public static var schema: String = "MultipleChoiseTaskChoise"
 
+    @DBID(custom: "id")
     public var id: Int?
 
     /// The choise description
-    public var choise: String
+    @Field(key: "choise")
+    public var choice: String
 
     /// A bool indication if it is correct or false
+    @Field(key: "isCorrect")
     public var isCorrect: Bool
 
     /// The id of the taks this choise relates to
-    public var taskId: MultipleChoiceTask.ID
+    @Parent(key: "taskId")
+    var task: MultipleChoiceTask.DatabaseModel
 
     public init(choise: String, isCorrect: Bool, taskId: MultipleChoiceTask.ID) {
-        self.choise = choise
+        self.choice = choise
         self.isCorrect = isCorrect
-        self.taskId = taskId
+        self.$task.id = taskId
     }
 
     public init(content: MultipleChoiceTaskChoice.Create.Data, taskID: MultipleChoiceTask.ID) {
-        self.taskId = taskID
+        self.$task.id = taskID
         self.isCorrect = content.isCorrect
-        self.choise = (try? content.choice.cleanXSS(whitelist: .basicWithImages())) ?? content.choice
+        self.choice = (try? content.choice.cleanXSS(whitelist: .basicWithImages())) ?? content.choice
     }
+
+    public init() {}
 }
 
-extension MultipleChoiseTaskChoise: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(MultipleChoiseTaskChoise.self, on: conn) { builder in
-            builder.field(for: \.id, isIdentifier: true)
-            builder.field(for: \.choise)
-            builder.field(for: \.isCorrect)
-            builder.field(for: \.taskId)
+extension MultipleChoiseTaskChoise {
+    enum Migrations {}
+}
 
-            builder.reference(from: \.taskId, to: \MultipleChoiceTask.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+extension MultipleChoiseTaskChoise.Migrations {
+    struct Create: KognitaModelMigration {
+
+        typealias Model = MultipleChoiseTaskChoise
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("choise", .string, .required)
+                .field("isCorrect", .bool, .required)
+                .field("taskId", .uint, .required, .references(MultipleChoiceTask.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
         }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.delete(MultipleChoiseTaskChoise.self, on: connection)
     }
 }
 

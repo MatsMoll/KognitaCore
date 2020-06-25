@@ -1,6 +1,5 @@
-import Authentication
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 public protocol UserContent {
     var userId: Int { get }
@@ -13,36 +12,45 @@ extension User {
     /// A registered user, capable of owning todo items.
     final class DatabaseModel: KognitaCRUDModel {
 
+        init() { }
+
         public static var tableName: String = "User"
 
         /// User's unique identifier.
         /// Can be `nil` if the user has not been saved yet.
+        @DBID(custom: "id")
         public var id: Int?
 
-        public var userId: Int { id ?? 0 }
-
         /// The name the user want to go by
+        @Field(key: "username")
         public var username: String
 
         /// User's email address.
+        @Field(key: "email")
         public private(set) var email: String
 
         /// BCrypt hash of the user's password.
+        @Field(key: "passwordHash")
         public private(set) var passwordHash: String
 
         /// The role of the User
+        @Field(key: "isAdmin")
         public private(set) var isAdmin: Bool
 
         /// If the user has verified the user email
+        @Field(key: "isEmailVerified")
         public var isEmailVerified: Bool
 
         /// Can be `nil` if the user has not been saved yet.
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
         /// Can be `nil` if the user has not been saved yet.
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
 
         /// Date of last date visiting the task discussions
+        @Field(key: "viewedNotificationsAt")
         public var viewedNotificationsAt: Date?
 
         /// A token used to activate other users
@@ -60,13 +68,9 @@ extension User {
             self.isEmailVerified = isEmailVerified
         }
 
-        public static func addTableConstraints(to builder: SchemaCreator<User.DatabaseModel>) {
-            builder.unique(on: \.email)
-            builder.unique(on: \.username)
-        }
-
-        public func update(password: String) throws {
-            passwordHash = try BCrypt.hash(password)
+        public func update(password: String) throws -> User.DatabaseModel {
+//            passwordHash = try BCrypt.hash(password)
+            return self
         }
     }
 }
@@ -84,110 +88,110 @@ extension User.DatabaseModel: ContentConvertable {
     }
 }
 
-/// Allows users to be verified by basic / password auth middleware.
-extension User.DatabaseModel: PasswordAuthenticatable {
-    /// See `PasswordAuthenticatable`.
-    public static var usernameKey: WritableKeyPath<User.DatabaseModel, String> = \.email
-
-    /// See `PasswordAuthenticatable`.
-    public static var passwordKey: WritableKeyPath<User.DatabaseModel, String> = \.passwordHash
-}
-
-/// Allows users to be verified by bearer / token auth middleware.
-extension User.DatabaseModel: TokenAuthenticatable {
-
-    /// See `TokenAuthenticatable`.
-    public typealias TokenType = User.Login.Token.DatabaseModel
-}
-
-extension User: PasswordAuthenticatable {
-    public static func authenticate(username: String, password: String, using verifier: PasswordVerifier, on conn: DatabaseConnectable) -> EventLoopFuture<User?> {
-        User.DatabaseModel.authenticate(username: username, password: password, using: verifier, on: conn)
-            .map { try $0?.content() }
-    }
-
-    public static var usernameKey: UsernameKey { fatalError() }
-    public static var passwordKey: PasswordKey { fatalError() }
-
-    public static func authenticate(using basic: BasicAuthorization, verifier: PasswordVerifier, on connection: DatabaseConnectable) -> EventLoopFuture<User?> {
-        User.DatabaseModel.authenticate(using: basic, verifier: verifier, on: connection)
-            .map { try $0?.content() }
-    }
-}
-
-/// Allows users to be verified by bearer / token auth middleware.
-extension User: TokenAuthenticatable {
-    public typealias TokenType = User.Login.Token
-
-    public static func authenticate(token: TokenType, on connection: DatabaseConnectable) -> EventLoopFuture<User?> {
-        User.DatabaseModel.authenticate(token: .init(id: token.id, string: token.string, userID: token.userID), on: connection).map { try $0?.content() }
-    }
-}
-
-extension User.DatabaseModel: SessionAuthenticatable { }
-extension User: SessionAuthenticatable {
-    public var sessionID: Int? { id }
-    public static func authenticate(sessionID: User.ID, on connection: DatabaseConnectable) -> EventLoopFuture<User?> {
-        User.DatabaseModel.authenticate(sessionID: sessionID, on: connection).map { try $0?.content() }
-    }
-}
-extension User.Login.Token: BearerAuthenticatable, Token {
-    public typealias UserType = User
-    public typealias UserIDType = User.ID
-
-    public static var tokenKey: TokenKey { fatalError() }
-    public static var userIDKey: UserIDKey { fatalError() }
-
-    public static func authenticate(using bearer: BearerAuthorization, on connection: DatabaseConnectable) -> EventLoopFuture<User.Login.Token?> {
-        DatabaseModel.authenticate(using: bearer, on: connection).map { try $0?.content() }
-    }
-
-    public static func bearerAuthMiddleware() -> BearerAuthenticationMiddleware<User.Login.Token> { .init() }
-}
-
 extension User {
-    public static func basicAuthMiddleware(using verifier: PasswordVerifier) -> BasicAuthenticationMiddleware<User> {
-        BasicAuthenticationMiddleware(verifier: verifier)
-    }
+    enum Migrations {}
+}
 
-    public static func tokenAuthMiddleware() -> TokenAuthenticationMiddleware<User> {
-        TokenAuthenticationMiddleware(bearer: User.Login.Token.bearerAuthMiddleware())
+extension User.Migrations {
+    struct Create: KognitaModelMigration {
+
+        typealias Model = User.DatabaseModel
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("username", .string, .required)
+                .field("email", .string, .required)
+                .field("passwordHash", .string, .required)
+                .field("isAdmin", .bool, .required)
+                .field("isEmailVerified", .bool, .required)
+                .field("viewedNotificationsAt", .date)
+                .defaultTimestamps()
+                .unique(on: "email")
+                .unique(on: "username")
+        }
+    }
+}
+
+public struct BasicUserAuthenticator: BasicAuthenticator {
+
+    let userRepository: UserRepository
+
+    public func authenticate(basic: BasicAuthorization, for request: Request) -> EventLoopFuture<Void> {
+        userRepository.verify(email: basic.username, with: basic.password)
+            .map { user in
+                if let user = user {
+                    request.auth.login(user)
+                }
+        }
+    }
+}
+
+public struct BearerUserAuthenticator: BearerAuthenticator {
+
+    let userRepository: UserRepository
+
+    public func authenticate(bearer: BearerAuthorization, for request: Request) -> EventLoopFuture<Void> {
+        userRepository.user(with: bearer.token)
+            .map { user in
+                if let user = user {
+                    request.auth.login(user)
+                }
+        }
+    }
+}
+
+extension User: SessionAuthenticatable {
+    public var sessionID: User.ID { id }
+}
+
+public struct SessionUserAuthenticator: SessionAuthenticator {
+
+    public typealias User = KognitaContent.User
+
+    let userRepository: UserRepository
+
+    public func authenticate(sessionID: User.ID, for request: Request) -> EventLoopFuture<Void> {
+        userRepository.find(sessionID)
+            .map { user in
+                if let user = user {
+                    request.auth.login(user)
+                }
+        }
     }
 }
 
 /// Allows `User` to be used as a dynamic parameter in route definitions.
 //extension User: ModelParameterRepresentable { }
 
-extension User {
-    struct UnknownUserMigration: PostgreSQLMigration {
-        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            return User.DatabaseModel(
-                id: nil,
-                username: "Unknown",
-                email: "unknown@kognita.no",
-                passwordHash: "$2b$12$w8PoPj1yhROCdkAc2JjUJefWX91RztazdWo.D5kQhSdY.eSrT3wD6"
-            )
-                .create(on: conn)
-                .transform(to: ())
-        }
+//extension User {
+//    struct UnknownUserMigration: PostgreSQLMigration {
+//        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//            return User.DatabaseModel(
+//                id: nil,
+//                username: "Unknown",
+//                email: "unknown@kognita.no",
+//                passwordHash: "$2b$12$w8PoPj1yhROCdkAc2JjUJefWX91RztazdWo.D5kQhSdY.eSrT3wD6"
+//            )
+//                .create(on: conn)
+//                .transform(to: ())
+//        }
+//
+//        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//            conn.future()
+//        }
+//    }
+//}
 
-        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            conn.future()
-        }
-    }
-}
-
-extension User {
-    struct ViewedNotificationAtMigration: PostgreSQLMigration {
-
-        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            conn.future()
-        }
-
-        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            PostgreSQLDatabase.update(User.DatabaseModel.self, on: conn) { builder in
-                builder.field(for: \User.DatabaseModel.viewedNotificationsAt)
-            }
-        }
-    }
-}
+//extension User {
+//    struct ViewedNotificationAtMigration: PostgreSQLMigration {
+//
+//        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//            conn.future()
+//        }
+//
+//        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//            PostgreSQLDatabase.update(User.DatabaseModel.self, on: conn) { builder in
+//                builder.field(for: \User.DatabaseModel.viewedNotificationsAt)
+//            }
+//        }
+//    }
+//}

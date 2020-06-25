@@ -5,56 +5,81 @@
 //  Created by Eskild Brobak on 25/02/2020.
 //
 
-import FluentPostgreSQL
 import Vapor
+import Fluent
 
 extension TaskDiscussionResponse {
 
-    public final class DatabaseModel: KognitaPersistenceModel, Validatable {
+    final class DatabaseModel: KognitaPersistenceModel {
 
-        public static var tableName: String = "TaskDiscussionResponse"
+        init() {}
 
-        public var id: Int?
+        static var tableName: String = "TaskDiscussionResponse"
 
-        public var userID: User.ID
+        @DBID(custom: "id")
+        var id: Int?
 
-        public var response: String
+        @Parent(key: "userID")
+        var user: User.DatabaseModel
 
-        public var discussionID: TaskDiscussion.ID
+        @Field(key: "response")
+        var response: String
 
-        public var createdAt: Date?
+        @Parent(key: "discussionID")
+        var discussion: TaskDiscussion.DatabaseModel
 
-        public var updatedAt: Date?
+        @Timestamp(key: "createdAt", on: .create)
+        var createdAt: Date?
+
+        @Timestamp(key: "updatedAt", on: .update)
+        var updatedAt: Date?
 
         init(data: TaskDiscussionResponse.Create.Data, userID: User.ID) throws {
             self.response = try data.response.cleanXSS(whitelist: .basicWithImages())
-            self.discussionID = data.discussionID
-            self.userID = userID
-            try validate()
-        }
-
-        public static func validations() throws -> Validations<TaskDiscussionResponse.DatabaseModel> {
-            var validations = Validations(TaskDiscussionResponse.DatabaseModel.self)
-            try validations.add(\.response, .count(4...))
-            try validations.add(\.userID, .range(1...))
-            try validations.add(\.discussionID, .range(1...))
-            return validations
+            self.$discussion.id = data.discussionID
+            self.$user.id = userID
         }
     }
 }
 
-extension TaskDiscussionResponse.DatabaseModel {
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(TaskDiscussionResponse.DatabaseModel.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension TaskDiscussionResponse: Validatable {
+    public static func validations(_ validations: inout Validations) {
+        validations.add("response", as: String.self, is: .count(4...))
+        validations.add("userID", as: Int.self, is: .range(1...))
+        validations.add("discussionID", as: Int.self, is: .range(1...))
+    }
+}
 
-            builder.reference(from: \.discussionID, to: \TaskDiscussion.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-        }.flatMap {
-            PostgreSQLDatabase.update(TaskDiscussionResponse.DatabaseModel.self, on: conn) { builder in
-                builder.deleteField(for: \.userID)
-                builder.field(for: \.userID, type: .int, .default(1))
-            }
+extension TaskDiscussionResponse {
+    enum Migrations {}
+}
+
+extension TaskDiscussionResponse.Migrations {
+    struct Create: Migration {
+
+        let schema = TaskDiscussionResponse.DatabaseModel.schema
+        let userSchema = User.DatabaseModel.schema
+        let discussionSchema = TaskDiscussion.DatabaseModel.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("userID", .uint, .required, .references(userSchema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
+                .field("discussionID", .uint, .required, .references(discussionSchema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("response", .string, .required)
+                .defaultTimestamps()
+                .create()
         }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
+    }
+}
+
+extension SchemaBuilder {
+    func defaultTimestamps() -> Self {
+        field("createdAt", .date, .required)
+            .field("updatedAt", .date, .required)
     }
 }

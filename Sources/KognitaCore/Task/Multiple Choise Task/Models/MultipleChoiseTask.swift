@@ -6,26 +6,32 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 extension MultipleChoiceTask {
     final class DatabaseModel: KognitaCRUDModel {
 
         public static var tableName: String = "MultipleChoiseTask"
 
+        @DBID(custom: "id")
         public var id: Int?
 
         /// A bool indicating if the user should be able to select one or more choises
+        @Field(key: "isMultipleSelect")
         public var isMultipleSelect: Bool
 
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
 
-        public convenience init(isMultipleSelect: Bool, task: Task) throws {
+        public convenience init(isMultipleSelect: Bool, task: TaskDatabaseModel) throws {
             try self.init(isMultipleSelect: isMultipleSelect,
                           taskID: task.requireID())
         }
+
+        init() {}
 
         public var actionDescription: String {
             return isMultipleSelect ? "Velg ett eller flere alternativer" : "Velg ett alternativ"
@@ -35,30 +41,39 @@ extension MultipleChoiceTask {
             self.isMultipleSelect = isMultipleSelect
             self.id = taskID
         }
-
-        public static func addTableConstraints(to builder: SchemaCreator<MultipleChoiceTask.DatabaseModel>) {
-            builder.reference(from: \.id, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-
     }
 }
 
 extension MultipleChoiceTask {
-    init(task: Task, isMultipleSelect: Bool, choises: [MultipleChoiseTaskChoise]) {
+    enum Migrations {
+        struct Create: KognitaModelMigration {
+            typealias Model = MultipleChoiceTask.DatabaseModel
+
+            func build(schema: SchemaBuilder) -> SchemaBuilder {
+                schema.field("isMultipleSelect", .bool, .required)
+                    .defaultTimestamps()
+                    .foreignKey("id", references: TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade)
+            }
+        }
+    }
+}
+
+extension MultipleChoiceTask {
+    init(task: TaskDatabaseModel, isMultipleSelect: Bool, choises: [MultipleChoiseTaskChoise]) {
         self.init(
             id: task.id ?? 0,
-            subtopicID: task.subtopicID,
+            subtopicID: task.$subtopic.id,
             description: task.description,
             question: task.question,
-            creatorID: task.creatorID,
+            creatorID: task.$creator.id,
             examType: nil,
             examYear: task.examPaperYear,
             isTestable: task.isTestable,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
-            editedTaskID: task.editedTaskID,
+            editedTaskID: nil,
             isMultipleSelect: isMultipleSelect,
-            choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choise: $0.choise, isCorrect: $0.isCorrect) }
+            choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choise: $0.choice, isCorrect: $0.isCorrect) }
         )
     }
 }
@@ -70,29 +85,7 @@ extension MultipleChoiceTask.DatabaseModel {
     /// - Parameter conn: A connection to the database
     /// - Returns: A `MultipleChoiseTaskContent` object
     /// - Throws: If there is no relation to a `Task` object or a database error
-    func content(on conn: DatabaseConnectable) throws -> EventLoopFuture<MultipleChoiceTask> {
-
-        return try choises
-            .query(on: conn)
-            .all()
-            .flatMap { choises in
-                Task.find(self.id ?? 0, on: conn)
-                    .unwrap(or: Abort(.internalServerError)).map { task in
-                        MultipleChoiceTask(
-                            task: task,
-                            isMultipleSelect: self.isMultipleSelect,
-                            choises: choises.shuffled()
-                        )
-                }
-        }
-    }
-
-    /// Fetches the relevant data used to present a task to the user
-    ///
-    /// - Parameter conn: A connection to the database
-    /// - Returns: A `MultipleChoiseTaskContent` object
-    /// - Throws: If there is no relation to a `Task` object or a database error
-    func content(task: Task, choices: [MultipleChoiseTaskChoise]) throws -> MultipleChoiceTask {
+    func content(task: TaskDatabaseModel, choices: [MultipleChoiseTaskChoise]) throws -> MultipleChoiceTask {
         return MultipleChoiceTask(
             task: task,
             isMultipleSelect: isMultipleSelect,
@@ -117,34 +110,6 @@ extension MultipleChoiceTask.DatabaseModel {
 //                .first()
 //        }
 //    }
-}
-
-extension MultipleChoiceTask.DatabaseModel {
-
-    var choises: Children<MultipleChoiceTask.DatabaseModel, MultipleChoiseTaskChoise> {
-        return children(\.taskId)
-    }
-
-    var task: Parent<MultipleChoiceTask.DatabaseModel, Task>? {
-        return parent(\.id)
-    }
-
-    static func filter(on subtopic: Subtopic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiceTask.DatabaseModel]> {
-        return Task.query(on: conn)
-            .filter(\.subtopicID == subtopic.id)
-            .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
-            .decode(MultipleChoiceTask.DatabaseModel.self)
-            .all()
-    }
-
-    static func filter(on topic: Topic, in conn: DatabaseConnectable) throws -> EventLoopFuture<[MultipleChoiceTask.DatabaseModel]> {
-        return Task.query(on: conn)
-            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
-            .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id)
-            .decode(MultipleChoiceTask.DatabaseModel.self)
-            .all()
-    }
 }
 
 //extension MultipleChoiceTask: ModelParameterRepresentable { }

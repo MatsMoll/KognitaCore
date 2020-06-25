@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 extension FlashCardTask {
@@ -14,18 +14,20 @@ extension FlashCardTask {
     public static func create(
         creator: User? = nil,
         subtopic: Subtopic? = nil,
-        task: Task? = nil,
-        on conn: PostgreSQLConnection
+        task: TaskDatabaseModel? = nil,
+        on app: Application
     ) throws -> FlashCardTask {
 
-        let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, on: conn)
+        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, on: app)
 
-        return try create(task: usedTask, on: conn)
+        return try create(task: usedTask, on: app.db)
     }
 
-    public static func create(task: Task, on conn: PostgreSQLConnection) throws -> FlashCardTask {
-        return try FlashCardTask(task: task)
-            .create(on: conn)
+    public static func create(task: TaskDatabaseModel, on database: Database) throws -> FlashCardTask {
+        let task = try FlashCardTask(task: task)
+
+        return try task.create(on: database)
+            .transform(to: task)
             .wait()
     }
 }

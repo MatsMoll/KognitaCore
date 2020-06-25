@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 extension Subtopic {
@@ -17,11 +17,11 @@ extension Subtopic {
     ///   - conn: The database connection
     /// - Throws: If duplicates
     /// - Returns: The created `Subtopic`
-    public static func create(name: String = "Topic", topic: Topic? = nil, on conn: PostgreSQLConnection) throws -> Subtopic {
+    public static func create(name: String = "Topic", topic: Topic? = nil, on app: Application) throws -> Subtopic {
 
-        let usedTopic = try topic ?? Topic.create(on: conn)
+        let usedTopic = try topic ?? Topic.create(on: app)
 
-        return try Subtopic.create(name: name, topicId: usedTopic.id, on: conn)
+        return try Subtopic.create(name: name, topicId: usedTopic.id, on: app.db)
     }
 
     /// Creates a Subtopic for testing
@@ -31,11 +31,12 @@ extension Subtopic {
     ///   - conn: The database connection
     /// - Throws: If duplicates
     /// - Returns: The created `Subtopic`
-    public static func create(name: String = "Topic", topicId: Topic.ID, on conn: PostgreSQLConnection) throws -> Subtopic {
+    public static func create(name: String = "Topic", topicId: Topic.ID, on database: Database) throws -> Subtopic {
 
-        return try Subtopic.DatabaseModel(name: name, topicID: topicId)
-            .save(on: conn)
-            .map { try $0.content() }
+        let subtopic = Subtopic.DatabaseModel(name: name, topicID: topicId)
+
+        return try subtopic.save(on: database)
+            .flatMapThrowing { try subtopic.content() }
             .wait()
     }
 }

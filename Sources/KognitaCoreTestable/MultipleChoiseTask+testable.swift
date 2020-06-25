@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 import XCTest
 @testable import KognitaCore
 
@@ -15,39 +15,39 @@ extension MultipleChoiceTask {
     public static func create(
         creator: User?       = nil,
         subtopic: Subtopic?   = nil,
-        task: Task?       = nil,
+        task: TaskDatabaseModel?       = nil,
         isMultipleSelect: Bool        = true,
         choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
         isTestable: Bool        = false,
-        on conn: PostgreSQLConnection
+        on app: Application
     ) throws -> MultipleChoiceTask {
 
-        let usedTask = try task ?? Task.create(creator: creator, subtopic: subtopic, isTestable: isTestable, on: conn)
+        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, isTestable: isTestable, on: app)
 
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
                           choises: choises,
-                          on: conn)
+                          on: app.db)
     }
 
     public static func create(
         taskId: Task.ID,
         isMultipleSelect: Bool        = true,
         choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
-        on conn: PostgreSQLConnection
+        on database: Database
     ) throws -> MultipleChoiceTask {
 
-        return try MultipleChoiceTask.DatabaseModel(isMultipleSelect: isMultipleSelect, taskID: taskId)
-            .create(on: conn)
-            .flatMap { task in
+        let task = MultipleChoiceTask.DatabaseModel(isMultipleSelect: isMultipleSelect, taskID: taskId)
+
+        return try task.create(on: database)
+            .failableFlatMap {
                 try choises.map {
                     try MultipleChoiseTaskChoise(content: $0, taskID: task.requireID())
-                        .create(on: conn)
+                        .create(on: database)
                 }
-                .flatten(on: conn)
-                .transform(to: task)
+                .flatten(on: database.eventLoop)
         }
-        .flatMap { try $0.content(on: conn) }
+        .failableFlatMap { try TestableRepositories.testable(with: database).multipleChoiceTaskRepository.task(withID: task.requireID()) }
         .wait()
     }
 }

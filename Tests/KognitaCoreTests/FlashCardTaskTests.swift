@@ -7,19 +7,20 @@
 
 import Vapor
 import XCTest
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 import KognitaCoreTestable
 
 class FlashCardTaskTests: VaporTestCase {
 
-    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: conn).typingTaskRepository }()
-    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: conn).practiceSessionRepository }()
-    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: database).typingTaskRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: database).practiceSessionRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: database).taskSolutionRepository }()
 
     func testCreateAsAdmin() throws {
-        let subtopic = try Subtopic.create(on: conn)
-        let user = try User.create(on: conn)
+
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
 
         let taskData = FlashCardTask.Create.Data(
             subtopicId: subtopic.id,
@@ -32,16 +33,13 @@ class FlashCardTaskTests: VaporTestCase {
         )
 
         do {
-            print("TypingTask")
             let flashCardTask = try typingTaskRepository
                 .create(from: taskData, by: user)
                 .wait()
 
-            print("Solution")
             let solution = try taskSolutionRepository
-                .solutions(for: flashCardTask.requireID(), for: user)
+                .solutions(for: flashCardTask.id, for: user)
                 .wait()
-            print("Done")
 
             XCTAssertNotNil(flashCardTask.createdAt)
             XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
@@ -54,8 +52,8 @@ class FlashCardTaskTests: VaporTestCase {
     }
 
     func testCreateAsStudent() throws {
-        let subtopic = try Subtopic.create(on: conn)
-        let user = try User.create(isAdmin: false, on: conn)
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(isAdmin: false, on: app)
 
         let taskData = FlashCardTask.Create.Data(
             subtopicId: subtopic.id,
@@ -73,7 +71,7 @@ class FlashCardTaskTests: VaporTestCase {
                 .wait()
 
             let solution = try taskSolutionRepository
-                .solutions(for: flashCardTask.requireID(), for: user)
+                .solutions(for: flashCardTask.id, for: user)
                 .wait()
 
             XCTAssertNotNil(flashCardTask.createdAt)
@@ -88,14 +86,14 @@ class FlashCardTaskTests: VaporTestCase {
 
     func testEditAsStudent() {
         failableTest {
-            let creatorStudent = try User.create(isAdmin: false, on: conn)
-            let otherStudent = try User.create(isAdmin: false, on: conn)
+            let creatorStudent = try User.create(isAdmin: false, on: app)
+            let otherStudent = try User.create(isAdmin: false, on: app)
 
-            let startingFlash = try FlashCardTask.create(creator: creatorStudent, on: conn)
-            var startingTask = try startingFlash.task!.get(on: conn).wait()
+            let startingFlash = try FlashCardTask.create(creator: creatorStudent, on: app)
+            var startingTask = try TaskDatabaseModel.find(startingFlash.id!, on: database).unwrap(or: Errors.badTest).wait()
 
             let content = FlashCardTask.Create.Data(
-                subtopicId: startingTask.subtopicID,
+                subtopicId: startingTask.$subtopic.id,
                 description: nil,
                 question: "Some question 2",
                 solution: "Some solution",
@@ -106,16 +104,16 @@ class FlashCardTaskTests: VaporTestCase {
 
             let editedTask = try typingTaskRepository
                 .updateModelWith(id: startingFlash.id!, to: content, by: creatorStudent).wait()
-            startingTask = try Task.query(on: conn, withSoftDeleted: true)
-                .filter(\.id == startingTask.id)
+            startingTask = try TaskDatabaseModel.query(on: database)
+                .withDeleted()
+                .filter(\.$id == startingTask.id!)
                 .first()
                 .unwrap(or: Abort(.internalServerError))
                 .wait() // refershing
 
             XCTAssertEqual(editedTask.question, content.question)
-            XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
 
-            let editedFlash = try FlashCardTask.find(editedTask.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
+            let editedFlash = try FlashCardTask.find(editedTask.id, on: database).unwrap(or: Errors.badTest).wait()
 
             throwsError(of: Abort.self) {
                 _ = try typingTaskRepository
@@ -127,12 +125,12 @@ class FlashCardTaskTests: VaporTestCase {
 
     func testAnswerIsSavedOnSubmit() throws {
 
-        let user = try User.create(on: conn)
+        let user = try User.create(on: app)
 
-        let subtopic = try Subtopic.create(on: conn)
+        let subtopic = try Subtopic.create(on: app)
 
-        let firstTask = try FlashCardTask.create(subtopic: subtopic, on: conn)
-        let secondTask = try FlashCardTask.create(subtopic: subtopic, on: conn)
+        let firstTask = try FlashCardTask.create(subtopic: subtopic, on: app)
+        let secondTask = try FlashCardTask.create(subtopic: subtopic, on: app)
 
         let create = PracticeSession.Create.Data(
             numberOfTaskGoal: 2,
@@ -143,7 +141,7 @@ class FlashCardTaskTests: VaporTestCase {
         do {
             let session = try practiceSessionRepository
                 .create(from: create, by: user).wait()
-            let sessionRepresentable = try session.representable(on: conn).wait()
+            let sessionRepresentable = try session.representable(on: database).wait()
 
             let firstSubmit = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -164,16 +162,16 @@ class FlashCardTaskTests: VaporTestCase {
             _ = try practiceSessionRepository
                 .submit(secondSubmit, in: sessionRepresentable, by: user).wait()
 
-            let answers = try FlashCardAnswer.query(on: conn)
+            let answers = try FlashCardAnswer.query(on: database)
                 .all()
                 .wait()
             let answerSet = Set(answers.map { $0.answer })
-            let taskIDSet = Set(answers.map { $0.taskID })
+            let taskIDSet = Set(answers.map { $0.$task.id })
 
-            let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
+            let sessionAnswers = try TaskSessionAnswer.query(on: database).all().wait()
 
             XCTAssertEqual(answers.count, 2)
-            XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
+            XCTAssert(sessionAnswers.allSatisfy { $0.$session.id == session.id })
             XCTAssertTrue(answerSet.contains(firstSubmit.answer), "First submitted answer not found in \(answerSet)")
             XCTAssertTrue(answerSet.contains(secondSubmit.answer), "Second submitted answer not found in \(answerSet)")
             XCTAssertTrue(try taskIDSet.contains(firstTask.requireID()), "First submitted task id not found in \(taskIDSet)")

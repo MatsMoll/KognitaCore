@@ -5,8 +5,8 @@
 //  Created by Mats Mollestad on 07/10/2018.
 //
 
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 extension Topic {
     final class DatabaseModel: KognitaCRUDModel, KognitaModelUpdatable {
@@ -32,28 +32,38 @@ extension Topic {
 //            }
 //        }
 
+        @DBID(custom: "id")
         public var id: Int?
 
         /// The subject the topic is assigned to
-        public var subjectId: Subject.ID
+        @Parent(key: "subjectId")
+        public var subject: Subject.DatabaseModel
+
+        @Children(for: \.$topic)
+        var subtopics: [Subtopic.DatabaseModel]
 
         /// The name of the topic
+        @Field(key: "name")
         public private(set) var name: String
 
         /// The chapther number in a subject
+        @Field(key: "chapter")
         public private(set) var chapter: Int
 
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
+
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
 
         public init(name: String, chapter: Int, subjectId: Subject.ID) throws {
             self.name           = name
             self.chapter        = chapter
-            self.subjectId      = subjectId
+            self.$subject.id    = subjectId
         }
 
         init(content: Create.Data, creator: User) throws {
-            subjectId   = content.subjectID
+            $subject.id = content.subjectID
             name        = content.name
             chapter     = content.chapter
         }
@@ -63,12 +73,7 @@ extension Topic {
             chapter     = content.chapter
         }
 
-        public static func addTableConstraints(to builder: SchemaCreator<Topic.DatabaseModel>) {
-
-            builder.unique(on: \.chapter, \.subjectId)
-
-            builder.reference(from: \.subjectId, to: \Subject.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-        }
+        init() {}
     }
 }
 
@@ -76,18 +81,36 @@ extension Topic.DatabaseModel: ContentConvertable {
     public func content() throws -> Topic {
         try .init(
             id: requireID(),
-            subjectID: subjectId,
+            subjectID: $subject.id,
             name: name,
             chapter: chapter
         )
     }
 }
 
+extension Topic {
+    enum Migrations {}
+}
+
+extension Topic.Migrations {
+    struct Create: KognitaModelMigration {
+        typealias Model = Topic.DatabaseModel
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("name", .string, .required)
+                .field("chapter", .int, .required)
+                .field("subjectId", .uint, .references(Subject.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .unique(on: "chapter", "subjectId")
+                .defaultTimestamps()
+        }
+    }
+}
+
 extension Topic.DatabaseModel {
 
-    var subject: Parent<Topic.DatabaseModel, Subject.DatabaseModel> {
-        return parent(\.subjectId)
-    }
+//    var subject: Parent<Topic.DatabaseModel, Subject.DatabaseModel> {
+//        return parent(\.subjectId)
+//    }
 
 //    func numberOfTasks(_ conn: DatabaseConnectable) throws -> Future<Int> {
 //        return try DatabaseRepository

@@ -6,7 +6,6 @@
 //
 
 import Vapor
-import FluentPostgreSQL
 
 extension Topic {
     struct Pivot {}

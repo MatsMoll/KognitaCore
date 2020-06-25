@@ -4,9 +4,8 @@
 //
 //  Created by Mats Mollestad on 12/04/2019.
 //
-
-import FluentPostgreSQL
-import FluentSQL
+import FluentKit
+import FluentPostgresDriver
 import Vapor
 
 extension TaskResult {
@@ -26,15 +25,15 @@ public protocol PracticeSessionRepresentable: Codable {
 
     func content() -> PracticeSession
 
-    func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
-    func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable>
+    func end(on database: Database) -> EventLoopFuture<PracticeSessionRepresentable>
+    func extendSession(with numberOfTasks: Int, on database: Database) -> EventLoopFuture<PracticeSessionRepresentable>
 }
 
 public struct SpaceRepetitionTask: Codable {
     let taskID: Task.ID
     let revisitDate: Date
     let createdAt: Date
-    let sessionID: TaskSession.ID?
+    let sessionID: TaskSession.IDValue?
 }
 
 extension TaskResult.DatabaseRepository {
@@ -82,397 +81,440 @@ extension TaskResult.DatabaseRepository {
             }
         }
 
-        func query(for conn: PostgreSQLConnection) throws -> SQLRawBuilder<PostgreSQLConnection> {
-            switch self {
-            case .flowTasks(let userId, let sessionId):
-                return conn.raw(self.rawQuery)
-                    .bind(userId)
-                    .bind(sessionId)
-            case .results(revisitingAfter: let date, for: let userId):
-                return conn.raw(self.rawQuery)
-                    .bind(userId)
-                    .bind(date)
-            case .resultsInTopics(let topicIds, for: let userId):
-                return conn.raw(self.rawQuery)
-                    .bind(userId)
-                    .bind(topicIds)
-            case .resultsInSubject(let subjectId, for: let userId):
-                return conn.raw(self.rawQuery)
-                    .bind(userId)
-                    .bind(subjectId)
-            case .subtopics, .taskResults:
-                throw Errors.incompleateSqlStatment
+        func query(for database: Database) throws -> SQLRawBuilder {
+
+            guard let sqlDB = database as? SQLDatabase else {
+                throw Abort(.internalServerError)
             }
+            throw Abort(.notImplemented)
+//            switch self {
+//            case .flowTasks(let userId, let sessionId):
+//                return sqlDB.raw(self.rawQuery)
+//                    .bind(userId)
+//                    .bind(sessionId)
+//            case .results(revisitingAfter: let date, for: let userId):
+//                return sqlDB.raw(self.rawQuery)
+//                    .bind(userId)
+//                    .bind(date)
+//            case .resultsInTopics(let topicIds, for: let userId):
+//                return sqlDB.raw(self.rawQuery)
+//                    .bind(userId)
+//                    .bind(topicIds)
+//            case .resultsInSubject(let subjectId, for: let userId):
+//                return sqlDB.raw(self.rawQuery)
+//                    .bind(userId)
+//                    .bind(subjectId)
+//            case .subtopics, .taskResults:
+//                throw Errors.incompleateSqlStatment
+//            }
         }
     }
 
-    public static func getResults(on conn: DatabaseConnectable) -> EventLoopFuture<[UserResultOverview]> {
+    public static func getResults(on database: Database) -> EventLoopFuture<[UserResultOverview]> {
 
-        conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                psqlConn.select()
-                    .column(.count(.all, as: "resultCount"))
-                    .column(.keyPath(\User.DatabaseModel.id, as: "userID"))
-                    .column(.keyPath(\User.DatabaseModel.username, as: "username"))
-                    .column(.function("sum", [.expression(.column(\TaskResult.DatabaseModel.resultScore))]), as: "totalScore")
-                    .from(User.DatabaseModel.self)
-                    .join(\User.DatabaseModel.id, to: \TaskResult.DatabaseModel.userID)
-                    .groupBy(\User.DatabaseModel.id)
-                    .all(decoding: UserResultOverview.self)
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        sqlDB.select()
+//            .columns(SQLFunction("count", args: SQLLiteral.all))
+//            .column(.count(.all, as: "resultCount"))
+//            .column(\User.DatabaseModel.$id, as: "userID")
+//            .column(.keyPath(\User.DatabaseModel.username, as: "username"))
+//            .column(.function("sum", [.expression(.column(\TaskResult.DatabaseModel.resultScore))]), as: "totalScore")
+//            .from(User.DatabaseModel.self)
+//            .join(\User.DatabaseModel.id, to: \TaskResult.DatabaseModel.userID)
+//            .groupBy(\User.DatabaseModel.id)
+//            .all(decoding: UserResultOverview.self)
     }
 
-    public static func getAllResults(for userId: User.ID, with conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult]> {
+    public static func getAllResults(for userId: User.ID, with database: Database) throws -> EventLoopFuture<[TaskResult]> {
 
-        conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                psqlConn.select()
-                    .all(table: TaskResult.DatabaseModel.self)
-                    .where(
-                        .column(.keyPath(\TaskResult.DatabaseModel.id)),
-                        .in,
-                        .subquery(.raw(Query.taskResults.rawQuery, binds: [userId]))
-                    )
-                    .orderBy(\TaskResult.DatabaseModel.revisitDate)
-                    .all(decoding: TaskResult.self)
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+
+//        conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//
+//                psqlConn.select()
+//                    .all(table: TaskResult.DatabaseModel.self)
+//                    .where(
+//                        .column(.keyPath(\TaskResult.DatabaseModel.id)),
+//                        .in,
+//                        .subquery(.raw(Query.taskResults.rawQuery, binds: [userId]))
+//                    )
+//                    .orderBy(\TaskResult.DatabaseModel.revisitDate)
+//                    .all(decoding: TaskResult.self)
+//        }
     }
 
-    public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on conn: PostgreSQLConnection) throws -> EventLoopFuture<SpaceRepetitionTask?> {
+    public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on database: Database) throws -> EventLoopFuture<SpaceRepetitionTask?> {
 
-        return try Query.flowTasks(
-            userID: session.userID,
-            sessionID: session.requireID()
-        )
-            .query(for: conn)
-            .all(decoding: SpaceRepetitionTask.self)
-            .map { tasks in
-                let uncompletedTasks = try tasks.filter { try $0.sessionID != session.requireID() }
-                let now = Date()
-                let timeInADay: TimeInterval = 60 * 60 * 24
-
-                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
-                .filter { $0.key < 10 }
-                .min { first, second in
-                    first.key > second.key
-                }?.value.random
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//
+//        return try Query.flowTasks(
+//            userID: session.userID,
+//            sessionID: session.requireID()
+//        )
+//            .query(for: conn)
+//            .all(decoding: SpaceRepetitionTask.self)
+//            .map { tasks in
+//                let uncompletedTasks = try tasks.filter { try $0.sessionID != session.requireID() }
+//                let now = Date()
+//                let timeInADay: TimeInterval = 60 * 60 * 24
+//
+//                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+//                .filter { $0.key < 10 }
+//                .min { first, second in
+//                    first.key > second.key
+//                }?.value.random
+//        }
     }
 
-    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with conn: PostgreSQLConnection, maxRevisitDays: Int? = 10) throws -> EventLoopFuture<[TaskResult]> {
+//    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with database: Database, maxRevisitDays: Int? = 10) throws -> EventLoopFuture<[TaskResult]> {
+//
+//        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
+//
+//        return try Query.results(
+//            revisitingAfter: oneDayAgo,
+//            for: userId
+//        )
+//            .query(for: conn)
+//            .all(decoding: SubqueryResult.self)
+//            .flatMap { result in
+//
+//                let ids = result.map { $0.id }
+//
+//                var query = TaskResult.DatabaseModel.query(on: conn)
+//                    .filter(\.id ~~ ids)
+//                    .filter(filter)
+//                    .sort(\.revisitDate)
+//                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
+//                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+//                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
+//
+//                if let maxRevisitDays = maxRevisitDays,
+//                    let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
+//                    query = query
+//                        .filter(\TaskResult.DatabaseModel.revisitDate < maxRevisitDaysDate)
+//                }
+//
+//                return query.all()
+//                    .map { try $0.map { try $0.content() } }
+//        }
+//    }
 
-        let oneDayAgo = Date(timeIntervalSinceNow: -60*60*24*3)
+    public static func getAllResultsContent(for user: User, with database: Database, limit: Int = 2) throws -> EventLoopFuture<[TopicResultContent]> {
 
-        return try Query.results(
-            revisitingAfter: oneDayAgo,
-            for: userId
-        )
-            .query(for: conn)
-            .all(decoding: SubqueryResult.self)
-            .flatMap { result in
-
-                let ids = result.map { $0.id }
-
-                var query = TaskResult.DatabaseModel.query(on: conn)
-                    .filter(\.id ~~ ids)
-                    .filter(filter)
-                    .sort(\.revisitDate)
-                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
-                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-
-                if let maxRevisitDays = maxRevisitDays,
-                    let maxRevisitDaysDate = Calendar.current.date(byAdding: .day, value: maxRevisitDays, to: Date()) {
-                    query = query
-                        .filter(\TaskResult.DatabaseModel.revisitDate < maxRevisitDaysDate)
-                }
-
-                return query.all()
-                    .map { try $0.map { try $0.content() } }
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+
+//        return try Query.results(
+//            revisitingAfter: Date(),
+//            for: user.id
+//        )
+//            .query(for: conn)
+//            .all(decoding: SubqueryResult.self)
+//            .flatMap { result in
+//
+//                let ids = result.map { $0.id }
+//                return TaskResult.DatabaseModel.query(on: conn)
+//                    .filter(\.id ~~ ids)
+//                    .sort(\.revisitDate, .ascending)
+//                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
+//                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+//                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
+//                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
+//                    .alsoDecode(Topic.DatabaseModel.self)
+//                    .alsoDecode(Subject.DatabaseModel.self)
+//                    .range(...limit)
+//                    .all()
+//                    .map { contens in
+//
+//                        var responses: [Topic.ID: TopicResultContent] = [:]
+//
+//                        for content in contens {
+//                            let result = content.0.0
+//                            let topic = content.0.1
+//
+//                            if let response = try responses[topic.requireID()] {
+//                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result.content()], topic: topic.content(), subject: content.1.content())
+//                            } else {
+//                                try responses[topic.requireID()] = TopicResultContent(results: [result.content()], topic: topic.content(), subject: content.1.content())
+//                            }
+//                        }
+//                        return responses.map { $0.value }
+//                            .sorted(by: { $0.revisitDate < $1.revisitDate })
+//                }
+//        }
     }
 
-    public static func getAllResultsContent(for user: User, with conn: PostgreSQLConnection, limit: Int = 2) throws -> EventLoopFuture<[TopicResultContent]> {
+    public static func getAmountHistory(for user: User, on database: Database, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
 
-        return try Query.results(
-            revisitingAfter: Date(),
-            for: user.id
-        )
-            .query(for: conn)
-            .all(decoding: SubqueryResult.self)
-            .flatMap { result in
-
-                let ids = result.map { $0.id }
-                return TaskResult.DatabaseModel.query(on: conn)
-                    .filter(\.id ~~ ids)
-                    .sort(\.revisitDate, .ascending)
-                    .join(\Task.id, to: \TaskResult.DatabaseModel.taskID)
-                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-                    .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
-                    .alsoDecode(Topic.DatabaseModel.self)
-                    .alsoDecode(Subject.DatabaseModel.self)
-                    .range(...limit)
-                    .all()
-                    .map { contens in
-
-                        var responses: [Topic.ID: TopicResultContent] = [:]
-
-                        for content in contens {
-                            let result = content.0.0
-                            let topic = content.0.1
-
-                            if let response = try responses[topic.requireID()] {
-                                try responses[topic.requireID()] = TopicResultContent(results: response.results + [result.content()], topic: topic.content(), subject: content.1.content())
-                            } else {
-                                try responses[topic.requireID()] = TopicResultContent(results: [result.content()], topic: topic.content(), subject: content.1.content())
-                            }
-                        }
-                        return responses.map { $0.value }
-                            .sorted(by: { $0.revisitDate < $1.revisitDate })
-                }
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+
+//        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
+//            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+//
+//        return conn.select()
+//            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
+//            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
+//            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
+//            .from(TaskResult.DatabaseModel.self)
+//            .where(\TaskResult.DatabaseModel.userID == user.id)
+//            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
+//            .groupBy(.column(.column(nil, "year")))
+//            .groupBy(.column(.column(nil, "week")))
+//            .all(decoding: TaskResult.History.self)
+//            .map { days in
+//                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
+//                let now = Date()
+//
+//                var data = [String: TaskResult.History]()
+//
+//                try (0...(numberOfWeeks - 1)).forEach {
+//                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
+//                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
+//
+//                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
+//
+//                    guard
+//                        let year = dateData.year,
+//                        let week = dateData.weekOfYear
+//                    else {
+//                        throw Errors.incompleateSqlStatment
+//                    }
+//
+//                    data["\(year)-\(week)"] = TaskResult.History(
+//                        numberOfTasksCompleted: 0,
+//                        year: Double(year),
+//                        week: Double(week)
+//                    )
+//                }
+//
+//                for day in days {
+//                    data["\(Int(day.year))-\(Int(day.week))"] = day
+//                }
+//
+//                return data.map { $1 }
+//                    .sorted(by: { first, second in
+//                        if first.year == second.year {
+//                            return first.week < second.week
+//                        } else {
+//                            return first.year < second.year
+//                        }
+//                })
+//        }
     }
 
-    public static func getAmountHistory(for user: User, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
+    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on database: Database, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
 
-        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
-            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
-
-        return conn.select()
-            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
-            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
-            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
-            .from(TaskResult.DatabaseModel.self)
-            .where(\TaskResult.DatabaseModel.userID == user.id)
-            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
-            .groupBy(.column(.column(nil, "year")))
-            .groupBy(.column(.column(nil, "week")))
-            .all(decoding: TaskResult.History.self)
-            .map { days in
-                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
-                let now = Date()
-
-                var data = [String: TaskResult.History]()
-
-                try (0...(numberOfWeeks - 1)).forEach {
-                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
-                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
-
-                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
-
-                    guard
-                        let year = dateData.year,
-                        let week = dateData.weekOfYear
-                    else {
-                        throw Errors.incompleateSqlStatment
-                    }
-
-                    data["\(year)-\(week)"] = TaskResult.History(
-                        numberOfTasksCompleted: 0,
-                        year: Double(year),
-                        week: Double(week)
-                    )
-                }
-
-                for day in days {
-                    data["\(Int(day.year))-\(Int(day.week))"] = day
-                }
-
-                return data.map { $1 }
-                    .sorted(by: { first, second in
-                        if first.year == second.year {
-                            return first.week < second.week
-                        } else {
-                            return first.year < second.year
-                        }
-                })
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
+//            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+//
+//        return conn.select()
+//            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
+//            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
+//            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
+//            .from(TaskResult.DatabaseModel.self)
+//            .join(\TaskResult.DatabaseModel.taskID, to: \TaskDatabaseModel.id)
+//            .join(\TaskDatabaseModel.subtopicID, to: \Subtopic.DatabaseModel.id)
+//            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
+//            .where(\TaskResult.DatabaseModel.userID == user.id)
+//            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
+//            .where(\Topic.DatabaseModel.subjectId == subjectId)
+//            .groupBy(.column(.column(nil, "year")))
+//            .groupBy(.column(.column(nil, "week")))
+//            .all(decoding: TaskResult.History.self)
+//            .map { days in
+//                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
+//                let now = Date()
+//
+//                var data = [String: TaskResult.History]()
+//
+//                try (0...(numberOfWeeks - 1)).forEach {
+//                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
+//                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
+//
+//                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
+//
+//                    guard
+//                        let year = dateData.year,
+//                        let week = dateData.weekOfYear
+//                    else {
+//                        throw Errors.incompleateSqlStatment
+//                    }
+//
+//                    data["\(year)-\(week)"] = TaskResult.History(
+//                        numberOfTasksCompleted: 0,
+//                        year: Double(year),
+//                        week: Double(week)
+//                    )
+//                }
+//
+//                for day in days {
+//                    data["\(Int(day.year))-\(Int(day.week))"] = day
+//                }
+//
+//                return data.map { $1 }
+//                    .sorted(by: { first, second in
+//                        if first.year == second.year {
+//                            return first.week < second.week
+//                        } else {
+//                            return first.year < second.year
+//                        }
+//                })
+//        }
     }
 
-    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on conn: PostgreSQLConnection, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
+    static func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: TaskSession.IDValue, on database: Database) -> EventLoopFuture<TaskResult> {
+        let result = TaskResult.DatabaseModel(result: result, userID: userID, sessionID: sessionID)
+        return result.save(on: database)
+            .flatMapThrowing { try result.content() }
+    }
 
-        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
-            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on database: Database) throws -> EventLoopFuture<[User.TopicLevel]> {
 
-        return conn.select()
-            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
-            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
-            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
-            .from(TaskResult.DatabaseModel.self)
-            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
-            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-            .where(\TaskResult.DatabaseModel.userID == user.id)
-            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
-            .where(\Topic.DatabaseModel.subjectId == subjectId)
-            .groupBy(.column(.column(nil, "year")))
-            .groupBy(.column(.column(nil, "week")))
-            .all(decoding: TaskResult.History.self)
-            .map { days in
-                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
-                let now = Date()
-
-                var data = [String: TaskResult.History]()
-
-                try (0...(numberOfWeeks - 1)).forEach {
-                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
-                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
-
-                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
-
-                    guard
-                        let year = dateData.year,
-                        let week = dateData.weekOfYear
-                    else {
-                        throw Errors.incompleateSqlStatment
-                    }
-
-                    data["\(year)-\(week)"] = TaskResult.History(
-                        numberOfTasksCompleted: 0,
-                        year: Double(year),
-                        week: Double(week)
-                    )
-                }
-
-                for day in days {
-                    data["\(Int(day.year))-\(Int(day.week))"] = day
-                }
-
-                return data.map { $1 }
-                    .sorted(by: { first, second in
-                        if first.year == second.year {
-                            return first.week < second.week
-                        } else {
-                            return first.year < second.year
-                        }
-                })
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+
+//        return conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//
+//                try Query.resultsInTopics(topics, for: userId)
+//                    .query(for: psqlConn)
+//                    .all(decoding: SubqueryTopicResult.self)
+//                    .flatMap { result in
+//
+//                        let ids = result.map { $0.id }
+//
+//                        return psqlConn.select()
+//                            .column(.column(\TaskResult.DatabaseModel.resultScore), as: "resultScore")
+//                            .column(.column(\Topic.DatabaseModel.id), as: "topicID")
+//                            .from(TaskResult.DatabaseModel.self)
+//                            .where(\TaskResult.DatabaseModel.id, .in, ids)
+//                            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
+//                            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
+//                            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
+//                            .all(decoding: UserLevelScore.self)
+//                            .flatMap { scores in
+//
+//                                return scores.group(by: \UserLevelScore.topicID)
+//                                    .map { topicID, grouped in
+//
+//                                    Task.query(on: psqlConn)
+//                                        .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+//                                        .filter(\Subtopic.DatabaseModel.topicID == topicID)
+//                                        .count()
+//                                        .map { maxScore in
+//                                            User.TopicLevel(
+//                                                topicID: topicID,
+//                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
+//                                                maxScore: Double(maxScore)
+//                                            )
+//                                    }
+//                                }.flatten(on: conn)
+//                        }
+//                }
+//        }
     }
 
-    static func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: TaskSession.ID, on conn: DatabaseConnectable) -> EventLoopFuture<TaskResult> {
-        return TaskResult.DatabaseModel(result: result, userID: userID, sessionID: sessionID)
-            .save(on: conn)
-            .map { try $0.content() }
-    }
+    public static func getUserLevel(in subject: Subject, userId: User.ID, on database: Database) throws -> EventLoopFuture<User.SubjectLevel> {
 
-    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on conn: DatabaseConnectable) throws -> EventLoopFuture<[User.TopicLevel]> {
-
-        return conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                try Query.resultsInTopics(topics, for: userId)
-                    .query(for: psqlConn)
-                    .all(decoding: SubqueryTopicResult.self)
-                    .flatMap { result in
-
-                        let ids = result.map { $0.id }
-
-                        return psqlConn.select()
-                            .column(.column(\TaskResult.DatabaseModel.resultScore), as: "resultScore")
-                            .column(.column(\Topic.DatabaseModel.id), as: "topicID")
-                            .from(TaskResult.DatabaseModel.self)
-                            .where(\TaskResult.DatabaseModel.id, .in, ids)
-                            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
-                            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-                            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-                            .all(decoding: UserLevelScore.self)
-                            .flatMap { scores in
-
-                                return scores.group(by: \UserLevelScore.topicID)
-                                    .map { topicID, grouped in
-
-                                    Task.query(on: psqlConn)
-                                        .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                                        .filter(\Subtopic.DatabaseModel.topicID == topicID)
-                                        .count()
-                                        .map { maxScore in
-                                            User.TopicLevel(
-                                                topicID: topicID,
-                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
-                                                maxScore: Double(maxScore)
-                                            )
-                                    }
-                                }.flatten(on: conn)
-                        }
-                }
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//
+//                try Query.resultsInSubject(subject.id, for: userId)
+//                    .query(for: psqlConn)
+//                    .all(decoding: SubqueryResult.self)
+//                    .flatMap { result in
+//
+//                        let ids = result.map { $0.id }
+//
+//                        guard ids.isEmpty == false else {
+//                            return psqlConn.future(
+//                                User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
+//                            )
+//                        }
+//
+//                        return TaskResult.DatabaseModel.query(on: psqlConn)
+//                            .filter(\.id ~~ ids)
+//                            .sum(\.resultScore)
+//                            .flatMap { score in
+//
+//                                Task.query(on: psqlConn)
+//                                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
+//                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
+//                                    .filter(\Topic.DatabaseModel.subjectId == subject.id)
+//                                    .count()
+//                                    .map { maxScore in
+//
+//                                        User.SubjectLevel(
+//                                            subjectID: subject.id,
+//                                            correctScore: score,
+//                                            maxScore: Double(maxScore)
+//                                        )
+//                                }
+//                        }
+//                }
+//        }
     }
 
-    public static func getUserLevel(in subject: Subject, userId: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.SubjectLevel> {
-
-        conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                try Query.resultsInSubject(subject.id, for: userId)
-                    .query(for: psqlConn)
-                    .all(decoding: SubqueryResult.self)
-                    .flatMap { result in
-
-                        let ids = result.map { $0.id }
-
-                        guard ids.isEmpty == false else {
-                            return psqlConn.future(
-                                User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
-                            )
-                        }
-
-                        return TaskResult.DatabaseModel.query(on: psqlConn)
-                            .filter(\.id ~~ ids)
-                            .sum(\.resultScore)
-                            .flatMap { score in
-
-                                Task.query(on: psqlConn)
-                                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-                                    .filter(\Topic.DatabaseModel.subjectId == subject.id)
-                                    .count()
-                                    .map { maxScore in
-
-                                        User.SubjectLevel(
-                                            subjectID: subject.id,
-                                            correctScore: score,
-                                            maxScore: Double(maxScore)
-                                        )
-                                }
-                        }
-                }
-        }
-    }
-
-    public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskResult?> {
-        return TaskResult.DatabaseModel.query(on: conn)
-            .filter(\TaskResult.DatabaseModel.taskID == taskID)
-            .filter(\TaskResult.DatabaseModel.userID == userId)
-            .sort(\.createdAt, .descending)
+    public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on database: Database) throws -> EventLoopFuture<TaskResult?> {
+        return TaskResult.DatabaseModel.query(on: database)
+            .filter(\TaskResult.DatabaseModel.$task.$id == taskID)
+            .filter(\TaskResult.DatabaseModel.$user.$id == userId)
+            .sort(\.$createdAt, .descending)
             .first()
-            .map { try $0?.content() }
+            .flatMapThrowing { try $0?.content() }
     }
 
-    public static func exportResults(on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskResult.Answer]> {
+    public static func exportResults(on database: Database) throws -> EventLoopFuture<[TaskResult.Answer]> {
 
-        let query = #"SELECT "TaskResult".*, "FlashCardAnswer".*, "MultipleChoiseTaskAnswer".* FROM "TaskResult" FULL OUTER JOIN "FlashCardAnswer" ON "FlashCardAnswer"."taskID" = "TaskResult"."taskID" AND "FlashCardAnswer"."sessionID" = "TaskResult"."sessionID" LEFT JOIN "MultipleChoiseTaskChoise" ON "TaskResult"."taskID" = "MultipleChoiseTaskChoise"."taskId" FULL OUTER JOIN "MultipleChoiseTaskAnswer" ON "MultipleChoiseTaskAnswer"."choiseID" = "MultipleChoiseTaskChoise"."id" AND "MultipleChoiseTaskChoise"."taskId" = "TaskResult"."taskID" AND "MultipleChoiseTaskAnswer"."sessionID" = "TaskResult"."sessionID" ORDER BY "createdAt" DESC;"#
-
-        return conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                psqlConn.raw(query)
-                    .all(decoding: TaskResult.self, MultipleChoiseTaskAnswer?.self, FlashCardAnswer?.self)
-                    .map { results in
-                        results
-                            .map { (result, multiple, flash) in
-                                TaskResult.Answer(
-                                    result: result,
-                                    multiple: multiple,
-                                    flash: flash
-                                )
-                        }
-                }
-                .map(Set.init)
-                .map(Array.init)
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
         }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        let query = #"SELECT "TaskResult".*, "FlashCardAnswer".*, "MultipleChoiseTaskAnswer".* FROM "TaskResult" FULL OUTER JOIN "FlashCardAnswer" ON "FlashCardAnswer"."taskID" = "TaskResult"."taskID" AND "FlashCardAnswer"."sessionID" = "TaskResult"."sessionID" LEFT JOIN "MultipleChoiseTaskChoise" ON "TaskResult"."taskID" = "MultipleChoiseTaskChoise"."taskId" FULL OUTER JOIN "MultipleChoiseTaskAnswer" ON "MultipleChoiseTaskAnswer"."choiseID" = "MultipleChoiseTaskChoise"."id" AND "MultipleChoiseTaskChoise"."taskId" = "TaskResult"."taskID" AND "MultipleChoiseTaskAnswer"."sessionID" = "TaskResult"."sessionID" ORDER BY "createdAt" DESC;"#
+//
+//        return conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//
+//                psqlConn.raw(query)
+//                    .all(decoding: TaskResult.self, MultipleChoiseTaskAnswer?.self, FlashCardAnswer?.self)
+//                    .map { results in
+//                        results
+//                            .map { (result, multiple, flash) in
+//                                TaskResult.Answer(
+//                                    result: result,
+//                                    multiple: multiple,
+//                                    flash: flash
+//                                )
+//                        }
+//                }
+//                .map(Set.init)
+//                .map(Array.init)
+//        }
     }
 }
 
@@ -520,12 +562,12 @@ extension TaskResult {
     public struct Answer: Codable, Hashable {
 
         public static func == (lhs: Answer, rhs: Answer) -> Bool {
-            lhs.result.id == rhs.result.id && lhs.multiple?.choiseID == rhs.multiple?.choiseID
+            lhs.result.id == rhs.result.id && lhs.multiple?.$choice.id == rhs.multiple?.$choice.id
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(result.id)
-            hasher.combine(multiple?.choiseID)
+            hasher.combine(multiple?.$choice.id)
         }
 
         let result: TaskResult

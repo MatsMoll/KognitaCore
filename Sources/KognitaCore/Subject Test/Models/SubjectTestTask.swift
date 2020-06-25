@@ -1,50 +1,57 @@
-import FluentPostgreSQL
-import FluentSQL
+import FluentKit
 import Vapor
 
 /// A practice session object
 extension SubjectTest {
     enum Pivot {
-        final class Task: PostgreSQLPivot {
+        final class Task: Model {
 
-            public typealias Database = PostgreSQLDatabase
+            static var schema: String = "SubjectTest_Task"
 
-            typealias Left = SubjectTest.DatabaseModel
-            public typealias Right = KognitaCore.Task
-
-            public static var leftIDKey: LeftIDKey = \.testID
-            public static var rightIDKey: RightIDKey = \.taskID
-
-            public static var createdAtKey: TimestampKey? = \.createdAt
-
+            @DBID(custom: "id")
             public var id: Int?
-            var testID: SubjectTest.ID
-            var taskID: KognitaCore.Task.ID
 
+            @Parent(key: "testID")
+            var test: SubjectTest.DatabaseModel
+
+            @Parent(key: "taskID")
+            var task: KognitaCore.TaskDatabaseModel
+
+            @Timestamp(key: "createdAt", on: .create)
             public var createdAt: Date?
 
-            init(testID: SubjectTest.ID, taskID: Task.ID) {
-                self.testID = testID
-                self.taskID = taskID
+            init() {}
+
+            init(testID: SubjectTest.ID, taskID: KognitaContent.Task.ID) {
+                self.$test.id = testID
+                self.$task.id = taskID
             }
         }
     }
 }
 
-extension SubjectTest.Pivot.Task: Migration {
+extension SubjectTest.Pivot.Task {
+    enum Migrations {}
+}
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(SubjectTest.Pivot.Task.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.unique(on: \.taskID, \.testID)
+extension SubjectTest.Pivot.Task.Migrations {
+    struct Create: Migration {
 
-            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.testID, to: \SubjectTest.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+        let schema = SubjectTest.Pivot.Task.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("testID", .uint, .required, .references(SubjectTest.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("createdAt", .date, .required)
+                .unique(on: "taskID", "testID")
+                .create()
         }
-    }
 
-    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.delete(SubjectTest.Pivot.Task.self, on: connection)
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
     }
 }
 
@@ -53,14 +60,14 @@ extension SubjectTest.Pivot.Task {
     enum Create {
         struct Data {
             let testID: SubjectTest.ID
-            let taskIDs: [Task.ID]
+            let taskIDs: [KognitaContent.Task.ID]
         }
 
         typealias Response = [SubjectTest.Pivot.Task]
     }
 
     enum Update {
-        typealias Data = [Task.ID]
+        typealias Data = [KognitaContent.Task.ID]
         typealias Response = Void
     }
 }

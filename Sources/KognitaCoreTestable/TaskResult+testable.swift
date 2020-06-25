@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 import Crypto
 @testable import KognitaCore
 
@@ -20,7 +20,7 @@ extension TaskResult {
     ///   - conn: The database connection
     /// - Throws: If the database query fails
     /// - Returns: A `TaskResult`
-    public static func create(task: Task, sessionID: TaskSession.ID, user: User, score: Double = 1, on conn: PostgreSQLConnection) throws -> TaskResult {
+    public static func create(task: TaskDatabaseModel, sessionID: TaskSession.IDValue, user: User, score: Double = 1, on database: Database) throws -> TaskResult {
         let practiceResult = TaskSessionResult(
             result: "",
             score: score,
@@ -30,9 +30,10 @@ extension TaskResult {
 
         let submitResult = try TaskSubmitResult(submit: submit, result: practiceResult, taskID: task.requireID())
 
-        return try TaskResult.DatabaseModel(result: submitResult, userID: user.id, sessionID: sessionID)
-            .save(on: conn)
-            .map { try $0.content() }
+        let result = TaskResult.DatabaseModel(result: submitResult, userID: user.id, sessionID: sessionID)
+
+        return try result.save(on: database)
+            .flatMapThrowing { try result.content() }
             .wait()
     }
 }

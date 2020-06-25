@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 public class TestableRepositories: RepositoriesRepresentable {
@@ -48,9 +48,9 @@ public class TestableRepositories: RepositoriesRepresentable {
     }
 
     private static var shared: TestableRepositories!
-    public static func testable(with conn: DatabaseConnectable) -> TestableRepositories {
+    public static func testable(with database: Database) -> TestableRepositories {
         if shared == nil {
-            shared = TestableRepositories(repositories: DatabaseRepositories(conn: conn))
+            shared = TestableRepositories(repositories: DatabaseRepositories(database: database))
         }
         return shared
     }
@@ -74,9 +74,9 @@ extension PracticeSession {
     ///   - conn: The database connection
     /// - Throws: If the database query failes
     /// - Returns: A `TaskSession.PracticeParameter` representing a session
-    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> PracticeSessionRepresentable {
+    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on database: Database) throws -> PracticeSessionRepresentable {
 
-        return try TestableRepositories.testable(with: conn)
+        return try TestableRepositories.testable(with: database)
             .practiceSessionRepository
             .create(
                 from: Create.Data(
@@ -87,7 +87,7 @@ extension PracticeSession {
                 by: user
             )
             .flatMap { session in
-                PracticeParameter.resolveWith(session.id, conn: conn)
+                PracticeParameter.resolveWith(session.id, database: database)
             }
             .wait()
     }

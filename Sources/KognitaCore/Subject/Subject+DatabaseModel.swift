@@ -5,8 +5,8 @@
 //  Created by Mats Mollestad on 06/10/2018.
 //
 
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 extension Subject {
 
@@ -15,54 +15,53 @@ extension Subject {
         public static var tableName: String = "Subject"
 
         /// The subject id
+        @DBID(custom: "id")
         public var id: Int?
 
         /// A description of the topic
+        @Field(key: "description")
         public private(set) var description: String
 
         /// The name of the subject
+        @Field(key: "name")
         public private(set) var name: String
 
         /// The creator of the subject
-        public var creatorId: User.ID
+        @Parent(key: "creatorId")
+        public var creator: User.DatabaseModel
 
         /// The category describing the subject etc. Tech
+        @Field(key: "category")
         public var category: String
 
         /// Creation data
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
         /// Update date
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
 
-        init(name: String, category: String, description: String, creatorId: User.ID) throws {
+        @Children(for: \.$subject)
+        var activeSubjects: [User.ActiveSubject]
+
+        @Children(for: \.$subject)
+        var topics: [Topic.DatabaseModel]
+
+        init() {}
+
+        init(name: String, category: String, description: String, creatorId: User.ID) {
             self.category = category
             self.name = name
-            self.creatorId = creatorId
+            self.$creator.id = creatorId
             self.description = description
-
-            try self.validateSubject()
         }
 
-        init(content: Create.Data, creator: User) throws {
-            self.creatorId = creator.id
+        init(content: Create.Data, creator: User) {
+            self.$creator.id = creator.id
             self.name = content.name
             self.description = content.description
             self.category = content.category
-
-            try self.validateSubject()
-        }
-
-        public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            PostgreSQLDatabase.create(Subject.DatabaseModel.self, on: conn) { builder in
-                try addProperties(to: builder)
-                builder.reference(from: \.creatorId, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-            }.flatMap {
-                PostgreSQLDatabase.update(Subject.DatabaseModel.self, on: conn) { builder in
-                    builder.deleteField(for: \.creatorId)
-                    builder.field(for: \.creatorId, type: .int, .default(1))
-                }
-            }
         }
 
         /// Validates the subjects information
@@ -93,6 +92,32 @@ extension Subject {
     }
 }
 
+extension Subject {
+    enum Migrations {}
+}
+
+extension Subject.Migrations {
+    struct Create: Migration {
+
+        let schema = Subject.DatabaseModel.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("description", .string, .required)
+                .field("name", .string, .required)
+                .field("category", .string, .required)
+                .field("creatorId", .uint, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
+                .defaultTimestamps()
+                .create()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
+    }
+}
+
 extension Subject.DatabaseModel: ContentConvertable {
     func content() throws -> Subject {
         try .init(
@@ -101,17 +126,6 @@ extension Subject.DatabaseModel: ContentConvertable {
             description: description,
             category: category
         )
-    }
-}
-
-extension Subject.DatabaseModel {
-
-    var topics: Children<Subject.DatabaseModel, Topic.DatabaseModel> {
-        return children(\Topic.DatabaseModel.subjectId)
-    }
-
-    var creator: Parent<Subject.DatabaseModel, User.DatabaseModel> {
-        return parent(\.creatorId)
     }
 }
 

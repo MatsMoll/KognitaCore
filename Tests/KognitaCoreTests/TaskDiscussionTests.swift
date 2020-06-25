@@ -4,13 +4,13 @@ import KognitaCoreTestable
 
 final class TaskDiscussionTests: VaporTestCase {
 
-    lazy var taskDiscussionRepository: TaskDiscussionRepositoring = { TestableRepositories.testable(with: conn).taskDiscussionRepository }()
+    lazy var taskDiscussionRepository: TaskDiscussionRepositoring = { TestableRepositories.testable(with: database).taskDiscussionRepository }()
 
     func testCreateDiscussionNotLoggedIn() {
         do {
-            _ = try Task.create(on: conn)
-            _ = try Task.create(on: conn)
-            let task = try Task.create(on: conn)
+            _ = try TaskDatabaseModel.create(on: app)
+            _ = try TaskDatabaseModel.create(on: app)
+            let task = try TaskDatabaseModel.create(on: app)
 
             let data = try TaskDiscussion.Create.Data(
                 description: "test",
@@ -26,10 +26,10 @@ final class TaskDiscussionTests: VaporTestCase {
 
     func testCreateDiscussions() {
         do {
-            _ = try Task.create(on: conn)
-            _ = try Task.create(on: conn)
-            let task = try Task.create(on: conn)
-            let user = try User.create(on: conn)
+            _ = try TaskDatabaseModel.create(on: app)
+            _ = try TaskDatabaseModel.create(on: app)
+            let task = try TaskDatabaseModel.create(on: app)
+            let user = try User.create(on: app)
 
             let data = try TaskDiscussion.Create.Data(
                 description: "test",
@@ -53,8 +53,8 @@ final class TaskDiscussionTests: VaporTestCase {
 
     func testCreateDiscussionNoDescription() {
         do {
-            let task = try Task.create(on: conn)
-            let user = try User.create(on: conn)
+            let task = try TaskDatabaseModel.create(on: app)
+            let user = try User.create(on: app)
 
             let noDescriptionData = try TaskDiscussion.Create.Data(
                 description: "",
@@ -76,7 +76,7 @@ final class TaskDiscussionTests: VaporTestCase {
 
     func testCreateDiscussionResponseWithoutDescription() {
         do {
-            let user = try User.create(on: conn)
+            let user = try User.create(on: app)
 
             let data = TaskDiscussionResponse.Create.Data(
                 response: "test",
@@ -94,8 +94,8 @@ final class TaskDiscussionTests: VaporTestCase {
 
     func testCreateDiscussionResponse() {
         do {
-            let user = try User.create(on: conn)
-            let discussion = try TaskDiscussion.create(on: conn)
+            let user = try User.create(on: app)
+            let discussion = try TaskDiscussion.create(on: app)
 
             let firstDiscussionResponse = try TaskDiscussionResponse.Create.Data(
                 response: "test",
@@ -130,8 +130,8 @@ final class TaskDiscussionTests: VaporTestCase {
     func testResponseWithoutDescription() {
         do {
 
-            let discussion = try TaskDiscussion.create(on: conn)
-            let user = try User.create(on: conn)
+            let discussion = try TaskDiscussion.create(on: app)
+            let user = try User.create(on: app)
 
             let noResponse = try TaskDiscussionResponse.Create.Data(
                 response: "",

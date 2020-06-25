@@ -7,26 +7,25 @@
 
 import Vapor
 import XCTest
-import FluentPostgreSQL
 @testable import KognitaCore
 import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
-    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: conn).taskSolutionRepository }()
-    lazy var taskRepository: TaskRepository = { Task.DatabaseRepository(conn: conn) }()
-    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: conn).typingTaskRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: database).taskSolutionRepository }()
+    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database) }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: database).typingTaskRepository }()
 
     func testTasksInSubject() throws {
 
-        let subject = try Subject.create(name: "test", on: conn)
-        let topic = try Topic.create(subject: subject, on: conn)
-        let subtopic = try Subtopic.create(topic: topic, on: conn)
-        _ = try Task.create(subtopic: subtopic, on: conn)
-        _ = try Task.create(subtopic: subtopic, on: conn)
-        _ = try Task.create(subtopic: subtopic, on: conn)
-        _ = try Task.create(subtopic: subtopic, on: conn)
-        _ = try Task.create(on: conn)
+        let subject = try Subject.create(name: "test", on: app)
+        let topic = try Topic.create(subject: subject, on: app)
+        let subtopic = try Subtopic.create(topic: topic, on: app)
+        _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        _ = try TaskDatabaseModel.create(on: app)
 
         let tasks = try taskRepository
             .getTasks(in: subject)
@@ -36,17 +35,17 @@ class TaskTests: VaporTestCase {
 
     func testSolutions() throws {
         do {
-            let task = try Task.create(createSolution: false, on: conn)
-            let user = try User.create(on: conn)
-            let secondUser = try User.create(isAdmin: false, on: conn)
-            let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: conn)
-            let secondSolution = try TaskSolution.create(task: task, on: conn)
-            let secondSolutionDB = try TaskSolution.DatabaseModel.find(secondSolution.id, on: conn).unwrap(or: Errors.badTest).wait()
-            _ = try TaskSolution.create(on: conn)
+            let task = try TaskDatabaseModel.create(createSolution: false, on: app)
+            let user = try User.create(on: app)
+            let secondUser = try User.create(isAdmin: false, on: app)
+            let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: app)
+            let secondSolution = try TaskSolution.create(task: task, on: app)
+            let secondSolutionDB = try TaskSolution.DatabaseModel.find(secondSolution.id, on: database).unwrap(or: Errors.badTest).wait()
+            _ = try TaskSolution.create(on: app)
 
             secondSolutionDB.isApproved = true
-            secondSolutionDB.approvedBy = user.id
-            _ = try secondSolutionDB.save(on: conn).wait()
+            secondSolutionDB.$approvedBy.id = user.id
+            _ = try secondSolutionDB.save(on: database).wait()
 
             try taskSolutionRepository.upvote(for: firstSolution.id, by: user).wait()
             try taskSolutionRepository.upvote(for: firstSolution.id, by: secondUser).wait()
@@ -71,8 +70,8 @@ class TaskTests: VaporTestCase {
 
     func testCreateTaskWithEmptySolution() {
         failableTest {
-            let subtopic = try Subtopic.create(on: conn)
-            let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: app)
+            let user = try User.create(on: app)
             let xssData = FlashCardTask.Create.Data(
                 subtopicId: subtopic.id,
                 description: "Test",
@@ -82,7 +81,7 @@ class TaskTests: VaporTestCase {
                 examPaperSemester: nil,
                 examPaperYear: nil
             )
-            let createData = Task.Create.Data(
+            let createData = TaskDatabaseModel.Create.Data(
                 content: xssData,
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
@@ -93,8 +92,8 @@ class TaskTests: VaporTestCase {
 
     func testCreateMultipleLineSolution() {
         failableTest {
-            let subtopic = try Subtopic.create(on: conn)
-            let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: app)
+            let user = try User.create(on: app)
             let xssData = FlashCardTask.Create.Data(
                 subtopicId: subtopic.id,
                 description: "Test",
@@ -109,7 +108,7 @@ Dette er flere linjer
                 examPaperSemester: nil,
                 examPaperYear: nil
             )
-            let createData = Task.Create.Data(
+            let createData = TaskDatabaseModel.Create.Data(
                 content: xssData,
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
@@ -123,8 +122,8 @@ Dette er flere linjer
 
     func testCreateTaskWithXSS() {
         do {
-            let subtopic = try Subtopic.create(on: conn)
-            let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: app)
+            let user = try User.create(on: app)
             let xssData = FlashCardTask.Create.Data(
                 subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
@@ -134,7 +133,7 @@ Dette er flere linjer
                 examPaperSemester: nil,
                 examPaperYear: nil
             )
-            let createData = Task.Create.Data(
+            let createData = TaskDatabaseModel.Create.Data(
                 content: xssData,
                 subtopicID: xssData.subtopicId,
                 solution: xssData.solution
@@ -151,8 +150,8 @@ Dette er flere linjer
 
     func testUpdateTaskXSS() {
         do {
-            let subtopic = try Subtopic.create(on: conn)
-            let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: app)
+            let user = try User.create(on: app)
             let xssData = FlashCardTask.Create.Data(
                 subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
@@ -163,14 +162,14 @@ Dette er flere linjer
                 examPaperYear: nil
             )
             let task = try typingTaskRepository.create(from: xssData, by: user).wait()
-            let flashCardTask = try FlashCardTask.find(task.requireID(), on: conn).unwrap(or: Errors.badTest).wait()
-            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
+            let flashCardTask = try FlashCardTask.find(task.id, on: database).unwrap(or: Errors.badTest).wait()
+            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
 
             XCTAssertEqual(task.description, "# XSS test")
             XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
 
             let updatedTask = try typingTaskRepository.updateModelWith(id: flashCardTask.id!, to: xssData, by: user).wait()
-            let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
+            let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
 
             XCTAssertEqual(updatedTask.description, "# XSS test")
             XCTAssertEqual(updatedSolution.solution, "<img>More XSS $$\\frac{1}{2}$$")
@@ -181,8 +180,8 @@ Dette er flere linjer
 
     func testUpdateSolutionXSS() {
         do {
-            let subtopic = try Subtopic.create(on: conn)
-            let user = try User.create(on: conn)
+            let subtopic = try Subtopic.create(on: app)
+            let user = try User.create(on: app)
             let xssData = FlashCardTask.Create.Data(
                 subtopicId: subtopic.id,
                 description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
@@ -198,9 +197,9 @@ Dette er flere linjer
                 solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
                 presentUser: false
             )
-            let solution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+            let solution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
             _ = try taskSolutionRepository.updateModelWith(id: solution.id!, to: solutionUpdateDate, by: user).wait()
-            let updatedSolution = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).first().unwrap(or: Errors.badTest).wait()
+            let updatedSolution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
 
             XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
         } catch {
@@ -210,11 +209,11 @@ Dette er flere linjer
 
     func testSolutionsCascadeDelete() {
         do {
-            let task = try Task.create(on: conn)
-            let user = try User.create(on: conn)
+            let task = try TaskDatabaseModel.create(on: app)
+            let user = try User.create(on: app)
             let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             XCTAssertEqual(solutions.count, 1)
-            try task.delete(force: true, on: conn).wait()
+            try task.delete(on: database).wait()
             let newSolution = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             XCTAssertTrue(newSolution.isEmpty)
         } catch {
@@ -224,9 +223,9 @@ Dette er flere linjer
 
     func testApproveSolution() {
         failableTest {
-            let user = try User.create(on: conn)
-            let unauthorizedUser = try User.create(isAdmin: false, on: conn)
-            let task = try Task.create(creator: unauthorizedUser, on: conn)
+            let user = try User.create(on: app)
+            let unauthorizedUser = try User.create(isAdmin: false, on: app)
+            let task = try TaskDatabaseModel.create(creator: unauthorizedUser, on: app)
 
             var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             var solution = try XCTUnwrap(solutions.first)
@@ -242,8 +241,8 @@ Dette er flere linjer
 
     func testApproveSolutionUnauthorized() {
         failableTest {
-            let user = try User.create(isAdmin: false, on: conn)
-            let task = try Task.create(creator: user, on: conn)
+            let user = try User.create(isAdmin: false, on: app)
+            let task = try TaskDatabaseModel.create(creator: user, on: app)
 
             var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
             var solution = try XCTUnwrap(solutions.first)
@@ -259,10 +258,10 @@ Dette er flere linjer
 
     func testDeleteSolution() {
         failableTest {
-            let user = try User.create(on: conn)
-            let task = try Task.create(on: conn)
+            let user = try User.create(on: app)
+            let task = try TaskDatabaseModel.create(on: app)
 
-            let solutions = try TaskSolution.DatabaseModel.query(on: conn).filter(\.taskID == task.requireID()).all().wait()
+            let solutions = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.requireID()).all().wait()
 
             XCTAssertEqual(solutions.count, 1)
             let solution = try XCTUnwrap(solutions.first)

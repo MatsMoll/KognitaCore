@@ -12,14 +12,18 @@ extension TaskSolution {
         public let numberOfVotes: Int
         public let userHasVoted: Bool
 
-        init(queryResponse: DatabaseRepository.Query.Response, numberOfVotes: Int, userHasVoted: Bool) {
-            self.createdAt = queryResponse.createdAt
-            self.solution = queryResponse.solution
-            self.creatorID = queryResponse.creatorID
-            self.creatorUsername = queryResponse.creatorUsername ?? "Unknown"
-            self.presentUser = queryResponse.presentUser
-            self.approvedBy = queryResponse.approvedBy
-            self.id = queryResponse.id
+        init(solution: TaskSolution.DatabaseModel, numberOfVotes: Int, userHasVoted: Bool) {
+            self.createdAt = solution.createdAt
+            self.solution = solution.solution
+            self.creatorID = solution.$creator.id
+            if solution.presentUser {
+                self.creatorUsername = solution.creator.username
+            } else {
+                self.creatorUsername = "Unknown"
+            }
+            self.presentUser = solution.presentUser
+            self.approvedBy = solution.approvedBy?.username
+            self.id = solution.id ?? 0
             self.numberOfVotes = numberOfVotes
             self.userHasVoted = userHasVoted
         }

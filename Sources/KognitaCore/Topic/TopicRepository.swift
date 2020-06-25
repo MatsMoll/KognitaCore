@@ -5,8 +5,8 @@
 //  Created by Mats Mollestad on 10/04/2019.
 //
 
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 public protocol TopicRepository: DeleteModelRepository {
     func all() throws -> EventLoopFuture<[Topic]>
@@ -72,15 +72,15 @@ extension Topic {
 extension Topic {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        init(conn: DatabaseConnectable, repositories: RepositoriesRepresentable) {
-            self.conn = conn
+        init(database: Database, repositories: RepositoriesRepresentable) {
+            self.database = database
             self.userRepository = repositories.userRepository
             self.subtopicRepository = repositories.subtopicRepository
             self.multipeChoiseRepository = repositories.multipleChoiceTaskRepository
             self.typingTaskRepository = repositories.typingTaskRepository
         }
 
-        public let conn: DatabaseConnectable
+        public let database: Database
 
         private let userRepository: UserRepository
         private let subtopicRepository: SubtopicRepositoring
@@ -107,35 +107,38 @@ extension Topic.DatabaseRepository: TopicRepository {
 
         guard let user = user else { throw Abort(.forbidden) }
 
-        return try userRepository
-            .isModerator(user: user, subjectID: content.subjectID)
-            .flatMap { _ in
-
-                try Topic.DatabaseModel(content: content, creator: user)
-                    .create(on: self.conn)
-                    .flatMap { topic in
-                        try Subtopic.DatabaseModel(
-                            name: "Generelt",
-                            topicID: topic.requireID()
-                        )
-                        .save(on: self.conn)
-                        .map { _ in try topic.content() }
-                }
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return try userRepository
+//            .isModerator(user: user, subjectID: content.subjectID)
+//            .flatMap { _ in
+//
+//                try Topic.DatabaseModel(content: content, creator: user)
+//                    .create(on: self.conn)
+//                    .flatMap { topic in
+//                        try Subtopic.DatabaseModel(
+//                            name: "Generelt",
+//                            topicID: topic.requireID()
+//                        )
+//                        .save(on: self.conn)
+//                        .map { _ in try topic.content() }
+//                }
+//        }
     }
 
     public func numberOfTasks(in topic: Topic) throws -> EventLoopFuture<Int> {
-        return Task.query(on: conn)
-            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
-            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
-            .count()
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return TaskDatabaseModel.query(on: db)
+//            .join(\Subtopic.DatabaseModel.id, to: \TaskDatabaseModel.subtopic)
+//            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
+//            .count()
     }
 
-    public func tasks(in topic: Topic) throws -> EventLoopFuture<[Task]> {
-        return Task.query(on: conn)
-            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopic)
-            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
-            .all()
+    func tasks(in topic: Topic) throws -> EventLoopFuture<[TaskDatabaseModel]> {
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return TaskDatabaseModel.query(on: conn)
+//            .join(\Subtopic.DatabaseModel.id, to: \TaskDatabaseModel.subtopic)
+//            .filter(\Subtopic.DatabaseModel.topicID == topic.id)
+//            .all()
     }
 
     public func subtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]> {
@@ -158,176 +161,166 @@ extension Topic.DatabaseRepository: TopicRepository {
     }
 
     public func getAll() -> EventLoopFuture<[Topic]> {
-        return Topic.DatabaseModel.query(on: conn)
+        return Topic.DatabaseModel.query(on: database)
             .all()
-            .map { try $0.map { try $0.content() } }
+            .flatMapEachThrowing { try $0.content() }
     }
 
     public func getTopics(in subject: Subject) throws -> EventLoopFuture<[Topic]> {
-        return Topic.DatabaseModel.query(on: conn)
-            .filter(\.subjectId == subject.id)
-            .sort(\.chapter, .ascending)
-            .all()
-            .map { try $0.map { try $0.content() }}
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return Topic.DatabaseModel.query(on: db)
+//            .filter(\.subjectId == subject.id)
+//            .sort(\.chapter, .ascending)
+//            .all()
+//            .map { try $0.map { try $0.content() }}
     }
 
     public func getTopicsWithTaskCount(in subject: Subject) throws -> EventLoopFuture<[Topic.WithTaskCount]> {
 
-        conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-                psqlConn.select()
-                    .all(table: Topic.DatabaseModel.self)
-                    .from(Topic.DatabaseModel.self)
-                    .column(.count(\Task.id), as: "taskCount")
-                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-                    .groupBy(\Topic.DatabaseModel.id)
-                    .where(\Topic.DatabaseModel.subjectId == subject.id)
-                    .where(\Task.isTestable == false)
-                    .all(decoding: Topic.self, TopicTaskCount.self)
-                    .map { topics in
-                        topics.map { data in
-                            Topic.WithTaskCount(
-                                topic: data.0,
-                                taskCount: data.1.taskCount
-                            )
-                        }
-                        .sorted(by: { $0.topic.chapter < $1.topic.chapter })
-            }
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//                psqlConn.select()
+//                    .all(table: Topic.DatabaseModel.self)
+//                    .from(Topic.DatabaseModel.self)
+//                    .column(.count(\TaskDatabaseModel.id), as: "taskCount")
+//                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
+//                    .join(\Subtopic.DatabaseModel.id, to: \TaskDatabaseModel.subtopicID)
+//                    .groupBy(\Topic.DatabaseModel.id)
+//                    .where(\Topic.DatabaseModel.subjectId == subject.id)
+//                    .where(\TaskDatabaseModel.isTestable == false)
+//                    .all(decoding: Topic.self, TopicTaskCount.self)
+//                    .map { topics in
+//                        topics.map { data in
+//                            Topic.WithTaskCount(
+//                                topic: data.0,
+//                                taskCount: data.1.taskCount
+//                            )
+//                        }
+//                        .sorted(by: { $0.topic.chapter < $1.topic.chapter })
+//            }
+//        }
    }
 
     public func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic]> {
-        return try getTopics(in: subject)
-            .flatMap { topics in
-                try topics.map {
-                    try self.content(for: $0)
-                }
-                .flatten(on: self.conn)
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return try getTopics(in: subject)
+//            .flatMap { topics in
+//                try topics.map {
+//                    try self.content(for: $0)
+//                }
+//                .flatten(on: self.conn)
+//        }
     }
 
-    public func getTopic(for task: Task) -> EventLoopFuture<Topic> {
-        return Topic.DatabaseModel.query(on: conn)
-            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-            .filter(\Subtopic.DatabaseModel.id == task.subtopicID)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
-            .map { try $0.content() }
-    }
-
-    public func timelyTopics(limit: Int? = 4, on conn: PostgreSQLConnection) throws -> EventLoopFuture<[TimelyTopic]> {
-
-        return conn.select()
-            .column(\Subject.DatabaseModel.name, as: "subjectName")
-            .column(\Topic.DatabaseModel.name, as: "topicName")
-            .column(\Topic.DatabaseModel.id, as: "topicID")
-            .column(.count(\Task.id), as: "numberOfTasks")
-            .from(Subject.DatabaseModel.self)
-            .join(\Subject.DatabaseModel.id, to: \Topic.DatabaseModel.subjectId)
-            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID, method: .left)
-            .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID, method: .left)
-            .where(\Task.deletedAt == nil)
-            .groupBy(\Topic.DatabaseModel.id)
-            .groupBy(\Subject.DatabaseModel.id)
-            .limit(limit)
-            .all(decoding: TimelyTopic.self)
+    public func getTopic(for taskID: Task.ID) -> EventLoopFuture<Topic> {
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return Topic.DatabaseModel.query(on: conn)
+//            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
+//            .filter(\Subtopic.DatabaseModel.id == task.subtopicID)
+//            .first()
+//            .unwrap(or: Abort(.internalServerError))
+//            .map { try $0.content() }
     }
 
     public func exportTopics(in subject: Subject) throws -> EventLoopFuture<SubjectExportContent> {
-        return try getTopics(in: subject)
-            .flatMap { topics in
-                try topics.map { try self.exportTasks(in: $0) }
-                    .flatten(on: self.conn)
-        }.map { topicContent in
-            SubjectExportContent(subject: subject, topics: topicContent)
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return try getTopics(in: subject)
+//            .flatMap { topics in
+//                try topics.map { try self.exportTasks(in: $0) }
+//                    .flatten(on: self.conn)
+//        }.map { topicContent in
+//            SubjectExportContent(subject: subject, topics: topicContent)
+//        }
     }
 
     public func exportTasks(in topic: Topic) throws -> EventLoopFuture<TopicExportContent> {
-        return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicID == topic.id)
-            .all()
-            .flatMap { subtopics in
-                try subtopics.map {
-                    try self.exportTasks(in: $0.content())
-                }
-                .flatten(on: self.conn)
-                .map { subtopicContent in
-                    TopicExportContent(
-                        topic: topic,
-                        subtopics: subtopicContent
-                    )
-                }
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return Subtopic.DatabaseModel.query(on: conn)
+//            .filter(\.topicID == topic.id)
+//            .all()
+//            .flatMap { subtopics in
+//                try subtopics.map {
+//                    try self.exportTasks(in: $0.content())
+//                }
+//                .flatten(on: self.conn)
+//                .map { subtopicContent in
+//                    TopicExportContent(
+//                        topic: topic,
+//                        subtopics: subtopicContent
+//                    )
+//                }
+//        }
     }
 
     public func exportTasks(in subtopic: Subtopic) throws -> EventLoopFuture<SubtopicExportContent> {
-        return conn.databaseConnection(to: .psql)
-            .flatMap { psqlConn in
-
-                psqlConn.select()
-                    .all(table: Task.self)
-                    .all(table: MultipleChoiceTask.DatabaseModel.self)
-                    .all(table: MultipleChoiseTaskChoise.self)
-                    .column(\TaskSolution.DatabaseModel.solution, as: "solution")
-                    .from(Task.self)
-                    .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
-                    .join(\Task.id, to: \FlashCardTask.id, method: .left)
-                    .join(\MultipleChoiceTask.DatabaseModel.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
-                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID, method: .left)
-                    .where(\Task.subtopicID == subtopic.id)
-                    .all(decoding: Task.BetaFormat.self, MultipleChoiceTask.DatabaseModel?.self, MultipleChoiseTaskChoise?.self)
-                    .map { tasks in
-
-                        var multipleTasks = [Int: MultipleChoiceTask.BetaFormat]()
-                        var flashTasks = [Task.BetaFormat]()
-
-                        for task in tasks {
-                            if
-                                let multiple = task.1,
-                                let choise = task.2
-                            {
-                                if let earlierTask = multipleTasks[multiple.id ?? 0] {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
-                                        task: task.0,
-                                        choises: earlierTask.choises + [choise],
-                                        isMultipleSelect: multiple.isMultipleSelect
-                                    )
-                                } else {
-                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
-                                        task: task.0,
-                                        choises: [choise],
-                                        isMultipleSelect: multiple.isMultipleSelect
-                                    )
-                                }
-                            } else {
-                                flashTasks.append(task.0)
-                            }
-                        }
-
-                        return SubtopicExportContent(
-                            subtopic: subtopic,
-                            multipleChoiseTasks: multipleTasks.map { $0.value },
-                            flashCards: flashTasks
-                        )
-                }
-        }
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return conn.databaseConnection(to: .psql)
+//            .flatMap { psqlConn in
+//
+//                psqlConn.select()
+//                    .all(table: TaskDatabaseModel.self)
+//                    .all(table: MultipleChoiceTask.DatabaseModel.self)
+//                    .all(table: MultipleChoiseTaskChoise.self)
+//                    .column(\TaskSolution.DatabaseModel.solution, as: "solution")
+//                    .from(TaskDatabaseModel.self)
+//                    .join(\TaskDatabaseModel.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
+//                    .join(\TaskDatabaseModel.id, to: \FlashCardTask.id, method: .left)
+//                    .join(\MultipleChoiceTask.DatabaseModel.id, to: \MultipleChoiseTaskChoise.taskId, method: .left)
+//                    .join(\TaskDatabaseModel.id, to: \TaskSolution.DatabaseModel.taskID, method: .left)
+//                    .where(\TaskDatabaseModel.subtopicID == subtopic.id)
+//                    .all(decoding: TaskDatabaseModel.BetaFormat.self, MultipleChoiceTask.DatabaseModel?.self, MultipleChoiseTaskChoise?.self)
+//                    .map { tasks in
+//
+//                        var multipleTasks = [Int: MultipleChoiceTask.BetaFormat]()
+//                        var flashTasks = [Task.BetaFormat]()
+//
+//                        for task in tasks {
+//                            if
+//                                let multiple = task.1,
+//                                let choise = task.2
+//                            {
+//                                if let earlierTask = multipleTasks[multiple.id ?? 0] {
+//                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
+//                                        task: task.0,
+//                                        choises: earlierTask.choises + [choise],
+//                                        isMultipleSelect: multiple.isMultipleSelect
+//                                    )
+//                                } else {
+//                                    multipleTasks[multiple.id ?? 0] = MultipleChoiceTask.BetaFormat(
+//                                        task: task.0,
+//                                        choises: [choise],
+//                                        isMultipleSelect: multiple.isMultipleSelect
+//                                    )
+//                                }
+//                            } else {
+//                                flashTasks.append(task.0)
+//                            }
+//                        }
+//
+//                        return SubtopicExportContent(
+//                            subtopic: subtopic,
+//                            multipleChoiseTasks: multipleTasks.map { $0.value },
+//                            flashCards: flashTasks
+//                        )
+//                }
+//        }
     }
 
     public func importContent(from content: TopicExportContent, in subject: Subject) throws -> EventLoopFuture<Void> {
-        try Topic.DatabaseModel(
-            name: content.topic.name,
-            chapter: content.topic.chapter,
-            subjectId: subject.id
-        )
-            .create(on: conn)
-            .flatMap { topic in
-                try content.subtopics.map {
-                    try self.importContent(from: $0, in: topic.content())
-                }
-                .flatten(on: self.conn)
-        }.transform(to: ())
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        try Topic.DatabaseModel(
+//            name: content.topic.name,
+//            chapter: content.topic.chapter,
+//            subjectId: subject.id
+//        )
+//            .create(on: conn)
+//            .flatMap { topic in
+//                try content.subtopics.map {
+//                    try self.importContent(from: $0, in: topic.content())
+//                }
+//                .flatten(on: self.conn)
+//        }.transform(to: ())
     }
 
     public func importContent(from content: SubtopicExportContent, in topic: Topic) throws -> EventLoopFuture<Void> {
@@ -335,29 +328,30 @@ extension Topic.DatabaseRepository: TopicRepository {
 //        content.subtopic.id = nil
 //        content.subtopic.topicId = try topic.requireID()
 
-        return Subtopic.DatabaseModel(
-            name: content.subtopic.name,
-            topicID: content.subtopic.topicID
-            )
-            .create(on: conn)
-            .flatMap { subtopic in
-                try content.multipleChoiseTasks
-                    .map { task in
-                        try self
-                            .multipeChoiseRepository
-                            .importTask(from: task, in: subtopic.content())
-                }
-                .flatten(on: self.conn)
-                .flatMap { _ in
-                    try content.flashCards
-                    .map { task in
-                        try self
-                            .typingTaskRepository
-                            .importTask(from: task, in: subtopic.content())
-                    }
-                    .flatten(on: self.conn)
-                }
-        }.transform(to: ())
+        return database.eventLoop.future(error: Abort(.notImplemented))
+//        return Subtopic.DatabaseModel(
+//            name: content.subtopic.name,
+//            topicID: content.subtopic.topicID
+//            )
+//            .create(on: conn)
+//            .flatMap { subtopic in
+//                try content.multipleChoiseTasks
+//                    .map { task in
+//                        try self
+//                            .multipeChoiseRepository
+//                            .importTask(from: task, in: subtopic.content())
+//                }
+//                .flatten(on: self.conn)
+//                .flatMap { _ in
+//                    try content.flashCards
+//                    .map { task in
+//                        try self
+//                            .typingTaskRepository
+//                            .importTask(from: task, in: subtopic.content())
+//                    }
+//                    .flatten(on: self.conn)
+//                }
+//        }.transform(to: ())
     }
 
 //    public static func leveledTopics(in subject: Subject, ) throws -> EventLoopFuture<[[Topic]]> {
@@ -433,7 +427,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 public struct SubtopicExportContent: Content {
     let subtopic: Subtopic
     let multipleChoiseTasks: [MultipleChoiceTask.BetaFormat]
-    let flashCards: [Task.BetaFormat]
+    let flashCards: [TaskBetaFormat]
 }
 
 public struct TopicExportContent: Content {
@@ -449,7 +443,7 @@ public struct SubjectExportContent: Content {
 extension MultipleChoiceTask {
     public struct BetaFormat: Content {
 
-        let task: Task.BetaFormat
+        let task: TaskBetaFormat
 
         let choises: [MultipleChoiseTaskChoise]
 

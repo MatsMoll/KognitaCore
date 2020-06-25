@@ -5,8 +5,8 @@
 //  Created by Mats Mollestad on 22/12/2019.
 //
 
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 //public protocol UpdateModelRepository {
 //    associatedtype UpdateData
@@ -18,17 +18,40 @@ import Vapor
 //}
 
 public protocol DatabaseConnectableRepository {
-    var conn: DatabaseConnectable { get }
+    var database: Database { get }
 }
 
 extension DatabaseConnectableRepository {
-    func updateDatabase<DatabaseModel: KognitaModelUpdatable>(_ type: DatabaseModel.Type, modelID: Int, to data: DatabaseModel.EditData) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: ContentConvertable {
-        DatabaseModel.find(modelID, on: conn)
+    func updateDatabase<DatabaseModel: KognitaModelUpdatable>(_ type: DatabaseModel.Type, modelID: Int, to data: DatabaseModel.EditData) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: ContentConvertable, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(modelID, on: database)
             .unwrap(or: Abort(.badRequest))
-            .flatMap { databaseModel in
+            .flatMapThrowing { databaseModel -> DatabaseModel in
                 try databaseModel.updateValues(with: data)
-                return databaseModel.save(on: self.conn)
-                    .map { try $0.content() }
+                return databaseModel
+            }.flatMap { databaseModel in
+                databaseModel.save(on: self.database)
+                    .transform(to: databaseModel)
+            }
+            .flatMapThrowing { try $0.content() }
+    }
+}
+
+extension EventLoopFuture {
+    func failableFlatMap<Result>(event: @escaping (Value) throws -> EventLoopFuture<Result>) -> EventLoopFuture<Result> {
+        flatMap { value in
+            do {
+                return try event(value)
+            } catch {
+                return self.eventLoop.future(error: error)
+            }
         }
+    }
+}
+
+func failable<Value>(eventLoop: EventLoop, event: () throws -> EventLoopFuture<Value>) -> EventLoopFuture<Value> {
+    do {
+        return try event()
+    } catch {
+        return eventLoop.makeFailedFuture(error)
     }
 }

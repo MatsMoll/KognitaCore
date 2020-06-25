@@ -6,43 +6,44 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 extension Subject {
-    public static func create(name: String = "Math", category: String = "Tech", creator: User? = nil, on conn: PostgreSQLConnection) throws -> Subject {
+    public static func create(name: String = "Math", category: String = "Tech", creator: User? = nil, on app: Application) throws -> Subject {
 
-        let createCreator = try creator ?? User.create(on: conn)
-        return try Subject.create(name: name, category: category, creatorId: createCreator.id, on: conn)
+        let createCreator = try creator ?? User.create(on: app)
+        return try Subject.create(name: name, category: category, creatorId: createCreator.id, on: app.db)
     }
 
-    public static func create(name: String = "Math", category: String = "Tech", description: String = "Some description", creatorId: User.ID, on conn: PostgreSQLConnection) throws -> Subject {
+    public static func create(name: String = "Math", category: String = "Tech", description: String = "Some description", creatorId: User.ID, on database: Database) throws -> Subject {
 
-        return try Subject.DatabaseModel(
+        let subject = Subject.DatabaseModel(
             name: name,
             category: category,
             description: description,
             creatorId: creatorId
         )
-            .save(on: conn)
-            .map { try $0.content() }
+
+        return try subject.save(on: database)
+            .flatMapThrowing { try subject.content() }
             .wait()
     }
 
-    public func makeActive(for user: User, canPractice: Bool, on conn: DatabaseConnectable) throws {
-        try TestableRepositories.testable(with: conn)
+    public func makeActive(for user: User, canPractice: Bool, on database: Database) throws {
+        try TestableRepositories.testable(with: database)
             .subjectRepository
             .mark(active: self, canPractice: canPractice, for: user).wait()
     }
 
-    public func makeInactive(for user: User, on conn: DatabaseConnectable) throws {
-        try TestableRepositories.testable(with: conn)
+    public func makeInactive(for user: User, on database: Database) throws {
+        try TestableRepositories.testable(with: database)
             .subjectRepository
             .mark(inactive: self, for: user).wait()
     }
 
-    public func grantModeratorPrivilege(for userID: User.ID, by moderator: User, on conn: DatabaseConnectable) throws {
-        try TestableRepositories.testable(with: conn)
+    public func grantModeratorPrivilege(for userID: User.ID, by moderator: User, on database: Database) throws {
+        try TestableRepositories.testable(with: database)
             .subjectRepository
             .grantModeratorPrivilege(for: userID, in: self.id, by: moderator).wait()
     }

@@ -13,7 +13,7 @@ public protocol TaskCreationContentable {
     var isTestable: Bool { get }
 
     /// The semester of the exam
-    var examPaperSemester: Task.ExamSemester? { get }
+    var examPaperSemester: TaskExamSemester? { get }
 
     /// The year of the exam
     var examPaperYear: Int? { get }
@@ -21,27 +21,16 @@ public protocol TaskCreationContentable {
 
 extension TaskCreationContentable where Self: Validatable {
 
-    public static func basicValidations() throws -> Validations<Self> {
-        var validations = Validations(Self.self)
-        validations.add(\.question, at: ["question"], "No question") { (question) in
-            guard question.isEmpty == false else { throw BasicValidationError("Missing question") }
-        }
-        validations.add(\.self, at: ["exampPaperYear"], "Invalid exam year") { data in
-            let year = Calendar.current.component(.year, from: Date())
-            guard let examYear = data.examPaperYear else { return }
-            guard examYear <= year, year > 1990 else {
-                throw BasicValidationError("Exam Year is either in the future or before 1990")
-            }
-            guard data.examPaperSemester != nil else {
-                throw BasicValidationError("Exam semester has not been set")
-            }
-        }
-        return validations
+    public static func basicValidations(_ validations: inout Validations) {
+        validations.add("question", as: String.self, is: !.empty)
+        validations.add("examPaperYear", as: Int?.self, is: .nil || .range(1990...))
     }
 
-    public static func validations() throws -> Validations<Self> { try basicValidations() }
+    public static func validations(_ validations: inout Validations) {
+        basicValidations(&validations)
+    }
 }
 
 extension MultipleChoiceTask.Create.Data: TaskCreationContentable {
-    public var examPaperSemester: Task.ExamSemester? { nil }
+    public var examPaperSemester: TaskExamSemester? { nil }
 }

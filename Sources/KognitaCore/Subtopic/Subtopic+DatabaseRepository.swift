@@ -6,18 +6,26 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
+
+extension EventLoopFuture where Value == Bool {
+    func ifFalse(throw error: Error) -> EventLoopFuture<Void> {
+        flatMapThrowing {
+            if $0 == false { throw error }
+        }
+    }
+}
 
 extension Subtopic {
     public struct DatabaseRepository: SubtopicRepositoring, DatabaseConnectableRepository {
 
-        public init(conn: DatabaseConnectable) {
-            self.conn = conn
+        public let database: Database
+
+        public init(database: Database) {
+            self.database = database
         }
 
-        public let conn: DatabaseConnectable
-
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
+        private var userRepository: UserRepository { User.DatabaseRepository(database: database) }
     }
 }
 
@@ -28,11 +36,11 @@ extension Subtopic.DatabaseRepository {
 
         return try userRepository
             .isModerator(user: user, topicID: content.topicId)
+            .ifFalse(throw: Abort(.forbidden))
             .flatMap {
-
-                Subtopic.DatabaseModel(content: content)
-                    .save(on: self.conn)
-                    .map { try $0.content() }
+                let subtopic = Subtopic.DatabaseModel(content: content)
+                return subtopic.save(on: self.database)
+                    .flatMapThrowing { try subtopic.content() }
         }
     }
 
@@ -53,16 +61,16 @@ extension Subtopic.DatabaseRepository {
     }
 
     public func getSubtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]> {
-        return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicID == topic.id)
+        return Subtopic.DatabaseModel.query(on: database)
+            .filter(\Subtopic.DatabaseModel.$topic.$id == topic.id)
             .all()
-            .map { try $0.map { try $0.content() }}
+            .flatMapEachThrowing { try $0.content() }
     }
 
     public func subtopics(with topicID: Topic.ID) -> EventLoopFuture<[Subtopic]> {
-        return Subtopic.DatabaseModel.query(on: conn)
-            .filter(\.topicID == topicID)
+        return Subtopic.DatabaseModel.query(on: database)
+            .filter(\Subtopic.DatabaseModel.$topic.$id == topicID)
             .all()
-            .map { try $0.map { try $0.content() }}
+            .flatMapEachThrowing { try $0.content() }
     }
 }

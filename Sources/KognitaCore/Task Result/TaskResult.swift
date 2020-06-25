@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 public protocol TaskSubmitable {
     var timeUsed: TimeInterval? { get }
@@ -23,40 +23,50 @@ extension TaskResult {
 
     final class DatabaseModel: KognitaPersistenceModel {
 
-        public typealias Database = PostgreSQLDatabase
-
         static var tableName: String = "TaskResult"
 
+        @DBID(custom: "id")
         public var id: Int?
 
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
 
         /// The date this task should be revisited
+        @Field(key: "revisitDate")
         public var revisitDate: Date?
 
         /// The user how executed the task
         /// Is optional since the user may delete the user, but this info is still relevant for the service
-        public var userID: User.ID?
+        @OptionalParent(key: "userID")
+        public var user: User.DatabaseModel?
 
-        public var taskID: Task.ID
+        @Parent(key: "taskID")
+        public var task: TaskDatabaseModel
 
+        @Field(key: "resultScore")
         public var resultScore: Double
 
+        @Field(key: "timeUsed")
         public var timeUsed: TimeInterval?
 
-        public var sessionID: TaskSession.ID?
+        @OptionalParent(key: "sessionID")
+        public var session: TaskSession?
 
         /// If the result value is set manually
+        @Field(key: "isSetManually")
         public var isSetManually: Bool
 
-        init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.ID?) {
-            self.taskID = result.taskID
-            self.userID = userID
+        init() {}
+
+        init(result: TaskSubmitResultRepresentable, userID: User.ID, sessionID: TaskSession.IDValue?) {
+            self.$task.id = result.taskID
+            self.$user.id = userID
             self.timeUsed = result.timeUsed
             self.resultScore = result.score.clamped(to: 0...1)
-            self.sessionID = sessionID
+            self.$session.id = sessionID
             self.isSetManually = false
 
             let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: resultScore)
@@ -74,36 +84,35 @@ extension TaskResult.DatabaseModel: ContentConvertable {
             id: requireID(),
             createdAt: createdAt ?? .now,
             revisitDate: revisitDate,
-            userID: userID,
-            taskID: taskID,
+            userID: $user.id ?? 0,
+            taskID: $task.id ?? 0,
             resultScore: resultScore,
             timeUsed: timeUsed,
-            sessionID: sessionID
+            sessionID: $session.id ?? 0
         )
     }
 }
 
-extension TaskResult.DatabaseModel: Migration {
+extension TaskResult {
+    enum Migrations {}
+}
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(TaskResult.DatabaseModel.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension TaskResult.Migrations {
+    struct Create: KognitaModelMigration {
 
-            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-            builder.reference(from: \.sessionID, to: \TaskSession.id, onUpdate: .cascade, onDelete: .setNull)
+        typealias Model = TaskResult.DatabaseModel
 
-            builder.unique(on: \.sessionID, \.taskID)
-        }.flatMap {
-            PostgreSQLDatabase.update(TaskResult.DatabaseModel.self, on: conn) { builder in
-                builder.deleteField(for: \.userID)
-                builder.field(for: \.userID, type: .int, .default(1))
-            }
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("taskID", .uint, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("userID", .uint, .required, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
+                .field("sessionID", .uint, .required, .references(TaskSession.schema, .id, onDelete: .setNull, onUpdate: .cascade))
+                .field("resultScore", .double, .required)
+                .field("isSetManually", .bool, .required)
+                .field("revisitDate", .date)
+                .field("timeUsed", .double)
+                .defaultTimestamps()
+                .unique(on: "sessionID", "taskID")
         }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(TaskResult.DatabaseModel.self, on: connection)
     }
 }
 
@@ -117,33 +126,5 @@ extension TaskResult {
 
     public var content: TaskResultContent {
         return TaskResultContent(result: self, daysUntilRevisit: daysUntilRevisit)
-    }
-}
-
-struct TaskResultUniqueMigration: PostgreSQLMigration {
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.update(TaskResult.DatabaseModel.self, on: conn) { builder in
-            builder.unique(on: \.sessionID, \.taskID)
-        }
-    }
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return conn.future()
-    }
-}
-
-extension TaskResult {
-    struct IsSetManuallyMigration: PostgreSQLMigration {
-
-        static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            PostgreSQLDatabase.update(TaskResult.DatabaseModel.self, on: conn) { builder in
-                builder.field(for: \.isSetManually, type: .bool, .default(.literal(.boolean(.false))))
-            }
-        }
-
-        static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-            PostgreSQLDatabase.update(TaskResult.DatabaseModel.self, on: conn) { builder in
-                builder.deleteField(for: \.isSetManually)
-            }
-        }
     }
 }

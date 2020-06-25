@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 public protocol DeleteModelRepository {
     func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void>
@@ -14,11 +14,9 @@ public protocol DeleteModelRepository {
 
 extension DeleteModelRepository where Self: DatabaseConnectableRepository {
 
-    public func deleteDatabase<DatabaseModel: PostgreSQLModel>(_ modelType: DatabaseModel.Type, modelID: Int) -> EventLoopFuture<Void> {
-        DatabaseModel.find(modelID, on: conn)
+    public func deleteDatabase<DatabaseModel: Model>(_ modelType: DatabaseModel.Type, modelID: Int) -> EventLoopFuture<Void> where DatabaseModel.IDValue == Int {
+        DatabaseModel.find(modelID, on: database)
             .unwrap(or: Abort(.badRequest))
-            .flatMap { databaseModel in
-                databaseModel.delete(on: self.conn)
-        }
+            .delete(on: database)
     }
 }

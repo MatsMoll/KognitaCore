@@ -1,61 +1,79 @@
-import FluentPostgreSQL
 import Foundation
-import NIO
 import Vapor
+import FluentKit
 
 final class TaskSessionAnswer: KognitaPersistenceModel {
 
     public static var tableName: String = "TaskSessionAnswer"
 
+    @Timestamp(key: "createdAt", on: .create)
     public var createdAt: Date?
 
+    @Timestamp(key: "updatedAt", on: .update)
     public var updatedAt: Date?
 
+    @DBID(custom: "id")
     public var id: Int?
 
-    public var sessionID: TaskSession.ID
+    @Parent(key: "sessionID")
+    var session: TaskSession
 
-    public var taskAnswerID: TaskAnswer.ID
+    @Parent(key: "taskAnswerID")
+    var taskAnswer: TaskAnswer
 
-    init(sessionID: TaskSession.ID, taskAnswerID: TaskAnswer.ID) {
-        self.sessionID = sessionID
-        self.taskAnswerID = taskAnswerID
+    init(sessionID: TaskSession.IDValue, taskAnswerID: TaskAnswer.IDValue) {
+        self.$session.id = sessionID
+        self.$taskAnswer.id = taskAnswerID
     }
 
-    public static func addTableConstraints(to builder: SchemaCreator<TaskSessionAnswer>) {
-        builder.reference(from: \.taskAnswerID, to: \TaskAnswer.id, onUpdate: .cascade, onDelete: .cascade)
-        builder.reference(from: \.sessionID, to: \TaskSession.id, onUpdate: .cascade, onDelete: .cascade)
+    init() {}
+}
+
+extension TaskSessionAnswer {
+    enum Migrations {}
+}
+
+extension TaskSessionAnswer.Migrations {
+    struct Create: KognitaModelMigration {
+        typealias Model = TaskSessionAnswer
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("sessionID", .uint, .required, .references(TaskSession.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("taskAnswerID", .uint, .required, .references(TaskAnswer.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .defaultTimestamps()
+        }
     }
 }
 
 protocol TaskSessionAnswerRepository {
-    func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]>
-    func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?>
+    func multipleChoiseAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]>
+    func flashCardAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?>
 }
 
 extension TaskSessionAnswer {
 
     public struct DatabaseRepository: TaskSessionAnswerRepository, DatabaseConnectableRepository {
 
-        typealias DatabaseModel = TaskSessionAnswer
+        public let database: Database
 
-        public let conn: DatabaseConnectable
-
-        public func multipleChoiseAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
-            MultipleChoiseTaskAnswer.query(on: conn, withSoftDeleted: true)
-                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
-                .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
-                .filter(\TaskSessionAnswer.sessionID == sessionID)
-                .filter(\MultipleChoiseTaskChoise.taskId == taskID)
-                .all()
+        public func multipleChoiseAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
+            database.eventLoop.future([])
+//            MultipleChoiseTaskAnswer.query(on: db)
+//                .withDeleted()
+//                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
+//                .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
+//                .filter(\TaskSessionAnswer.sessionID == sessionID)
+//                .filter(\MultipleChoiseTaskChoise.taskId == taskID)
+//                .all()
         }
 
-        public func flashCardAnswers(in sessionID: TaskSession.ID, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?> {
-            FlashCardAnswer.query(on: conn)
-                .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id)
-                .filter(\TaskSessionAnswer.sessionID == sessionID)
-                .filter(\FlashCardAnswer.taskID == taskID)
-                .first()
+        public func flashCardAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?> {
+            database.eventLoop.future(nil)
+//            FlashCardAnswer.query(on: conn)
+//                .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id)
+//                .filter(\TaskSessionAnswer.sessionID == sessionID)
+//                .filter(\FlashCardAnswer.taskID == taskID)
+//                .first()
         }
     }
 }

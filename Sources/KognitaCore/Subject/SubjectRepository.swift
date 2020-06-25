@@ -6,7 +6,6 @@
 //
 
 import Vapor
-import FluentPostgreSQL
 
 public struct SubjectCompendiumFilter: Codable {
     let subtopicIDs: Set<Subtopic.ID>?
@@ -33,5 +32,5 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>
     func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject>
     func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
-    func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User) throws -> EventLoopFuture<Void>
+    func importContent(in subject: Subject, peerWise: [TaskPeerWise], user: User) throws -> EventLoopFuture<Void>
 }

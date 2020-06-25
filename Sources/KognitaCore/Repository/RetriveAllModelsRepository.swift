@@ -5,7 +5,7 @@
 //  Created by Mats Mollestad on 22/12/2019.
 //
 
-import FluentPostgreSQL
+import FluentKit
 
 //public protocol RetriveAllModelsRepository {
 //    associatedtype ResponseModel
@@ -30,17 +30,10 @@ import FluentPostgreSQL
 
 extension DatabaseConnectableRepository {
 
-    func all<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.query(on: conn)
+    func all<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: Model {
+        DatabaseModel.query(on: database)
             .all()
-            .map { try $0.map { try $0.content() } }
-    }
-
-    func all<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.query(on: conn)
-            .filter(filter)
-            .all()
-            .map { try $0.map { try $0.content() } }
+            .flatMapEachThrowing { try $0.content() }
     }
 }
 
@@ -52,29 +45,14 @@ extension DatabaseConnectableRepository {
 
 extension DatabaseConnectableRepository {
 
-    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.find(id, on: conn)
-            .map { try $0?.content() }
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: Model, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(id, on: database)
+            .flatMapThrowing { try $0?.content() }
     }
 
-    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.find(id, on: conn)
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: Model, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(id, on: database)
             .unwrap(or: error)
-            .map { try $0.content() }
-    }
-
-    func first<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.query(on: conn)
-            .filter(filter)
-            .first()
-            .unwrap(or: error)
-            .map { try $0.content() }
-    }
-
-    func first<DatabaseModel: ContentConvertable>(where filter: FilterOperator<PostgreSQLDatabase, DatabaseModel>, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: PostgreSQLModel {
-        DatabaseModel.query(on: conn)
-            .filter(filter)
-            .first()
-            .map { try $0?.content() }
+            .content()
     }
 }

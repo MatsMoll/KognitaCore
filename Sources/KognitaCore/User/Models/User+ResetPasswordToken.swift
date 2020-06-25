@@ -6,50 +6,77 @@
 //
 
 import Vapor
-import FluentPostgreSQL
-import Crypto
+import FluentKit
 
 extension User {
 
     public enum ResetPassword {
 
-        public struct Token: KognitaPersistenceModel, SoftDeleatableModel {
+        public final class Token: KognitaPersistenceModel, SoftDeleatableModel {
 
             public static var tableName: String = "User.ResetPassword.Token"
 
+            @DBID(custom: "id")
             public var id: Int?
 
-            public let userId: User.ID
+            @Parent(key: "userId")
+            var user: User.DatabaseModel
 
-            public let string: String
+            @Field(key: "string")
+            var string: String
 
             /// The date the token expires
+            @Timestamp(key: "deletedAt", on: .delete)
             public var deletedAt: Date?
+
+            @Timestamp(key: "createdAt", on: .create)
             public var createdAt: Date?
+
+            @Timestamp(key: "updatedAt", on: .update)
             public var updatedAt: Date?
 
             init(userId: User.ID) throws {
-                self.userId = userId
+                self.$user.id = userId
                 self.deletedAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
-                self.string = try CryptoRandom().generateData(count: 16).base64URLEncodedString(options: .init())
+                self.string = [UInt8].random(count: 16).base64
             }
+
+            public init() {}
+        }
+    }
+}
+
+extension User.ResetPassword.Token {
+    enum Migrations {}
+}
+
+extension User.ResetPassword.Token.Migrations {
+    struct Create: KognitaModelMigration {
+
+        typealias Model = User.ResetPassword.Token
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("string", .string, .required)
+                .field("userId", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("deletedAt", .date)
+                .defaultTimestamps()
         }
     }
 }
 
 extension User.ResetPassword.Token {
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
-            try addProperties(to: builder)
-            builder.reference(from: \.userId, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-        }.flatMap {
-            PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
-                builder.deleteField(for: \.userId)
-                builder.field(for: \.userId, type: .int, .default(1))
-            }
-        }
-    }
+//    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//        PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
+//            try addProperties(to: builder)
+//            builder.reference(from: \.userId, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
+//        }.flatMap {
+//            PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
+//                builder.deleteField(for: \.userId)
+//                builder.field(for: \.userId, type: .int, .default(1))
+//            }
+//        }
+//    }
 
     public enum Create {
         public struct Data {
@@ -79,11 +106,9 @@ public protocol ResetPasswordRepositoring {
 extension User.ResetPassword.Token {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        typealias DatabaseModel = User.ResetPassword.Token
+        public let database: Database
 
-        public let conn: DatabaseConnectable
-
-        private var userRepository: some UserRepository { User.DatabaseRepository(conn: conn) }
+        private var userRepository: UserRepository { User.DatabaseRepository(database: database) }
     }
 }
 
@@ -95,11 +120,10 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
 
     public func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
 
-        return try User.ResetPassword.Token(userId: user.id)
-            .save(on: conn)
-            .map { token in
-                .init(token: token.string)
-        }
+        let token = try User.ResetPassword.Token(userId: user.id)
+
+        return token.save(on: database)
+            .map { .init(token: token.string) }
     }
 
     public func reset(to content: User.ResetPassword.Data, with token: String) throws -> EventLoopFuture<Void> {
@@ -107,21 +131,18 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
         guard content.password == content.verifyPassword else { throw User.DatabaseRepository.Errors.passwordMismatch }
 
         return User.ResetPassword.Token
-            .query(on: conn)
-            .filter(\.string == token)
+            .query(on: database)
+            .filter(\.$string == token)
             .first()
             .unwrap(or: ResetErrors.incorrectOrExpiredToken)
             .flatMap { tokenModel in
 
                 User.DatabaseModel
-                    .find(tokenModel.userId, on: self.conn)
+                    .find(tokenModel.$user.id, on: self.database)
                     .unwrap(or: Abort(.badRequest))
-                    .flatMap { user in
-
-                        try user.update(password: content.password)
-                        return user.save(on: self.conn)
-                            .transform(to: ())
-                }
-        }
+            }
+            .flatMapThrowing { try $0.update(password: content.password) }
+            .flatMap { $0.save(on: self.database) }
+            .transform(to: ())
     }
 }

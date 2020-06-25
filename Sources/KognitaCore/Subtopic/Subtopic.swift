@@ -5,7 +5,7 @@
 //  Created by Mats Mollestad on 26/08/2019.
 //
 
-import FluentPostgreSQL
+import Fluent
 import Vapor
 
 extension Subtopic {
@@ -13,33 +13,63 @@ extension Subtopic {
 
         public static var tableName: String = "Subtopic"
 
+        @DBID(custom: "id")
         public var id: Int?
 
+        @Field(key: "name")
         public var name: String
 
-        public var topicID: Topic.ID
+        @Parent(key: "topicID")
+        public var topic: Topic.DatabaseModel
 
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
+        @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
+
+        @Children(for: \.$subtopic)
+        var tasks: [TaskDatabaseModel]
+
+        init() {}
 
         init(name: String, topicID: Topic.ID) {
             self.name = name
-            self.topicID = topicID
+            self.$topic.id = topicID
         }
 
         init(content: Create.Data) {
             self.name = content.name
-            self.topicID = content.topicId
+            self.$topic.id = content.topicId
         }
 
         public func updateValues(with content: Create.Data) {
             self.name = content.name
-            self.topicID = content.topicId
+            self.$topic.id = content.topicId
+        }
+    }
+}
+
+extension Subtopic {
+    enum Migrations {}
+}
+
+extension Subtopic.Migrations {
+    struct Create: Migration {
+
+        let schema = Subtopic.DatabaseModel.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("name", .string, .required)
+                .field("topicID", .uint, .required, .references(Topic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .defaultTimestamps()
+                .create()
         }
 
-        public static func addTableConstraints(to builder: SchemaCreator<Subtopic.DatabaseModel>) {
-            builder.reference(from: \.topicID, to: \Topic.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
         }
     }
 }
@@ -49,7 +79,7 @@ extension Subtopic.DatabaseModel: ContentConvertable {
         try .init(
             id: requireID(),
             name: name,
-            topicID: topicID
+            topicID: $topic.id
         )
     }
 }

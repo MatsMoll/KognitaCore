@@ -6,22 +6,22 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 extension Topic {
-    public static func create(name: String = "Topic", chapter: Int = 1, creator: User? = nil, subject: Subject? = nil, on conn: PostgreSQLConnection) throws -> Topic {
+    public static func create(name: String = "Topic", chapter: Int = 1, creator: User? = nil, subject: Subject? = nil, on app: Application) throws -> Topic {
 
-        let createSubject = try subject ?? Subject.create(creator: creator, on: conn)
+        let createSubject = try subject ?? Subject.create(creator: creator, on: app)
 
-        return try Topic.create(name: name, chapter: chapter, subjectId: createSubject.id, on: conn)
+        return try Topic.create(name: name, chapter: chapter, subjectId: createSubject.id, on: app.db)
     }
 
-    public static func create(name: String = "Topic", chapter: Int = 1, subjectId: Subject.ID, on conn: PostgreSQLConnection) throws -> Topic {
+    public static func create(name: String = "Topic", chapter: Int = 1, subjectId: Subject.ID, on database: Database) throws -> Topic {
 
-        return try Topic.DatabaseModel(name: name, chapter: chapter, subjectId: subjectId)
-            .save(on: conn)
-            .map { try $0.content() }
+        let topic = try Topic.DatabaseModel(name: name, chapter: chapter, subjectId: subjectId)
+        return try topic.save(on: database)
+            .flatMapThrowing { try topic.content() }
             .wait()
     }
 }

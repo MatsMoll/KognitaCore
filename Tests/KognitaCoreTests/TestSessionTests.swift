@@ -6,13 +6,13 @@ import XCTest
 @available(OSX 10.15, *)
 class TestSessionTests: VaporTestCase {
 
-    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: conn).subjectTestRepository }()
-    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: conn).testSessionRepository }()
+    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: database).subjectTestRepository }()
+    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: database).testSessionRepository }()
 
     func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
 
-        let userOne = try User.create(on: conn)
-        let userTwo = try User.create(on: conn)
+        let userOne = try User.create(on: app)
+        let userTwo = try User.create(on: app)
 
         do {
             let test = try setupTestWithTasks()
@@ -20,8 +20,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             try XCTAssertNotEqual(sessionOne.requireID(), sessionTwo.requireID())
             XCTAssertEqual(sessionOne.testID, test.id)
@@ -58,10 +58,10 @@ class TestSessionTests: VaporTestCase {
                 try testSessionRepository
                     .submit(content: thiredSubmit, for: sessionOne, by: userOne).wait()
             )
-            let answers         = try TaskSessionAnswer.query(on: conn).all().wait()
-            let flashAnswers    = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
-            let taskIDs         = Set(flashAnswers.map { $0.choiseID })
-            let sessionIDs      = Set(answers.map { $0.sessionID })
+            let answers         = try TaskSessionAnswer.query(on: database).all().wait()
+            let flashAnswers    = try MultipleChoiseTaskAnswer.query(on: database).all().wait()
+            let taskIDs         = Set(flashAnswers.map { $0.$choice.id })
+            let sessionIDs      = Set(answers.map { $0.$session.id })
             let userSessions    = try Set([sessionOne.requireID(), sessionTwo.requireID()])
 
             XCTAssertEqual(userSessions, sessionIDs)
@@ -75,13 +75,13 @@ class TestSessionTests: VaporTestCase {
 
     func testUpdateAnswerInSession() throws {
 
-        let user = try User.create(on: conn)
+        let user = try User.create(on: app)
 
         do {
             let test = try setupTestWithTasks()
 
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: user).wait()
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
 
             let firstSubmittion             = try submittionAt(index: 1, for: test)
             let secondIncorrectSubmittion   = try submittionAt(index: 2, for: test, isCorrect: false)
@@ -92,11 +92,11 @@ class TestSessionTests: VaporTestCase {
             // Updating old submittion
             try testSessionRepository.submit(content: secondCorrectSubmittion, for: sessionOne, by: user).wait()
 
-            let answers = try TaskSessionAnswer.query(on: conn).all().wait()
-            let choises = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
-            let taskAnswers = try TaskAnswer.query(on: conn).all().wait()
+            let answers = try TaskSessionAnswer.query(on: database).all().wait()
+            let choises = try MultipleChoiseTaskAnswer.query(on: database).all().wait()
+            let taskAnswers = try TaskAnswer.query(on: database).all().wait()
 
-            let choisesIDs = Set(choises.map { $0.choiseID })
+            let choisesIDs = Set(choises.map { $0.$choice.id })
             let submittedChoisesIDs = Set(firstSubmittion.choises + secondCorrectSubmittion.choises)
 
             XCTAssertEqual(taskAnswers.count, 2)
@@ -110,8 +110,8 @@ class TestSessionTests: VaporTestCase {
 
     func testSubmittingTestSession() throws {
 
-        let userOne = try User.create(on: conn)
-        let userTwo = try User.create(on: conn)
+        let userOne = try User.create(on: app)
+        let userTwo = try User.create(on: app)
 
         do {
             let test = try setupTestWithTasks()
@@ -119,8 +119,8 @@ class TestSessionTests: VaporTestCase {
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            var sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            var sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            var sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            var sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -136,26 +136,26 @@ class TestSessionTests: VaporTestCase {
 
             try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
 
-            var results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
+            var results = try TaskResult.DatabaseModel.query(on: database).all().wait()
 
-            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             XCTAssertEqual(results.count, 3)
             XCTAssertNotNil(sessionOne.submittedAt)
             XCTAssertNil(sessionTwo.submittedAt)
 
             try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
-            results = try TaskResult.DatabaseModel.query(on: conn).all().wait()
+            results = try TaskResult.DatabaseModel.query(on: database).all().wait()
 
-            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             XCTAssertEqual(results.count, 5)
             XCTAssertNotNil(sessionOne.submittedAt)
             XCTAssertNotNil(sessionTwo.submittedAt)
-            XCTAssertEqual(results.filter({ $0.sessionID == sessionOneEntry.id }).count, 3)
-            XCTAssertEqual(results.filter({ $0.sessionID == sessionTwoEntry.id }).count, 2)
+            XCTAssertEqual(results.filter({ $0.$session.id == sessionOneEntry.id }).count, 3)
+            XCTAssertEqual(results.filter({ $0.$session.id == sessionTwoEntry.id }).count, 2)
             XCTAssert(results.allSatisfy({ $0.resultScore == 1 }), "One or more results was not recored as 100% correct")
 
             // Should throw when submtting an answer after submitting results
@@ -175,15 +175,15 @@ class TestSessionTests: VaporTestCase {
         failableTest {
             let test = try setupTestWithTasks()
 
-            let userOne = try User.create(on: conn)
-            let userTwo = try User.create(on: conn)
-            let userThree = try User.create(on: conn)
+            let userOne = try User.create(on: app)
+            let userTwo = try User.create(on: app)
+            let userThree = try User.create(on: app)
 
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -224,15 +224,15 @@ class TestSessionTests: VaporTestCase {
         failableTest {
             let test = try setupTestWithTasks()
 
-            let userOne = try User.create(on: conn)
-            let userTwo = try User.create(on: conn)
-            let userThree = try User.create(on: conn)
+            let userOne = try User.create(on: app)
+            let userTwo = try User.create(on: app)
+            let userThree = try User.create(on: app)
 
             let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
             let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, conn: conn).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, conn: conn).wait()
+            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
             let firstSubmittion     = try submittionAt(index: 1, for: test)
             let secondSubmittion    = try submittionAt(index: 2, for: test)
@@ -274,17 +274,16 @@ class TestSessionTests: VaporTestCase {
 
     func choisesAt(index: Int, for test: SubjectTest) throws -> [MultipleChoiseTaskChoise] {
         try SubjectTest.Pivot.Task
-            .query(on: conn)
-            .sort(\.createdAt)
-            .filter(\.testID, .equal, test.id)
-            .filter(\.id, .equal, index)
-            .join(\MultipleChoiseTaskChoise.taskId, to: \SubjectTest.Pivot.Task.taskID)
-            .decode(MultipleChoiseTaskChoise.self)
-            .all()
+            .query(on: database)
+            .sort(\.$createdAt)
+            .filter(\.$test.$id == test.id)
+            .filter(\.$id == index)
+            .join(MultipleChoiseTaskChoise.self, on: \MultipleChoiseTaskChoise.$task.$id == \SubjectTest.Pivot.Task.$task.$id)
+            .all(MultipleChoiseTaskChoise.self)
             .wait()
     }
 
-    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.ID]) -> MultipleChoiceTask.Submit {
+    func multipleChoiseAnswer(with choises: [MultipleChoiseTaskChoise.IDValue]) -> MultipleChoiceTask.Submit {
         .init(
             timeUsed: .seconds(20),
             choises: choises,
@@ -293,16 +292,16 @@ class TestSessionTests: VaporTestCase {
     }
 
     func setupTestWithTasks(scheduledAt: Date = .now, duration: TimeInterval = .minutes(10), numberOfTasks: Int = 3) throws -> SubjectTest {
-        let topic = try Topic.create(on: conn)
-        let subtopic = try Subtopic.create(topic: topic, on: conn)
+        let topic = try Topic.create(on: app)
+        let subtopic = try Subtopic.create(topic: topic, on: app)
         let taskIds = try (0..<numberOfTasks).map { _ in
-            try MultipleChoiceTask.create(subtopic: subtopic, on: conn).id
+            try MultipleChoiceTask.create(subtopic: subtopic, on: app).id
         }
-        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
 
-        let user = try User.create(on: conn)
+        let user = try User.create(on: app)
 
         let data = SubjectTest.Create.Data(
             tasks: taskIds,

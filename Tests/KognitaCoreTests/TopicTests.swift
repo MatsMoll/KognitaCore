@@ -7,19 +7,18 @@
 
 import XCTest
 import Vapor
-import FluentPostgreSQL
 @testable import KognitaCore
 import KognitaCoreTestable
 
 class TopicTests: VaporTestCase {
 
-    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: conn).topicRepository }()
-    lazy var subtopicRepository: SubtopicRepositoring = { TestableRepositories.testable(with: conn).subtopicRepository }()
+    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: database).topicRepository }()
+    lazy var subtopicRepository: SubtopicRepositoring = { TestableRepositories.testable(with: database).subtopicRepository }()
 
     func testCreate() throws {
 
-        let user = try User.create(on: conn)
-        let subject = try Subject.create(on: conn)
+        let user = try User.create(on: app)
+        let subject = try Subject.create(on: app)
 
         let topicData = Topic.Create.Data(
             subjectID: subject.id,
@@ -44,18 +43,18 @@ class TopicTests: VaporTestCase {
 
 //    func testTimlyTopics() throws {
 //
-//        let subtopic = try Subtopic.create(on: conn)
+//        let subtopic = try Subtopic.create(on: app)
 //
-//        _ = try Topic.create(on: conn)
+//        _ = try Topic.create(on: app)
 //
-//        _ = try Task.create(on: conn)
-//        _ = try Task.create(on: conn)
+//        _ = try Task.create(on: app)
+//        _ = try Task.create(on: app)
 //
-//        _ = try Task.create(subtopic: subtopic, on: conn)
-//        _ = try Task.create(subtopic: subtopic, on: conn)
-//        _ = try Task.create(subtopic: subtopic, on: conn)
-//        let outdated = try Task.create(subtopic: subtopic, on: conn)
-//        _ = try outdated.delete(on: conn).wait()
+//        _ = try Task.create(subtopic: subtopic, on: app)
+//        _ = try Task.create(subtopic: subtopic, on: app)
+//        _ = try Task.create(subtopic: subtopic, on: app)
+//        let outdated = try Task.create(subtopic: subtopic, on: app)
+//        _ = try outdated.delete(on: app).wait()
 //
 //        let timely = try topicRepository
 //            .timelyTopics()
@@ -67,20 +66,20 @@ class TopicTests: VaporTestCase {
 //    }
 
     func testSoftDelete() throws {
-        let subtopic = try Subtopic.create(on: conn)
+        let subtopic = try Subtopic.create(on: app)
 
-        _ = try Subtopic.create(on: conn)
+        _ = try Subtopic.create(on: app)
 
-        _ = try Task.create(on: conn)
-        _ = try Task.create(on: conn)
+        _ = try TaskDatabaseModel.create(on: app)
+        _ = try TaskDatabaseModel.create(on: app)
 
-        _ = try Task.create(subtopic: subtopic, on: conn)
-        let outdated = try Task.create(subtopic: subtopic, on: conn)
-        _ = try outdated.delete(on: conn)
+        _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        let outdated = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        _ = try outdated.delete(on: database)
             .wait()
 
-        let allValidTasks = try Task.query(on: conn).all().wait()
-        let allTasks = try Task.query(on: conn, withSoftDeleted: true).all().wait()
+        let allValidTasks = try TaskDatabaseModel.query(on: database).all().wait()
+        let allTasks = try TaskDatabaseModel.query(on: database).withDeleted().all().wait()
 
         XCTAssertEqual(allValidTasks.count, 3)
         XCTAssertEqual(allTasks.count, 4)
@@ -88,20 +87,20 @@ class TopicTests: VaporTestCase {
 
 //    func testLeveledTopics() throws {
 //
-//        let subject = try Subject.create(on: conn)
+//        let subject = try Subject.create(on: app)
 //
-//        let topicOne = try Topic.create(chapter: 1, subject: subject, on: conn)
-//        let topicTwo = try Topic.create(chapter: 2, subject: subject, on: conn)
-//        let topicThree = try Topic.create(chapter: 3, subject: subject, on: conn)
-//        let topicFour = try Topic.create(chapter: 4, subject: subject, on: conn)
-//        let topicFive = try Topic.create(chapter: 6, subject: subject, on: conn)
+//        let topicOne = try Topic.create(chapter: 1, subject: subject, on: app)
+//        let topicTwo = try Topic.create(chapter: 2, subject: subject, on: app)
+//        let topicThree = try Topic.create(chapter: 3, subject: subject, on: app)
+//        let topicFour = try Topic.create(chapter: 4, subject: subject, on: app)
+//        let topicFive = try Topic.create(chapter: 6, subject: subject, on: app)
 //
-//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicTwo, on: conn).wait()
-//        _ = try Topic.Pivot.Preknowleged.create(topic: topicTwo, requires: topicThree, on: conn).wait()
-//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicThree, on: conn).wait()
-//        _ = try Topic.Pivot.Preknowleged.create(topic: topicFour, requires: topicTwo, on: conn).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicTwo, on: app).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicTwo, requires: topicThree, on: app).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicOne, requires: topicThree, on: app).wait()
+//        _ = try Topic.Pivot.Preknowleged.create(topic: topicFour, requires: topicTwo, on: app).wait()
 //
-//        let levels = try Topic.Repository.leveledTopics(in: subject, on: conn).wait()
+//        let levels = try Topic.Repository.leveledTopics(in: subject, on: app).wait()
 //
 //        XCTAssertEqual(levels.count, 3)
 //        XCTAssertEqual(levels.first?.count, 2)

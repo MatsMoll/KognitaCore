@@ -6,34 +6,39 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 /// A submittet choise in a task
-final class MultipleChoiseTaskAnswer: PostgreSQLModel, Codable {
+final class MultipleChoiseTaskAnswer: Model, Codable {
 
-    public typealias Database = PostgreSQLDatabase
+    static var schema: String = "MultipleChoiseTaskAnswer"
 
+    @DBID(custom: "id")
     public var id: Int?
 
-    public var choiseID: MultipleChoiseTaskChoise.ID
+    @Parent(key: "choiseID")
+    public var choice: MultipleChoiseTaskChoise
 
-    public init(answerID: TaskAnswer.ID, choiseID: MultipleChoiseTaskChoise.ID) {
+    init(answerID: TaskAnswer.IDValue, choiseID: MultipleChoiseTaskChoise.IDValue) {
         self.id = answerID
-        self.choiseID = choiseID
+        self.$choice.id = choiseID
     }
+
+    init() {}
 }
 
-extension MultipleChoiseTaskAnswer: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(MultipleChoiseTaskAnswer.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension MultipleChoiseTaskAnswer {
+    enum Migrations {}
+}
 
-            builder.reference(from: \.id, to: \TaskAnswer.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.choiseID, to: \MultipleChoiseTaskChoise.id, onUpdate: .cascade, onDelete: .cascade)
+extension MultipleChoiseTaskAnswer.Migrations {
+    struct Create: KognitaModelMigration {
+
+        typealias Model = MultipleChoiseTaskAnswer
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("choiseID", .uint, .required, .references(MultipleChoiseTaskChoise.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .foreignKey("id", references: TaskAnswer.schema, .id, onDelete: .cascade, onUpdate: .cascade)
         }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.delete(MultipleChoiseTaskAnswer.self, on: connection)
     }
 }

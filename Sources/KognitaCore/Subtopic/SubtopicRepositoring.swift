@@ -6,7 +6,6 @@
 //
 
 import Vapor
-import FluentPostgreSQL
 
 public protocol SubtopicRepositoring: DeleteModelRepository {
     func create(from content: Subtopic.Create.Data, by user: User?) throws -> EventLoopFuture<Subtopic.Create.Response>

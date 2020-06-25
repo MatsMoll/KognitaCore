@@ -23,12 +23,12 @@ extension FlashCardTask {
 
             public var isTestable: Bool
 
-            public var examPaperSemester: Task.ExamSemester?
+            public var examPaperSemester: TaskExamSemester?
 
             public var examPaperYear: Int?
         }
 
-        public typealias Response = Task
+        public typealias Response = KognitaContent.TypingTask
     }
 
     public typealias Edit = Create

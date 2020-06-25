@@ -1,39 +1,49 @@
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
-final class TaskSession: PostgreSQLModel, Migration {
+final class TaskSession: Model {
 
-    public typealias Database = PostgreSQLDatabase
+    static var schema: String = "TaskSession"
 
+    @Timestamp(key: "createdAt", on: .create)
     public var createdAt: Date?
 
+    @DBID(custom: "id")
     public var id: Int?
 
-    public var userID: User.ID
+    @Parent(key: "userID")
+    public var user: User.DatabaseModel
 
     init(userID: User.ID) {
-        self.userID = userID
+        self.$user.id = userID
     }
 
-    public static var createdAtKey: WritableKeyPath<TaskSession, Date?>? = \.createdAt
+    init() {}
+
+    @Parent(key: "id")
+    var practiceSession: PracticeSession.DatabaseModel
 }
 
 extension TaskSession {
+    enum Migrations {}
+}
 
-    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(TaskSession.self, on: conn) { builder in
-            try addProperties(to: builder)
-        }.flatMap {
-            PostgreSQLDatabase.update(TaskSession.self, on: conn) { builder in
-                builder.deleteField(for: \.userID)
-                builder.field(for: \.userID, type: .int, .default(1))
-                builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-            }
+extension TaskSession.Migrations {
+    struct Create: Migration {
+
+        let schema = TaskSession.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("createdAt", .date, .required)
+                .field("userID", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
+                .create()
         }
-    }
 
-    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.delete(TaskSession.self, on: conn)
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
     }
 }
 
@@ -44,7 +54,7 @@ extension PracticeSession {
         let practiceSession: PracticeSession.DatabaseModel
 
         public var id: Int? { session.id }
-        public var userID: User.ID { session.userID }
+        public var userID: User.ID { session.user.id ?? 0 }
         public var createdAt: Date? { session.createdAt }
         public var endedAt: Date? { practiceSession.endedAt }
         public var numberOfTaskGoal: Int { practiceSession.numberOfTaskGoal }
@@ -57,34 +67,32 @@ extension PracticeSession {
             PracticeSession(model: practiceSession)
         }
 
-        public static func resolveWith(_ id: Int, conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
-            return TaskSession.query(on: conn)
-                .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
-                .filter(\TaskSession.id == id)
-                .alsoDecode(PracticeSession.DatabaseModel.self)
+        public static func resolveWith(_ id: Int, database: Database) -> EventLoopFuture<PracticeSessionRepresentable> {
+            return TaskSession.query(on: database)
+                .with(\.$practiceSession)
+                .filter(\TaskSession.$id == id)
                 .first()
                 .unwrap(or: Abort(.internalServerError))
                 .map {
-                    PracticeParameter(session: $0.0, practiceSession: $0.1)
+                    PracticeParameter(session: $0, practiceSession: $0.practiceSession)
             }
         }
 
-        public func end(on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
+        public func end(on database: Database) -> EventLoopFuture<PracticeSessionRepresentable> {
             let session = self.session
             practiceSession.endedAt = .now
-            return practiceSession.save(on: conn)
-                .map { practiceSession in
-
+            return practiceSession.save(on: database)
+                .map {
                     PracticeSession.PracticeParameter(
                         session: session,
-                        practiceSession: practiceSession
+                        practiceSession: self.practiceSession
                     )
             }
         }
 
-        public func extendSession(with numberOfTasks: Int, on conn: DatabaseConnectable) -> EventLoopFuture<PracticeSessionRepresentable> {
+        public func extendSession(with numberOfTasks: Int, on database: Database) -> EventLoopFuture<PracticeSessionRepresentable> {
             practiceSession.numberOfTaskGoal += abs(numberOfTasks)
-            return practiceSession.save(on: conn)
+            return practiceSession.save(on: database)
                 .transform(to: self)
         }
     }

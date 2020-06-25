@@ -1,6 +1,7 @@
 import Vapor
+import FluentKit
 
-public protocol RepositoriesRepresentable: Service {
+public protocol RepositoriesRepresentable {
     var topicRepository: TopicRepository { get }
     var subjectRepository: SubjectRepositoring { get }
     var subjectTestRepository: SubjectTestRepositoring { get }
@@ -16,31 +17,31 @@ public protocol RepositoriesRepresentable: Service {
 
 public class DatabaseRepositories: RepositoriesRepresentable {
 
-    internal init(conn: DatabaseConnectable) {
-        self.conn = conn
+    internal init(database: Database) {
+        self.database = database
     }
 
-    let conn: DatabaseConnectable
+    let database: Database
 
-    public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var subjectTestRepository: SubjectTestRepositoring = SubjectTest.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var subjectTestRepository: SubjectTestRepositoring = SubjectTest.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var userRepository: UserRepository = User.DatabaseRepository(conn: conn)
+    public lazy var userRepository: UserRepository = User.DatabaseRepository(database: database)
 
-    public lazy var subtopicRepository: SubtopicRepositoring = Subtopic.DatabaseRepository(conn: conn)
+    public lazy var subtopicRepository: SubtopicRepositoring = Subtopic.DatabaseRepository(database: database)
 
-    public lazy var testSessionRepository: TestSessionRepositoring = TestSession.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var testSessionRepository: TestSessionRepositoring = TestSession.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var practiceSessionRepository: PracticeSessionRepository = PracticeSession.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var practiceSessionRepository: PracticeSessionRepository = PracticeSession.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var multipleChoiceTaskRepository: MultipleChoiseTaskRepository = MultipleChoiceTask.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var multipleChoiceTaskRepository: MultipleChoiseTaskRepository = MultipleChoiceTask.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var typingTaskRepository: FlashCardTaskRepository = FlashCardTask.DatabaseRepository(conn: conn, repositories: self)
+    public lazy var typingTaskRepository: FlashCardTaskRepository = FlashCardTask.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var taskSolutionRepository: TaskSolutionRepositoring = TaskSolution.DatabaseRepository(conn: conn)
+    public lazy var taskSolutionRepository: TaskSolutionRepositoring = TaskSolution.DatabaseRepository(database: database)
 
-    public lazy var taskDiscussionRepository: TaskDiscussionRepositoring = TaskDiscussion.DatabaseRepository(conn: conn)
+    public lazy var taskDiscussionRepository: TaskDiscussionRepositoring = TaskDiscussion.DatabaseRepository(database: database)
 }

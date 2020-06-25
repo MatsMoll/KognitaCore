@@ -6,18 +6,30 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
+
+public enum TaskExamSemester: String, Codable {
+    case fall
+    case spring
+
+    public var norwegianDescription: String {
+        switch self {
+        case .fall:     return "Høst"
+        case .spring:   return "Vår"
+        }
+    }
+}
 
 /// The superclass of all task types
-public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
+final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
 
-    public static var tableName: String = "Task"
+    public static let tableName: String = "Task"
 
     /// The semester a exam was taken
     ///
     /// - fall: The fall
     /// - spring: The spring
-    public enum ExamSemester: String, PostgreSQLEnum, PostgreSQLMigration {
+    public enum ExamSemester: String, Codable {
         case fall
         case spring
 
@@ -29,40 +41,51 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         }
     }
 
+    @DBID(custom: "id")
     public var id: Int?
 
     /// The topic.id for the topic this task relates to
-    public var subtopicID: Subtopic.ID
+    @Parent(key: "subtopicID")
+    var subtopic: Subtopic.DatabaseModel
 
     /// Some markdown that contains extra information about the task if needed
+    @Field(key: "description")
     public var description: String?
 
     /// The question needed to answer the task
+    @Field(key: "question")
     public var question: String
 
     /// The id of the user who created the task
-    public var creatorID: User.ID?
+    @Parent(key: "creatorId")
+    var creator: User.DatabaseModel
 
     /// The semester of the exam
+    @Field(key: "examPaperSemester")
     public var examPaperSemester: ExamSemester?
 
     /// The year of the exam
+    @Field(key: "examPaperYear")
     public var examPaperYear: Int?
 
     /// If the task can be used for testing
+    @Field(key: "isTestable")
     public var isTestable: Bool
 
     /// The date the task was created at
+    @Timestamp(key: "createdAt", on: .create)
     public var createdAt: Date?
 
     /// The date the task was updated at
     /// - Note: Usually a task will be marked as isOutdated and create a new `Task` when updated
+    @Timestamp(key: "updatedAt", on: .update)
     public var updatedAt: Date?
 
+    @Timestamp(key: "deletedAt", on: .delete)
     public var deletedAt: Date?
 
-    /// The id of the new edited task if there exists one
-    public var editedTaskID: Task.ID?
+    @Children(for: \.$task)
+    var solutions: [TaskSolution.DatabaseModel]
 
     init(
         subtopicID: Subtopic.ID,
@@ -73,11 +96,12 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         examPaperYear: Int? = nil,
         isTestable: Bool = false
     ) {
-        self.subtopicID     = subtopicID
+        self.$subtopic.id   = subtopicID
         self.description    = description
         self.question       = question
-        self.creatorID      = creatorID
+        self.$creator.id    = creatorID
         self.isTestable     = isTestable
+        self.deletedAt      = nil
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
             self.examPaperSemester = examPaperSemester
@@ -89,51 +113,65 @@ public final class Task: KognitaPersistenceModel, SoftDeleatableModel {
         subtopicID: Subtopic.ID,
         creator: User
     ) throws {
-        self.subtopicID     = subtopicID
+        self.$subtopic.id     = subtopicID
         self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
         self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable     = content.isTestable
-        self.creatorID      = creator.id
+        self.$creator.id      = creator.id
         self.examPaperSemester = nil
         self.examPaperYear  = content.examPaperYear
+        self.deletedAt  = nil
         if description?.isEmpty == true {
             self.description = nil
         }
     }
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(Task.self, on: conn) { builder in
-            try addProperties(to: builder)
+    init() {}
+}
 
-            builder.reference(from: \.subtopicID, to: \Subtopic.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-        }.flatMap {
-            PostgreSQLDatabase.update(Task.self, on: conn) { builder in
-                builder.deleteField(for: \.creatorID)
-                builder.field(for: \.creatorID, type: .int, .default(1))
-            }
+extension TaskDatabaseModel {
+    func update(content: TaskCreationContentable) -> TaskDatabaseModel {
+        self.description = content.description
+        self.question = content.question
+        self.isTestable = content.isTestable
+        self.examPaperYear = content.examPaperYear
+        return self
+    }
+}
+
+extension TaskDatabaseModel {
+    enum Migrations {}
+}
+
+extension TaskDatabaseModel.Migrations {
+    struct Create: KognitaModelMigration {
+
+        typealias Model = TaskDatabaseModel
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("creatorId", .uint, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
+                .field("subtopicID", .uint, .required, .references(Subtopic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("question", .string, .required)
+                .field("description", .string)
+                .field("isTestable", .bool, .required)
+                .field("examPaperYear", .int)
+                .field("examPaperSemester", .string)
+                .field("deletedAt", .date)
+                .defaultTimestamps()
         }
     }
 }
 
-extension Task {
+extension TaskDatabaseModel {
 
-    var subtopic: Parent<Task, Subtopic.DatabaseModel> {
-        return parent(\.subtopicID)
-    }
-
-    var creator: Parent<Task, User.DatabaseModel>? {
-        return parent(\.creatorID)
-    }
-
-    var betaFormatted: BetaFormat {
-        BetaFormat(
+    var betaFormatted: TaskBetaFormat {
+        TaskBetaFormat(
             description: description,
             question: question,
             solution: nil,
-            examPaperSemester: examPaperSemester,
+            examPaperSemester: nil,
             examPaperYear: examPaperYear,
-            editedTaskID: editedTaskID
+            editedTaskID: nil
         )
     }
 
@@ -182,27 +220,27 @@ extension Task {
 //    }
 }
 
-extension Task: Content { }
+extension TaskDatabaseModel: Content { }
 
-extension Task {
-    public struct BetaFormat: Content {
+//extension TaskDatabaseModel {
+public struct TaskBetaFormat: Content {
 
-        /// Some html that contains extra information about the task if needed
-        public var description: String?
+    /// Some html that contains extra information about the task if needed
+    public var description: String?
 
-        /// The question needed to answer the task
-        public var question: String
+    /// The question needed to answer the task
+    public var question: String
 
-        /// A soulution to the task (May be changed to support multiple solutions)
-        public var solution: String?
+    /// A soulution to the task (May be changed to support multiple solutions)
+    public var solution: String?
 
-        /// The semester of the exam
-        public var examPaperSemester: ExamSemester?
+    /// The semester of the exam
+    public var examPaperSemester: TaskExamSemester?
 
-        /// The year of the exam
-        public var examPaperYear: Int?
+    /// The year of the exam
+    public var examPaperYear: Int?
 
-        /// The id of the new edited task if there exists one
-        public var editedTaskID: Task.ID?
-    }
+    /// The id of the new edited task if there exists one
+    public var editedTaskID: Task.ID?
 }
+//}

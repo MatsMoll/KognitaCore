@@ -6,76 +6,94 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 extension PracticeSession.Pivot {
 
-    final class Task: PostgreSQLPivot {
+    final class Task: Model {
 
-        static var name: String = "PracticeSession_Task"
+        static var schema: String = "PracticeSession_Task"
 
-        public typealias Database = PostgreSQLDatabase
-
+        @DBID(custom: "id")
         public var id: Int?
 
-        var sessionID: PracticeSession.ID
+        @Parent(key: "sessionID")
+        var session: PracticeSession.DatabaseModel
 
-        var taskID: KognitaCore.Task.ID
+        @Parent(key: "taskID")
+        var task: TaskDatabaseModel
 
+        @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
 
-        var isCompleted: Bool = false
+        @Field(key: "isCompleted")
+        var isCompleted: Bool
 
         /// The index of the task
         /// The first exicuted task will be 1, then 2, and so on
+        @Field(key: "index")
         var index: Int
 
+        @Field(key: "score")
         var score: Double?
 
-        public typealias Left = PracticeSession.DatabaseModel
-        public typealias Right = KognitaCore.Task
-
-        public static var leftIDKey: LeftIDKey = \.sessionID
-        public static var rightIDKey: RightIDKey = \.taskID
-
-        public static var createdAtKey: TimestampKey? = \.createdAt
-
-        init(sessionID: PracticeSession.ID, taskID: KognitaCore.Task.ID, index: Int) {
-            self.sessionID = sessionID
-            self.taskID = taskID
+        init(sessionID: PracticeSession.ID, taskID: KognitaContent.Task.ID, index: Int) {
+            self.$session.id = sessionID
+            self.$task.id = taskID
             self.index = index
+            self.isCompleted = false
         }
 
-        static func create(session: PracticeSessionRepresentable, task: KognitaCore.Task, index: Int, on conn: DatabaseConnectable)
+        init() {}
+
+        static func create(session: PracticeSessionRepresentable, task: KognitaCore.TaskDatabaseModel, index: Int, on database: Database)
             throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
 
-            return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: task.requireID(), index: index)
-                .create(on: conn)
+            let pivot = try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: task.requireID(), index: index)
+
+            return pivot.create(on: database).transform(to: pivot)
         }
 
-        static func create(session: PracticeSessionRepresentable, taskID: KognitaCore.Task.ID, index: Int, on conn: DatabaseConnectable)
+        static func create(session: PracticeSessionRepresentable, taskID: KognitaContent.Task.ID, index: Int, on database: Database)
             throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
 
-            return try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: taskID, index: index)
-                .create(on: conn)
+            let pivot = try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: taskID, index: index)
+            return pivot.create(on: database).transform(to: pivot)
         }
     }
 }
 
-extension PracticeSession.Pivot.Task: Migration {
+extension PracticeSession.Pivot.Task {
+    enum Migrations {
+        struct Create: KognitaModelMigration {
+            typealias Model = PracticeSession.Pivot.Task
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(PracticeSession.Pivot.Task.self, on: conn) { builder in
-            try addProperties(to: builder)
-
-            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.sessionID, to: \PracticeSession.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
-
-            builder.unique(on: \.sessionID, \.taskID)
+            func build(schema: SchemaBuilder) -> SchemaBuilder {
+                schema.field("isCompleted", .bool, .required)
+                    .field("index", .int, .required)
+                    .field("score", .double)
+                    .field("sessionID", .uint, .required, .references(PracticeSession.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                    .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                    .field("createdAt", .date, .required)
+            }
         }
     }
-
-    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.delete(PracticeSession.Pivot.Task.self, on: connection)
-    }
 }
+
+//extension PracticeSession.Pivot.Task: Migration {
+//
+//    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//        return PostgreSQLDatabase.create(PracticeSession.Pivot.Task.self, on: conn) { builder in
+//            try addProperties(to: builder)
+//
+//            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
+//            builder.reference(from: \.sessionID, to: \PracticeSession.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+//
+//            builder.unique(on: \.sessionID, \.taskID)
+//        }
+//    }
+//
+//    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//        return PostgreSQLDatabase.delete(PracticeSession.Pivot.Task.self, on: connection)
+//    }
+//}

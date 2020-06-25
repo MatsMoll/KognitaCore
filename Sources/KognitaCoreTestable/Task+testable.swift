@@ -6,10 +6,10 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
-extension Task {
+extension TaskDatabaseModel {
 
     public static func create(
         creator: User?           = nil,
@@ -19,11 +19,11 @@ extension Task {
         explenation: String          = "Some explenation",
         createSolution: Bool            = true,
         isTestable: Bool            = false,
-        on conn: PostgreSQLConnection
-    ) throws -> Task {
+        on app: Application
+    ) throws -> TaskDatabaseModel {
 
-        let usedCreator = try creator ?? User.create(on: conn)
-        let usedSubtopic = try subtopic ?? Subtopic.create(on: conn)
+        let usedCreator = try creator ?? User.create(on: app)
+        let usedSubtopic = try subtopic ?? Subtopic.create(on: app)
 
         return try create(creator: usedCreator,
                           subtopicId: usedSubtopic.id,
@@ -32,7 +32,7 @@ extension Task {
                           explenation: explenation,
                           createSolution: createSolution,
                           isTestable: isTestable,
-                          on: conn)
+                          on: app.db)
     }
 
     public static func create(
@@ -43,19 +43,19 @@ extension Task {
         explenation: String          = "Some explenation",
         createSolution: Bool            = true,
         isTestable: Bool            = false,
-        on conn: PostgreSQLConnection
-    ) throws -> Task {
+        on database: Database
+    ) throws -> TaskDatabaseModel {
 
-        return try Task(subtopicID: subtopicId,
+        let task = TaskDatabaseModel(subtopicID: subtopicId,
                         description: description,
                         question: question,
                         creatorID: creator.id,
                         isTestable: isTestable)
 
-            .save(on: conn)
-            .flatMap { task in
+        return try task.save(on: database)
+            .failableFlatMap {
                 if createSolution {
-                    return try TaskSolution.DatabaseRepository(conn: conn)
+                    return try TaskSolution.DatabaseRepository(database: database)
                         .create(from:
                             TaskSolution.Create.Data(
                                 solution: explenation,
@@ -63,9 +63,10 @@ extension Task {
                                 taskID: task.requireID()
                             ),
                             by: creator
-                    ).transform(to: task)
+                    )
+                    .transform(to: task)
                 } else {
-                    return conn.future(task)
+                    return database.eventLoop.future(task)
                 }
         }.wait()
     }
