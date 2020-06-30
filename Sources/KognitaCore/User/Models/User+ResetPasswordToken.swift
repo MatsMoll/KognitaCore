@@ -58,7 +58,7 @@ extension User.ResetPassword.Token.Migrations {
         func build(schema: SchemaBuilder) -> SchemaBuilder {
             schema.field("string", .string, .required)
                 .field("userId", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
-                .field("deletedAt", .date)
+                .field("deletedAt", .datetime)
                 .defaultTimestamps()
         }
     }
@@ -107,8 +107,7 @@ extension User.ResetPassword.Token {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
         public let database: Database
-
-        private var userRepository: UserRepository { User.DatabaseRepository(database: database) }
+        private var userRepository: UserRepository
     }
 }
 
@@ -141,7 +140,10 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
                     .find(tokenModel.$user.id, on: self.database)
                     .unwrap(or: Abort(.badRequest))
             }
-            .flatMapThrowing { try $0.update(password: content.password) }
+            .flatMapThrowing { (user: User.DatabaseModel) -> User.DatabaseModel in
+                user.passwordHash = try self.password.hash(content.password)
+                return user
+            }
             .flatMap { $0.save(on: self.database) }
             .transform(to: ())
     }

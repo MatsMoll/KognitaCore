@@ -56,6 +56,8 @@ extension PracticeSession {
                 throw Abort(.badRequest, reason: "Needs more then 0 task goal")
             }
             self.numberOfTaskGoal = numberOfTaskGoal
+            self.endedAt = nil
+            self.deletedAt = nil
         }
     }
 }
@@ -74,7 +76,7 @@ extension PracticeSession {
             func build(schema: SchemaBuilder) -> SchemaBuilder {
                 schema.field("endedAt", .date)
                     .field("numberOfTaskGoal", .int, .required)
-                    .field("deletedAt", .date)
+                    .field("deletedAt", .datetime)
                     .foreignKey("id", references: TaskSession.schema, .id, onDelete: .cascade, onUpdate: .cascade)
                     .defaultTimestamps()
             }

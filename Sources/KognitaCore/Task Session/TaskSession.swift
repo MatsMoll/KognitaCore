@@ -36,7 +36,7 @@ extension TaskSession.Migrations {
         func prepare(on database: Database) -> EventLoopFuture<Void> {
             database.schema(schema)
                 .field("id", .uint, .identifier(auto: true))
-                .field("createdAt", .date, .required)
+                .field("createdAt", .datetime, .required)
                 .field("userID", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
                 .create()
         }
@@ -54,7 +54,7 @@ extension PracticeSession {
         let practiceSession: PracticeSession.DatabaseModel
 
         public var id: Int? { session.id }
-        public var userID: User.ID { session.user.id ?? 0 }
+        public var userID: User.ID { session.$user.id }
         public var createdAt: Date? { session.createdAt }
         public var endedAt: Date? { practiceSession.endedAt }
         public var numberOfTaskGoal: Int { practiceSession.numberOfTaskGoal }

@@ -67,17 +67,17 @@ extension TaskResult.DatabaseRepository {
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
 
-        var rawQuery: String {
+        var rawQuery: SQLQueryString {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks: return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = $1 AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = ($2)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
+            case .flowTasks(let userID, let sessionID): return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = \#(bind: userID) AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = \#(bind: sessionID)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .resultsInTopics:
-                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Topic"."id" = ANY($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
-            case .resultsInSubject:
-                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectId" WHERE "Task"."deletedAt" IS NULL AND "userID" = ($1) AND "Subject"."id" = ($2) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+            case .resultsInTopics(let topicIDs, let userID):
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+            case .resultsInSubject(let subjectID, let userID):
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectId" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
         }
 
@@ -86,27 +86,12 @@ extension TaskResult.DatabaseRepository {
             guard let sqlDB = database as? SQLDatabase else {
                 throw Abort(.internalServerError)
             }
-            throw Abort(.notImplemented)
-//            switch self {
-//            case .flowTasks(let userId, let sessionId):
-//                return sqlDB.raw(self.rawQuery)
-//                    .bind(userId)
-//                    .bind(sessionId)
-//            case .results(revisitingAfter: let date, for: let userId):
-//                return sqlDB.raw(self.rawQuery)
-//                    .bind(userId)
-//                    .bind(date)
-//            case .resultsInTopics(let topicIds, for: let userId):
-//                return sqlDB.raw(self.rawQuery)
-//                    .bind(userId)
-//                    .bind(topicIds)
-//            case .resultsInSubject(let subjectId, for: let userId):
-//                return sqlDB.raw(self.rawQuery)
-//                    .bind(userId)
-//                    .bind(subjectId)
-//            case .subtopics, .taskResults:
-//                throw Errors.incompleateSqlStatment
-//            }
+            switch self {
+            case .resultsInSubject, .flowTasks, .results, .resultsInTopics:
+                return sqlDB.raw(self.rawQuery)
+            case .subtopics, .taskResults:
+                throw Errors.incompleateSqlStatment
+            }
         }
     }
 
@@ -150,30 +135,25 @@ extension TaskResult.DatabaseRepository {
 //        }
     }
 
-    public static func getSpaceRepetitionTask(for session: PracticeSessionRepresentable, on database: Database) throws -> EventLoopFuture<SpaceRepetitionTask?> {
+    public static func getSpaceRepetitionTask(for userID: User.ID, sessionID: PracticeSession.ID, on database: Database) throws -> EventLoopFuture<SpaceRepetitionTask?> {
 
-        guard let sqlDB = database as? SQLDatabase else {
-            return database.eventLoop.future(error: Abort(.internalServerError))
+        return try Query.flowTasks(
+            userID: userID,
+            sessionID: sessionID
+        )
+            .query(for: database)
+            .all(decoding: SpaceRepetitionTask.self)
+            .map { tasks in
+                let uncompletedTasks = tasks.filter { $0.sessionID != sessionID }
+                let now = Date()
+                let timeInADay: TimeInterval = 60 * 60 * 24
+
+                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+                .filter { $0.key < 10 }
+                .min { first, second in
+                    first.key > second.key
+                }?.value.randomElement()
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//
-//        return try Query.flowTasks(
-//            userID: session.userID,
-//            sessionID: session.requireID()
-//        )
-//            .query(for: conn)
-//            .all(decoding: SpaceRepetitionTask.self)
-//            .map { tasks in
-//                let uncompletedTasks = try tasks.filter { try $0.sessionID != session.requireID() }
-//                let now = Date()
-//                let timeInADay: TimeInterval = 60 * 60 * 24
-//
-//                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
-//                .filter { $0.key < 10 }
-//                .min { first, second in
-//                    first.key > second.key
-//                }?.value.random
-//        }
     }
 
 //    public static func getAllResults<A>(for userId: User.ID, filter: FilterOperator<PostgreSQLDatabase, A>, with database: Database, maxRevisitDays: Int? = 10) throws -> EventLoopFuture<[TaskResult]> {
@@ -261,7 +241,17 @@ extension TaskResult.DatabaseRepository {
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
+
+        return sqlDB.select()
+            .count(\TaskResult.DatabaseModel.$id, as: "numberOfTasksCompleted")
+            .date(part: .year, from: \TaskResult.DatabaseModel.$createdAt, as: "year")
+            .date(part: .week, from: \TaskResult.DatabaseModel.$createdAt, as: "week")
+            .from(TaskResult.DatabaseModel.schema)
+            .where("userID", .equal, user.id)
+            .groupBy("year")
+            .groupBy("week")
+            .all(decoding: TaskResult.History.self)
+            .flatMapThrowing { days in
 
 //        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
 //            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
@@ -278,43 +268,43 @@ extension TaskResult.DatabaseRepository {
 //            .all(decoding: TaskResult.History.self)
 //            .map { days in
 //                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
-//                let now = Date()
-//
-//                var data = [String: TaskResult.History]()
-//
-//                try (0...(numberOfWeeks - 1)).forEach {
-//                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
-//                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
-//
-//                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
-//
-//                    guard
-//                        let year = dateData.year,
-//                        let week = dateData.weekOfYear
-//                    else {
-//                        throw Errors.incompleateSqlStatment
-//                    }
-//
-//                    data["\(year)-\(week)"] = TaskResult.History(
-//                        numberOfTasksCompleted: 0,
-//                        year: Double(year),
-//                        week: Double(week)
-//                    )
-//                }
-//
-//                for day in days {
-//                    data["\(Int(day.year))-\(Int(day.week))"] = day
-//                }
-//
-//                return data.map { $1 }
-//                    .sorted(by: { first, second in
-//                        if first.year == second.year {
-//                            return first.week < second.week
-//                        } else {
-//                            return first.year < second.year
-//                        }
-//                })
-//        }
+                let now = Date()
+
+                var data = [String: TaskResult.History]()
+
+                try (0...(numberOfWeeks - 1)).forEach {
+                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
+                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
+
+                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
+
+                    guard
+                        let year = dateData.year,
+                        let week = dateData.weekOfYear
+                    else {
+                        throw Errors.incompleateSqlStatment
+                    }
+
+                    data["\(year)-\(week)"] = TaskResult.History(
+                        numberOfTasksCompleted: 0,
+                        year: Double(year),
+                        week: Double(week)
+                    )
+                }
+
+                for day in days {
+                    data["\(Int(day.year))-\(Int(day.week))"] = day
+                }
+
+                return data.map { $1 }
+                    .sorted(by: { first, second in
+                        if first.year == second.year {
+                            return first.week < second.week
+                        } else {
+                            return first.year < second.year
+                        }
+                })
+        }
     }
 
     public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on database: Database, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
@@ -322,9 +312,62 @@ extension TaskResult.DatabaseRepository {
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
+
 //        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
 //            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+
+        return sqlDB.select()
+            .count(\TaskResult.DatabaseModel.$id, as: "numberOfTasksCompleted")
+            .date(part: .year, from: \TaskResult.DatabaseModel.$createdAt, as: "year")
+            .date(part: .week, from: \TaskResult.DatabaseModel.$createdAt, as: "week")
+            .from(TaskResult.DatabaseModel.schema)
+            .join(from: \TaskResult.DatabaseModel.$task.$id, to: \TaskDatabaseModel.$id)
+            .join(from: \TaskDatabaseModel.$subtopic.$id, to: \Subtopic.DatabaseModel.$id)
+            .join(from: \Subtopic.DatabaseModel.$topic.$id, to: \Topic.DatabaseModel.$id)
+            .where("userID", .equal, user.id)
+            .where("subtopicId", .equal, subjectId)
+            .groupBy("year")
+            .groupBy("week")
+            .all(decoding: TaskResult.History.self)
+            .flatMapThrowing { days in
+                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
+                let now = Date()
+
+                var data = [String: TaskResult.History]()
+
+                try (0...(numberOfWeeks - 1)).forEach {
+                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
+                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
+
+                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
+
+                    guard
+                        let year = dateData.year,
+                        let week = dateData.weekOfYear
+                    else {
+                        throw Errors.incompleateSqlStatment
+                    }
+
+                    data["\(year)-\(week)"] = TaskResult.History(
+                        numberOfTasksCompleted: 0,
+                        year: Double(year),
+                        week: Double(week)
+                    )
+                }
+
+                for day in days {
+                    data["\(Int(day.year))-\(Int(day.week))"] = day
+                }
+
+                return data.map { $1 }
+                    .sorted(by: { first, second in
+                        if first.year == second.year {
+                            return first.week < second.week
+                        } else {
+                            return first.year < second.year
+                        }
+                })
+        }
 //
 //        return conn.select()
 //            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
@@ -340,44 +383,6 @@ extension TaskResult.DatabaseRepository {
 //            .groupBy(.column(.column(nil, "year")))
 //            .groupBy(.column(.column(nil, "week")))
 //            .all(decoding: TaskResult.History.self)
-//            .map { days in
-//                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
-//                let now = Date()
-//
-//                var data = [String: TaskResult.History]()
-//
-//                try (0...(numberOfWeeks - 1)).forEach {
-//                    let date = Calendar.current.date(byAdding: .weekOfYear, value: -$0, to: now) ??
-//                        now.addingTimeInterval(-TimeInterval($0) * 24 * 60 * 60 * 4)
-//
-//                    let dateData = Calendar.current.dateComponents([.year, .weekOfYear], from: date)
-//
-//                    guard
-//                        let year = dateData.year,
-//                        let week = dateData.weekOfYear
-//                    else {
-//                        throw Errors.incompleateSqlStatment
-//                    }
-//
-//                    data["\(year)-\(week)"] = TaskResult.History(
-//                        numberOfTasksCompleted: 0,
-//                        year: Double(year),
-//                        week: Double(week)
-//                    )
-//                }
-//
-//                for day in days {
-//                    data["\(Int(day.year))-\(Int(day.week))"] = day
-//                }
-//
-//                return data.map { $1 }
-//                    .sorted(by: { first, second in
-//                        if first.year == second.year {
-//                            return first.week < second.week
-//                        } else {
-//                            return first.year < second.year
-//                        }
-//                })
 //        }
     }
 
@@ -392,92 +397,75 @@ extension TaskResult.DatabaseRepository {
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
 
-//        return conn.databaseConnection(to: .psql)
-//            .flatMap { psqlConn in
-//
-//                try Query.resultsInTopics(topics, for: userId)
-//                    .query(for: psqlConn)
-//                    .all(decoding: SubqueryTopicResult.self)
-//                    .flatMap { result in
-//
-//                        let ids = result.map { $0.id }
-//
-//                        return psqlConn.select()
-//                            .column(.column(\TaskResult.DatabaseModel.resultScore), as: "resultScore")
-//                            .column(.column(\Topic.DatabaseModel.id), as: "topicID")
-//                            .from(TaskResult.DatabaseModel.self)
-//                            .where(\TaskResult.DatabaseModel.id, .in, ids)
-//                            .join(\TaskResult.DatabaseModel.taskID, to: \Task.id)
-//                            .join(\Task.subtopicID, to: \Subtopic.DatabaseModel.id)
-//                            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-//                            .all(decoding: UserLevelScore.self)
-//                            .flatMap { scores in
-//
-//                                return scores.group(by: \UserLevelScore.topicID)
-//                                    .map { topicID, grouped in
-//
-//                                    Task.query(on: psqlConn)
-//                                        .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-//                                        .filter(\Subtopic.DatabaseModel.topicID == topicID)
-//                                        .count()
-//                                        .map { maxScore in
-//                                            User.TopicLevel(
-//                                                topicID: topicID,
-//                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
-//                                                maxScore: Double(maxScore)
-//                                            )
-//                                    }
-//                                }.flatten(on: conn)
-//                        }
-//                }
-//        }
+        return try Query.resultsInTopics(topics, for: userId)
+            .query(for: database)
+            .all(decoding: SubqueryTopicResult.self)
+            .flatMap { _ in
+
+                return sqlDB.select()
+                    .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
+                    .column(\Topic.DatabaseModel.$id, as: "topicID")
+                    .from(TaskResult.DatabaseModel.schema)
+                    .join(parent: \TaskResult.DatabaseModel.$task)
+                    .join(parent: \TaskDatabaseModel.$subtopic)
+                    .join(parent: \Subtopic.DatabaseModel.$topic)
+                    .all(decoding: UserLevelScore.self)
+                    .flatMap { scores in
+                        return scores.group(by: \UserLevelScore.topicID)
+                            .map { topicID, grouped in
+
+                                TaskDatabaseModel.query(on: database)
+                                    .join(parent: \TaskDatabaseModel.$subtopic)
+                                    .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
+                                    .count()
+                                    .map { maxScore in
+                                        User.TopicLevel(
+                                            topicID: topicID,
+                                            correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
+                                            maxScore: Double(maxScore)
+                                        )
+                                }
+                        }.flatten(on: database.eventLoop)
+                }
+        }
     }
 
     public static func getUserLevel(in subject: Subject, userId: User.ID, on database: Database) throws -> EventLoopFuture<User.SubjectLevel> {
 
-        guard let sqlDB = database as? SQLDatabase else {
-            return database.eventLoop.future(error: Abort(.internalServerError))
+        return try Query.resultsInSubject(subject.id, for: userId)
+            .query(for: database)
+            .all(decoding: SubqueryResult.self)
+            .flatMap { result in
+
+                let ids = result.map { $0.id }
+
+                guard ids.isEmpty == false else {
+                    return database.eventLoop.future(
+                        User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
+                    )
+                }
+
+                return TaskResult.DatabaseModel.query(on: database)
+                    .filter(\.$id ~~ ids)
+                    .sum(\.$resultScore)
+                    .flatMap { score in
+
+                        TaskDatabaseModel.query(on: database)
+                            .join(parent: \TaskDatabaseModel.$subtopic)
+                            .join(parent: \Subtopic.DatabaseModel.$topic)
+                            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
+                            .count()
+                            .map { maxScore in
+
+                                User.SubjectLevel(
+                                    subjectID: subject.id,
+                                    correctScore: score ?? 0,
+                                    maxScore: Double(maxScore)
+                                )
+                        }
+                }
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        conn.databaseConnection(to: .psql)
-//            .flatMap { psqlConn in
-//
-//                try Query.resultsInSubject(subject.id, for: userId)
-//                    .query(for: psqlConn)
-//                    .all(decoding: SubqueryResult.self)
-//                    .flatMap { result in
-//
-//                        let ids = result.map { $0.id }
-//
-//                        guard ids.isEmpty == false else {
-//                            return psqlConn.future(
-//                                User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
-//                            )
-//                        }
-//
-//                        return TaskResult.DatabaseModel.query(on: psqlConn)
-//                            .filter(\.id ~~ ids)
-//                            .sum(\.resultScore)
-//                            .flatMap { score in
-//
-//                                Task.query(on: psqlConn)
-//                                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-//                                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-//                                    .filter(\Topic.DatabaseModel.subjectId == subject.id)
-//                                    .count()
-//                                    .map { maxScore in
-//
-//                                        User.SubjectLevel(
-//                                            subjectID: subject.id,
-//                                            correctScore: score,
-//                                            maxScore: Double(maxScore)
-//                                        )
-//                                }
-//                        }
-//                }
-//        }
     }
 
     public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on database: Database) throws -> EventLoopFuture<TaskResult?> {

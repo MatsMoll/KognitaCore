@@ -54,6 +54,11 @@ extension PracticeSession.Pivot {
             return pivot.create(on: database).transform(to: pivot)
         }
 
+        static func create(sessionID: PracticeSession.ID, taskID: KognitaContent.Task.ID, index: Int, on database: Database) -> EventLoopFuture<PracticeSession.Pivot.Task> {
+            let pivot = PracticeSession.Pivot.Task(sessionID: sessionID, taskID: taskID, index: index)
+            return pivot.create(on: database).transform(to: pivot)
+        }
+
         static func create(session: PracticeSessionRepresentable, taskID: KognitaContent.Task.ID, index: Int, on database: Database)
             throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
 
@@ -74,7 +79,8 @@ extension PracticeSession.Pivot.Task {
                     .field("score", .double)
                     .field("sessionID", .uint, .required, .references(PracticeSession.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
-                    .field("createdAt", .date, .required)
+                    .field("createdAt", .datetime, .required)
+                    .unique(on: "taskID", "sessionID")
             }
         }
     }

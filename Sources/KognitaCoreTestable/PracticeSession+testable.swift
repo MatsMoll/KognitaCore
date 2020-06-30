@@ -48,9 +48,9 @@ public class TestableRepositories: RepositoriesRepresentable {
     }
 
     private static var shared: TestableRepositories!
-    public static func testable(with database: Database) -> TestableRepositories {
+    public static func testable(with app: Application) -> TestableRepositories {
         if shared == nil {
-            shared = TestableRepositories(repositories: DatabaseRepositories(database: database))
+            shared = TestableRepositories(repositories: DatabaseRepositories(database: app.db, password: app.password))
         }
         return shared
     }
@@ -74,9 +74,9 @@ extension PracticeSession {
     ///   - conn: The database connection
     /// - Throws: If the database query failes
     /// - Returns: A `TaskSession.PracticeParameter` representing a session
-    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on database: Database) throws -> PracticeSessionRepresentable {
+    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on app: Application) throws -> PracticeSessionRepresentable {
 
-        return try TestableRepositories.testable(with: database)
+        return try TestableRepositories.testable(with: app)
             .practiceSessionRepository
             .create(
                 from: Create.Data(
@@ -87,7 +87,7 @@ extension PracticeSession {
                 by: user
             )
             .flatMap { session in
-                PracticeParameter.resolveWith(session.id, database: database)
+                PracticeParameter.resolveWith(session.id, database: app.db)
             }
             .wait()
     }

@@ -1,6 +1,74 @@
 import FluentSQL
 import Vapor
 
+enum PostgreSQLDatePart: String {
+    case year
+    case day
+    case week
+}
+
+extension SQLSelectBuilder {
+    func column<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>) -> Self {
+        self.column(table: T.schemaOrAlias, column: T()[keyPath: path].key.description)
+    }
+
+    func column<T: Model, Value>(_ path: KeyPath<T, IDProperty<T, Value>>) -> Self {
+        self.column(table: T.schemaOrAlias, column: T()[keyPath: path].key.description)
+    }
+
+    func column<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
+    }
+
+    func column<T: Model, Value>(_ path: KeyPath<T, IDProperty<T, Value>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
+    }
+
+    func count<T: Model, Value>(_ path: KeyPath<T, IDProperty<T, Value>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLFunction("COUNT", args: SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias)), as: SQLIdentifier(identifier)))
+    }
+
+    func date<T: Model, Format: TimestampFormat>(part: PostgreSQLDatePart, from path: KeyPath<T, TimestampProperty<T, Format>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLFunction("date_part", args: [SQLQueryString("'\(part.rawValue)'"), SQLColumn(T()[keyPath: path].$timestamp.key.description, table: T.schemaOrAlias)]), as: SQLIdentifier(identifier)))
+    }
+
+    func groupBy<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>) -> Self {
+        self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
+        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+}
+
 public protocol SubjectTestRepositoring: DeleteModelRepository {
 
     func find(_ id: SubjectTest.ID, or error: Error) -> EventLoopFuture<SubjectTest>
@@ -24,7 +92,7 @@ public protocol SubjectTestRepositoring: DeleteModelRepository {
     ///   - user: The user that enters the test
     ///   - conn: The database connection
     /// - Returns: A `TestSession` for the user
-    func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User) throws -> EventLoopFuture<TestSession>
+    func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User) -> EventLoopFuture<TestSession>
 
     /// Retrive data about the test
     /// - Parameters:
@@ -127,33 +195,33 @@ extension SubjectTest {
                 throw Abort(.unauthorized)
             }
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return subjectRepository
-//                .subjectIDFor(taskIDs: content.tasks)
-//                .failableFlatMap { subjectID in
-//
-//                    guard subjectID == content.subjectID else {
-//                        throw Abort(.badRequest)
-//                    }
-//
-//                    return try self.userRepository
-//                        .isModerator(user: user, subjectID: subjectID)
-//            }.flatMap { _ in
-//                let test = SubjectTest.DatabaseModel(data: content)
-//
-//                return test.create(on: self.db)
-//                    .failableFlatMap {
-//                        try self
-//                            .createTask(
-//                                from: .init(
-//                                    testID: test.requireID(),
-//                                    taskIDs: content.tasks
-//                                ),
-//                                by: user
-//                        )
-//                        .flatMapThrowing { _ in try test.content() }
-//                }
-//            }
+            return subjectRepository
+                .subjectIDFor(taskIDs: content.tasks)
+                .flatMap { subjectID in
+
+                    guard subjectID == content.subjectID else {
+                        return self.database.eventLoop.future(error: Abort(.badRequest))
+                    }
+
+                    return self.userRepository
+                        .isModerator(user: user, subjectID: subjectID)
+                        .ifFalse(throw: Abort(.forbidden))
+            }.flatMap {
+                let test = SubjectTest.DatabaseModel(data: content)
+
+                return test.create(on: self.database)
+                    .failableFlatMap {
+                        try self
+                            .createTask(
+                                from: .init(
+                                    testID: test.requireID(),
+                                    taskIDs: content.tasks
+                                ),
+                                by: user
+                        )
+                }
+                .flatMapThrowing { try test.content() }
+            }
         }
 
         public func updateModelWith(id: Int, to data: SubjectTest.Update.Data, by user: User) throws -> EventLoopFuture<SubjectTest> {
@@ -183,16 +251,15 @@ extension SubjectTest {
 //            }
         }
 
-        func createTask(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<[SubjectTest.Pivot.Task]> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            content.taskIDs.map {
-//                SubjectTest.Pivot.Task(
-//                    testID: content.testID,
-//                    taskID: $0
-//                )
-//                .create(on: self.db)
-//            }
-//            .flatten(on: database.eventLoop)
+        func createTask(from content: SubjectTest.Pivot.Task.Create.Data, by user: User?) throws -> EventLoopFuture<Void> {
+            content.taskIDs.map {
+                SubjectTest.Pivot.Task(
+                    testID: content.testID,
+                    taskID: $0
+                )
+                .create(on: self.database)
+            }
+            .flatten(on: database.eventLoop)
         }
 
         func updateTaskWith(id: Int, to data: SubjectTest.Pivot.Task.Update.Data, by user: User) throws -> EventLoopFuture<Void> {
@@ -223,151 +290,161 @@ extension SubjectTest {
 //            }
         }
 
-        public func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User) throws -> EventLoopFuture<TestSession> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            guard test.isOpen else {
-//                throw Errors.testIsClosed
-//            }
-//            guard test.password == request.password else {
-//                throw Errors.incorrectPassword
-//            }
-//            return TestSession.DatabaseModel.query(on: conn)
-//                .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
-//                .filter(\TaskSession.userID == user.id)
-//                .filter(\TestSession.DatabaseModel.testID == test.id)
-//                .first()
-//                .flatMap { session in
-//
-//                    if let session = session {
-//                        throw try Errors.alreadyEntered(sessionID: session.requireID())
-//                    }
-//                    return TaskSession(userID: user.id)
-//                        .create(on: self.conn)
-//                        .flatMap { session in
-//
-//                            try TestSession.DatabaseModel(
-//                                sessionID: session.requireID(),
-//                                testID: test.id
-//                            )
-//                            .create(on: self.conn)
-//                            .map { try $0.content() }
-//                    }
-//            }
+        public func enter(test: SubjectTest, with request: SubjectTest.Enter.Request, by user: User) -> EventLoopFuture<TestSession> {
+            guard test.isOpen else {
+                return database.eventLoop.future(error: Errors.testIsClosed)
+            }
+            guard test.password == request.password else {
+                return database.eventLoop.future(error: Errors.incorrectPassword)
+            }
+            return TestSession.DatabaseModel.query(on: database)
+                .join(TaskSession.self, on: \TaskSession.$id == \TestSession.DatabaseModel.$id)
+                .filter(TaskSession.self, \TaskSession.$user.$id == user.id)
+                .filter(\TestSession.DatabaseModel.$test.$id == test.id)
+                .first()
+                .flatMap { session in
+
+                    if let sessionID = try? session?.requireID() {
+                        return self.database.eventLoop.future(error: Errors.alreadyEntered(sessionID: sessionID))
+                    }
+                    let session = TaskSession(userID: user.id)
+
+                    return session.create(on: self.database)
+                        .flatMapThrowing {
+                            try TestSession.DatabaseModel(
+                                sessionID: session.requireID(),
+                                testID: test.id
+                            )
+                        }
+                        .flatMap { session in
+                            session.create(on: self.database)
+                                .flatMapThrowing { try session.content() }
+                    }
+            }
         }
 
         public func open(test: SubjectTest, by user: User) throws -> EventLoopFuture<SubjectTest> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return try userRepository
-//                .isModerator(user: user, subjectID: test.subjectID)
-//                .flatMap {
-//                    SubjectTest.DatabaseModel.find(test.id, on: self.conn)
-//                        .unwrap(or: Abort(.badRequest))
-//                        .flatMap { test in
-//                            test.open(on: self.conn)
-//                                .map { try $0.content() }
-//                    }
-//            }
+            return userRepository
+                .isModerator(user: user, subjectID: test.subjectID)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap {
+                    SubjectTest.DatabaseModel.find(test.id, on: self.database)
+                        .unwrap(or: Abort(.badRequest))
+                }
+                .flatMap { $0.open(on: self.database) }
+                .content()
         }
 
         public func userCompletionStatus(in test: SubjectTest, user: User) throws -> EventLoopFuture<CompletionStatus> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            try userRepository
-//                .isModerator(user: user, subjectID: test.subjectID)
-//                .flatMap {
-//
-//                    TestSession.DatabaseModel.query(on: self.conn)
-//                        .filter(\.testID == test.id)
-//                        .all()
-//                        .map { sessions in
-//                            sessions.reduce(
-//                                into: CompletionStatus(
-//                                    amountOfCompletedUsers: 0,
-//                                    amountOfEnteredUsers: 0
-//                                )
-//                            ) { status, session in
-//                                status.amountOfEnteredUsers += 1
-//                                if session.hasSubmitted {
-//                                    status.amountOfCompletedUsers += 1
-//                                }
-//                            }
-//
-//                    }
-//            }
+            userRepository
+                .isModerator(user: user, subjectID: test.subjectID)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap {
+
+                    TestSession.DatabaseModel.query(on: self.database)
+                        .filter(\.$test.$id == test.id)
+                        .all()
+                        .map { sessions in
+                            sessions.reduce(
+                                into: CompletionStatus(
+                                    amountOfCompletedUsers: 0,
+                                    amountOfEnteredUsers: 0
+                                )
+                            ) { status, session in
+                                status.amountOfEnteredUsers += 1
+                                if session.hasSubmitted {
+                                    status.amountOfCompletedUsers += 1
+                                }
+                            }
+                    }
+            }
+        }
+
+        func sessionWith(id: TestSession.ID, isOwnedBy userID: User.ID) -> EventLoopFuture<Bool> {
+            TaskSession.query(on: database).filter(\.$user.$id == userID).filter(\.$id == id).first().map { $0 != nil }
         }
 
         public func taskWith(id: Int, in session: TestSessionRepresentable, for user: User) throws -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            guard session.userID == user.id else {
-//                throw Abort(.forbidden)
-//            }
-//
-//            return SubjectTest.Pivot.Task
-//                .query(on: conn)
-//                .join(\TaskDatabaseModel.id, to: \SubjectTest.Pivot.Task.taskID)
-//                .join(\KognitaContent.MultipleChoiceTask.DatabaseModel.id, to: \TaskDatabaseModel.id)
-//                .join(\MultipleChoiseTaskChoise.taskId, to: \KognitaContent.MultipleChoiceTask.DatabaseModel.id)
-//                .filter(\SubjectTest.Pivot.Task.testID == session.testID)
-//                .filter(\SubjectTest.Pivot.Task.id == id)
-//                .decode(TaskDatabaseModel.self)
-//                .alsoDecode(KognitaContent.MultipleChoiceTask.DatabaseModel.self)
-//                .alsoDecode(MultipleChoiseTaskChoise.self)
-//                .all()
-//                .flatMap { taskContent in
-//
-//                    guard
-//                        let task = taskContent.first?.0.0,
-//                        let multipleChoiseTask = taskContent.first?.0.1
-//                    else {
-//                        throw Abort(.internalServerError)
-//                    }
-//                    let choices = taskContent.map { $0.1 }
-//
-//                    return try TaskSessionAnswer.query(on: self.conn)
-//                        .join(\MultipleChoiseTaskAnswer.id, to: \TaskSessionAnswer.taskAnswerID)
-//                        .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
-//                        .filter(\TaskSessionAnswer.sessionID == session.requireID())
-//                        .filter(\MultipleChoiseTaskChoise.taskId == task.requireID())
-//                        .decode(MultipleChoiseTaskAnswer.self)
-//                        .all()
-//                        .flatMap { answers in
-//
-//                            let answeredChoices = answers.map { $0.choiseID }
-//
-//                            return SubjectTest.Pivot.Task
-//                                .query(on: self.conn)
-//                                .filter(\.testID == session.testID)
-//                                .all()
-//                                .flatMap { testTasks in
-//
-//                                    SubjectTest.DatabaseModel
-//                                        .find(session.testID, on: self.conn)
-//                                        .unwrap(or: Abort(.internalServerError))
-//                                        .map { test in
-//
-//                                            try SubjectTest.MultipleChoiseTaskContent(
-//                                                test: test.content(),
-//                                                task: multipleChoiseTask.content(task: task, choices: choices),
-//                                                choises: choices.map { choice in
-//                                                    try MultipleChoiseTaskContent.Choise(
-//                                                        id: choice.requireID(),
-//                                                        choise: choice.choise,
-//                                                        isCorrect: choice.isCorrect,
-//                                                        isSelected: answeredChoices.contains(choice.requireID())
-//                                                    )
-//                                                },
-//                                                testTasks: testTasks.map { testTask in
-//                                                    try AssignedTask(
-//                                                        testTaskID: testTask.requireID(),
-//                                                        isCurrent: testTask.taskID == id
-//                                                    )
-//                                                }
-//                                            )
-//                                    }
-//                            }
-//                    }
-//            }
+            guard let sessionID = try? session.requireID() else { return database.eventLoop.future(error: Abort(.badRequest)) }
+
+            return sessionWith(id: sessionID, isOwnedBy: user.id)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap {
+
+                    SubjectTest.Pivot.Task.query(on: self.database)
+                        .join(parent: \SubjectTest.Pivot.Task.$task)
+                        .join(superclass: KognitaContent.MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self)
+                        .filter(\SubjectTest.Pivot.Task.$test.$id == session.testID)
+                        .filter(\SubjectTest.Pivot.Task.$id == id)
+                        .first(TaskDatabaseModel.self, KognitaContent.MultipleChoiceTask.DatabaseModel.self)
+                        .unwrap(or: Abort(.badRequest))
+                        .flatMap { (task, multipleChoiseTask) in
+
+                            guard let taskID = task.id else { return self.database.eventLoop.future(error: Abort(.internalServerError)) }
+
+                            return MultipleChoiseTaskChoise.query(on: self.database)
+                                .filter(\MultipleChoiseTaskChoise.$task.$id == taskID)
+                                .all()
+                                .flatMap { (choices: [MultipleChoiseTaskChoise]) in
+
+                                    return TaskSessionAnswer.query(on: self.database)
+                                        .join(MultipleChoiseTaskAnswer.self, on: \MultipleChoiseTaskAnswer.$id == \TaskSessionAnswer.$taskAnswer.$id)
+                                        .join(parent: \MultipleChoiseTaskAnswer.$choice)
+                                        .filter(\TaskSessionAnswer.$session.$id == sessionID)
+                                        .filter(MultipleChoiseTaskChoise.self, \MultipleChoiseTaskChoise.$task.$id == taskID)
+                                        .all(MultipleChoiseTaskAnswer.self)
+                                        .flatMap { (answers: [MultipleChoiseTaskAnswer]) in
+
+                                            self.multipleChoiceTaskContent(
+                                                id: id,
+                                                task: task,
+                                                multipleChoiceTask: multipleChoiseTask,
+                                                choices: choices,
+                                                answers: answers,
+                                                in: session
+                                            )
+                                    }
+                            }
+                    }
+            }
+        }
+
+        private func multipleChoiceTaskContent(id: Int, task: TaskDatabaseModel, multipleChoiceTask: KognitaContent.MultipleChoiceTask.DatabaseModel, choices: [MultipleChoiseTaskChoise], answers: [MultipleChoiseTaskAnswer], in session: TestSessionRepresentable) -> EventLoopFuture<SubjectTest.MultipleChoiseTaskContent> {
+
+            let answeredChoices = answers.map { $0.$choice.id }
+
+            return SubjectTest.Pivot.Task.query(on: self.database)
+                .filter(\.$test.$id == session.testID)
+                .all()
+                .flatMap { (testTasks: [SubjectTest.Pivot.Task]) in
+
+                    SubjectTest.DatabaseModel
+                        .find(session.testID, on: self.database)
+                        .unwrap(or: Abort(.internalServerError))
+                        .flatMapThrowing { (test: SubjectTest.DatabaseModel) -> SubjectTest.MultipleChoiseTaskContent in
+
+                            try SubjectTest.MultipleChoiseTaskContent(
+                                test: test.content(),
+                                task: multipleChoiceTask.content(task: task, choices: choices),
+                                choises: choices.map { choice in
+                                    try MultipleChoiseTaskContent.Choise(
+                                        id: choice.requireID(),
+                                        choise: choice.choice,
+                                        isCorrect: choice.isCorrect,
+                                        isSelected: answeredChoices.contains(choice.requireID())
+                                    )
+                                },
+                                testTasks: testTasks.map { testTask in
+                                    try AssignedTask(
+                                        testTaskID: testTask.requireID(),
+                                        isCurrent: testTask.$task.id == id
+                                    )
+                                }
+                            )
+                    }
+            }
         }
 
         struct MultipleChoiseTaskAnswerCount: Codable {
@@ -376,49 +453,43 @@ extension SubjectTest {
         }
 
         public func results(for test: SubjectTest, user: User) throws -> EventLoopFuture<Results> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            guard test.endedAt != nil else {
-//                throw Errors.testHasNotBeenHeldYet
-//            }
-//
-//            return try userRepository
-//                .isModerator(user: user, subjectID: test.subjectID)
-//                .flatMap {
-//
-//                    self.conn.databaseConnection(to: .psql)
-//                        .flatMap { conn in
-//
-//                            conn.select()
-//                                .column(\MultipleChoiseTaskAnswer.choiseID)
-//                                .column(.count(\MultipleChoiseTaskAnswer.id), as: "numberOfAnswers")
-//                                .from(TestSession.DatabaseModel.self)
-//                                .join(\TestSession.DatabaseModel.id, to: \TaskSessionAnswer.sessionID)
-//                                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
-//                                .groupBy(\MultipleChoiseTaskAnswer.choiseID)
-//                                .where(\TestSession.DatabaseModel.testID == test.id)
-//                                .all(decoding: MultipleChoiseTaskAnswerCount.self)
-//                                .flatMap { choiseCount in
-//
-//                                    conn.select()
-//                                        .all(table: TaskDatabaseModel.self)
-//                                        .all(table: MultipleChoiseTaskChoise.self)
-//                                        .from(SubjectTest.Pivot.Task.self)
-//                                        .join(\SubjectTest.Pivot.Task.taskID, to: \TaskDatabaseModel.id)
-//                                        .join(\TaskDatabaseModel.id, to: \MultipleChoiseTaskChoise.taskId)
-//                                        .where(\SubjectTest.Pivot.Task.testID == test.id)
-//                                        .all(decoding: TaskDatabaseModel.self, MultipleChoiseTaskChoise.self)
-//                                        .flatMap { tasks in
-//                                            try self.calculateResultStatistics(
-//                                                for: test,
-//                                                tasks: tasks,
-//                                                choiseCount: choiseCount,
-//                                                user: user,
-//                                                on: conn
-//                                            )
-//                                    }
-//                            }
-//                    }
-//            }
+            guard test.endedAt != nil else {
+                throw Errors.testHasNotBeenHeldYet
+            }
+
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future(error: Abort(.internalServerError)) }
+
+            return userRepository
+                .isModerator(user: user, subjectID: test.subjectID)
+                .ifFalse(throw: Abort(.badRequest))
+                .flatMap {
+
+                    sql.select()
+                        .column(\MultipleChoiseTaskAnswer.$choice.$id)
+                        .column(SQLAlias(SQLFunction("COUNT", args: "choiseID"), as: SQLIdentifier("numberOfAnswers")))
+                        .from(TestSession.DatabaseModel.schema)
+                        .join(from: \TestSession.DatabaseModel.$id, to: \TaskSessionAnswer.$session.$id)
+                        .join(from: \TaskSessionAnswer.$id, to: \MultipleChoiseTaskAnswer.$id)
+                        .groupBy(\MultipleChoiseTaskAnswer.$choice.$id)
+                        .where("testID", .equal, test.id)
+                        .all(decoding: MultipleChoiseTaskAnswerCount.self)
+                        .flatMap { choiceCount in
+
+                            SubjectTest.Pivot.Task.query(on: self.database)
+                                .join(parent: \SubjectTest.Pivot.Task.$task)
+                                .join(MultipleChoiseTaskChoise.self, on: \TaskDatabaseModel.$id == \MultipleChoiseTaskChoise.$task.$id)
+                                .filter(\SubjectTest.Pivot.Task.$test.$id == test.id)
+                                .all(TaskDatabaseModel.self, MultipleChoiseTaskChoise.self)
+                                .failableFlatMap { tasks in
+                                    try self.calculateResultStatistics(
+                                        for: test,
+                                        tasks: tasks,
+                                        choiseCount: choiceCount,
+                                        user: user
+                                    )
+                            }
+                    }
+            }
         }
 
         private func calculateResultStatistics(
@@ -428,75 +499,74 @@ extension SubjectTest {
             user: User
         ) throws -> EventLoopFuture<SubjectTest.Results> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            guard let heldAt = test.openedAt else {
-//                throw Errors.testHasNotBeenHeldYet
-//            }
-//
-//            var numberOfCorrectAnswers: Double = 0
-//
-//            let grupedChoiseCount = choiseCount.reduce(into: [MultipleChoiceTaskChoice.ID: Int]()) { dict, choiseCount in
-//                dict[choiseCount.choiseID] = choiseCount.numberOfAnswers
-//            }
-//
-//            let taskResults: [SubjectTest.Results.MultipleChoiseTaskResult] = tasks.group(by: \.0.id)
-//                .compactMap { _, info in
-//
-//                    guard let task = info.first?.0 else {
-//                        return nil
-//                    }
-//
-//                    var totalCount = info.reduce(0) { $0 + ((try? grupedChoiseCount[$1.1.requireID()]) ?? 0) }
-//                    let numberOfCorrectChoises = info.reduce(into: 0.0) { $0 += ($1.1.isCorrect ? 1 : 0) }
-//                    if totalCount == 0 { // In order to fix NaN values
-//                        totalCount = 1
-//                    }
-//
-//                    return try? Results.MultipleChoiseTaskResult(
-//                        taskID: task.requireID(),
-//                        question: task.question,
-//                        description: task.description,
-//                        choises: info.map { _, choise in
-//
-//                            let choiseCount = (try? grupedChoiseCount[choise.requireID()]) ?? 0
-//                            if choise.isCorrect {
-//                                numberOfCorrectAnswers += (Double(choiseCount) * 1 / numberOfCorrectChoises)
-//                            }
-//
-//                            return Results.MultipleChoiseTaskResult.Choise(
-//                                choise: choise.choise,
-//                                numberOfSubmissions: choiseCount,
-//                                percentage: Double(choiseCount) / Double(totalCount),
-//                                isCorrect: choise.isCorrect
-//                            )
-//                        }
-//                    )
-//            }
-//
-//            return try detailedUserResults(for: test, maxScore: Double(taskResults.count), user: user)
-//                .flatMap { userResults in
-//
-//                    TestSession.DatabaseModel.query(on: self.db)
-//                        .filter(\.testID == test.id)
-//                        .count()
-//                        .flatMap { numberOfSessions in
-//
-//                            Subject.DatabaseModel.find(test.subjectID, on: self.db)
-//                                .unwrap(or: Abort(.internalServerError))
-//                                .map { subject in
-//
-//                                    Results(
-//                                        title: test.title,
-//                                        heldAt: heldAt,
-//                                        taskResults: taskResults,
-//                                        averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions),
-//                                        subjectID: test.subjectID,
-//                                        subjectName: subject.name,
-//                                        userResults: userResults
-//                                    )
-//                            }
-//                    }
-//            }
+            guard let heldAt = test.openedAt else {
+                throw Errors.testHasNotBeenHeldYet
+            }
+
+            var numberOfCorrectAnswers: Double = 0
+
+            let grupedChoiseCount = choiseCount.reduce(into: [MultipleChoiceTaskChoice.ID: Int]()) { dict, choiseCount in
+                dict[choiseCount.choiseID] = choiseCount.numberOfAnswers
+            }
+
+            let taskResults: [SubjectTest.Results.MultipleChoiseTaskResult] = tasks.group(by: \.0.id)
+                .compactMap { _, info in
+
+                    guard let task = info.first?.0 else {
+                        return nil
+                    }
+
+                    var totalCount = info.reduce(0) { $0 + ((try? grupedChoiseCount[$1.1.requireID()]) ?? 0) }
+                    let numberOfCorrectChoises = info.reduce(into: 0.0) { $0 += ($1.1.isCorrect ? 1 : 0) }
+                    if totalCount == 0 { // In order to fix NaN values
+                        totalCount = 1
+                    }
+
+                    return try? Results.MultipleChoiseTaskResult(
+                        taskID: task.requireID(),
+                        question: task.question,
+                        description: task.description,
+                        choises: info.map { _, choise in
+
+                            let choiseCount = (try? grupedChoiseCount[choise.requireID()]) ?? 0
+                            if choise.isCorrect {
+                                numberOfCorrectAnswers += (Double(choiseCount) * 1 / numberOfCorrectChoises)
+                            }
+
+                            return Results.MultipleChoiseTaskResult.Choise(
+                                choise: choise.choice,
+                                numberOfSubmissions: choiseCount,
+                                percentage: Double(choiseCount) / Double(totalCount),
+                                isCorrect: choise.isCorrect
+                            )
+                        }
+                    )
+            }
+
+            return try detailedUserResults(for: test, maxScore: Double(taskResults.count), user: user)
+                .flatMap { userResults in
+
+                    TestSession.DatabaseModel.query(on: self.database)
+                        .filter(\.$test.$id == test.id)
+                        .count()
+                        .flatMap { numberOfSessions in
+
+                            Subject.DatabaseModel.find(test.subjectID, on: self.database)
+                                .unwrap(or: Abort(.internalServerError))
+                                .map { subject in
+
+                                    Results(
+                                        title: test.title,
+                                        heldAt: heldAt,
+                                        taskResults: taskResults,
+                                        averageScore: (numberOfCorrectAnswers / Double(taskResults.count))/Double(numberOfSessions),
+                                        subjectID: test.subjectID,
+                                        subjectName: subject.name,
+                                        userResults: userResults
+                                    )
+                            }
+                    }
+            }
         }
 
         public func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?> {
@@ -684,35 +754,30 @@ extension SubjectTest {
 
         public func scoreHistogram(for test: SubjectTest, user: User) throws -> EventLoopFuture<SubjectTest.ScoreHistogram> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            try userRepository
-//                .isModerator(user: user, subjectID: test.subjectID)
-//                .flatMap { _ in
-//
-//                    self.conn.databaseConnection(to: .psql)
-//                        .flatMap { conn in
-//
-//                            conn.select()
-//                                .column(.count(\SubjectTest.Pivot.Task.id), as: "taskCount")
-//                                .from(SubjectTest.Pivot.Task.self)
-//                                .where(\SubjectTest.Pivot.Task.testID == test.id)
-//                                .first(decoding: TestCountQueryResult.self)
-//                                .unwrap(or: Abort(.badRequest))
-//                                .flatMap { count in
-//
-//                                    conn.select()
-//                                        .column(\TaskResult.DatabaseModel.resultScore, as: "score")
-//                                        .column(\TestSession.DatabaseModel.id, as: "sessionID")
-//                                        .from(TestSession.DatabaseModel.self)
-//                                        .join(\TestSession.DatabaseModel.id, to: \TaskResult.DatabaseModel.sessionID)
-//                                        .where(\TestSession.DatabaseModel.testID == test.id)
-//                                        .all(decoding: HistogramQueryResult.self)
-//                                        .map { results in
-//                                            self.calculateHistogram(from: results, maxScore: count.taskCount)
-//                                    }
-//                            }
-//                    }
-//            }
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future(error: Abort(.internalServerError)) }
+
+            return userRepository
+                .isModerator(user: user, subjectID: test.subjectID)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap { _ in
+
+                    SubjectTest.Pivot.Task.query(on: self.database)
+                        .filter(\.$test.$id == test.id)
+                        .count()
+                        .flatMap { count in
+
+                            sql.select()
+                                .column(\TaskResult.DatabaseModel.$resultScore, as: "score")
+                                .column(\TestSession.DatabaseModel.$id, as: "sessionID")
+                                .from(TestSession.DatabaseModel.schema)
+                                .join(from: \TestSession.DatabaseModel.$id, to: \TaskResult.DatabaseModel.$session.$id)
+                                .where("testID", .equal, test.id)
+                                .all(decoding: HistogramQueryResult.self)
+                                .map { results in
+                                    self.calculateHistogram(from: results, maxScore: count)
+                            }
+                    }
+            }
         }
 
         func calculateHistogram(from results: [HistogramQueryResult], maxScore: Int) -> SubjectTest.ScoreHistogram {
@@ -745,46 +810,43 @@ extension SubjectTest {
 
         public func detailedUserResults(for test: SubjectTest, maxScore: Double, user: User) throws -> EventLoopFuture<[UserResult]> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            guard maxScore != 0 else {
-//                throw Abort(.badRequest)
-//            }
-//
-//            return try userRepository
-//                .isModerator(user: user, subjectID: test.subjectID)
-//                .flatMap {
-//
-//                    self.conn.databaseConnection(to: .psql)
-//                        .flatMap { conn in
-//
-//                            conn.select()
-//                                .column(\User.DatabaseModel.email, as: "userEmail")
-//                                .column(\User.DatabaseModel.id, as: "userID")
-//                                .column(\TaskResult.DatabaseModel.resultScore, as: "score")
-//                                .from(TaskResult.DatabaseModel.self)
-//                                .join(\TaskResult.DatabaseModel.sessionID, to: \TaskSession.id)
-//                                .join(\TaskSession.userID, to: \User.DatabaseModel.id)
-//                                .join(\TaskSession.id, to: \TestSession.DatabaseModel.id)
-//                                .where(\TestSession.DatabaseModel.testID == test.id)
-//                                .all(decoding: UserResultQueryResult.self)
-//                                .map { users in
-//
-//                                    users.group(by: \.userID)
-//                                        .compactMap { (_, scores) in
-//
-//                                            guard let userEmail = scores.first?.userEmail else {
-//                                                return nil
-//                                            }
-//                                            let score = scores.reduce(0.0) { $0 + $1.score }
-//                                            return UserResult(
-//                                                userEmail: userEmail,
-//                                                score: score,
-//                                                percentage: score / maxScore
-//                                            )
-//                                    }
-//                            }
-//                    }
-//            }
+            guard maxScore != 0 else {
+                throw Abort(.badRequest)
+            }
+
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future(error: Abort(.internalServerError)) }
+
+            return userRepository
+                .isModerator(user: user, subjectID: test.subjectID)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap {
+
+                    return sql.select()
+                        .column(\User.DatabaseModel.$email, as: "userEmail")
+                        .column(\User.DatabaseModel.$id, as: "userID")
+                        .column(\TaskResult.DatabaseModel.$resultScore, as: "score")
+                        .from(TaskResult.DatabaseModel.schema)
+                        .join(from: \TaskResult.DatabaseModel.$session.$id, to: \TaskSession.$id)
+                        .join(from: \TaskSession.$user.$id, to: \User.DatabaseModel.$id)
+                        .join(from: \TaskSession.$id, to: \TestSession.DatabaseModel.$id)
+                        .where("testID", .equal, test.id)
+                        .all(decoding: UserResultQueryResult.self)
+                        .map { users in
+
+                            users.group(by: \.userID)
+                                .compactMap { (_, scores) in
+                                    guard let userEmail = scores.first?.userEmail else {
+                                        return nil
+                                    }
+                                    let score = scores.reduce(0.0) { $0 + $1.score }
+                                    return UserResult(
+                                        userEmail: userEmail,
+                                        score: score,
+                                        percentage: score / maxScore
+                                    )
+                            }
+                    }
+            }
         }
 
         public func isOpen(testID: SubjectTest.ID) -> EventLoopFuture<Bool> {

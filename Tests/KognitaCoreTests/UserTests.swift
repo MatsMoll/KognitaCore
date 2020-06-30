@@ -6,8 +6,8 @@ import KognitaCoreTestable
 
 class UserTests: VaporTestCase {
 
-    lazy var userRepository: UserRepository = { TestableRepositories.testable(with: app.db).userRepository }()
-    lazy var resetPasswordRepository: ResetPasswordRepositoring = { TestableRepositories.testable(with: app.db).userRepository as! ResetPasswordRepositoring }()
+    lazy var userRepository: UserRepository = { TestableRepositories.testable(with: app).userRepository }()
+    lazy var resetPasswordRepository: ResetPasswordRepositoring = { TestableRepositories.testable(with: app).userRepository }()
 
     func testEmailVerificationTokenOnCreate() throws {
 

@@ -12,8 +12,8 @@ import KognitaCoreTestable
 
 final class PracticeSessionTests: VaporTestCase {
 
-    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: database).practiceSessionRepository }()
-    lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: database).multipleChoiceTaskRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: app).practiceSessionRepository }()
+    lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: app).multipleChoiceTaskRepository }()
 
     func testUpdateFlashAnswer() {
         failableTest {
@@ -27,7 +27,7 @@ final class PracticeSessionTests: VaporTestCase {
             _ = try FlashCardTask.create(subtopic: subtopic, on: app)
             _ = try FlashCardTask.create(subtopic: subtopic, on: app)
 
-            let session = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+            let session = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
             var answer = FlashCardTask.Submit(
                 timeUsed: 20,
@@ -89,7 +89,7 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try FlashCardTask.create(subtopic: subtopic, on: app)
         _ = try FlashCardTask.create(subtopic: subtopic, on: app)
 
-        let session = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let session = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
         var answer = FlashCardTask.Submit(
             timeUsed: 20,
@@ -119,7 +119,7 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
         _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
 
-        let session = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let session = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
         var answer = MultipleChoiceTask.Submit(
             timeUsed: 20,
@@ -362,7 +362,7 @@ final class PracticeSessionTests: VaporTestCase {
         _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
         _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
         _ = try MultipleChoiceTask.create(on: app)
-        let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
         let parameterSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), database: database).wait()
 
@@ -381,7 +381,7 @@ final class PracticeSessionTests: VaporTestCase {
             _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
             _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
             _ = try MultipleChoiceTask.create(on: app)
-            let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, numberOfTaskGoal: 10, on: database)
+            let createdSesssion = try PracticeSession.create(in: [subtopic.id], for: user, numberOfTaskGoal: 10, on: app)
 
             let parameterSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), database: database).wait()
 

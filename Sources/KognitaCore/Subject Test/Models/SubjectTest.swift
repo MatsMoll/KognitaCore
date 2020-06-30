@@ -27,7 +27,7 @@ extension SubjectTest {
         public var duration: TimeInterval
 
         /// The time the test is open for entering
-        @Field(key: "opendAt")
+        @Field(key: "openedAt")
         public var openedAt: Date?
 
         /// The date the test ended
@@ -69,6 +69,10 @@ extension SubjectTest {
             self.title                  = title
             self.$subject.id            = subjectID
             self.isTeamBasedLearning    = isTeamBasedLearning
+            self.openedAt               = nil
+            self.endedAt                = nil
+            self.updatedAt              = nil
+            self.createdAt              = nil
         }
 
         convenience init(data: SubjectTest.Create.Data) {

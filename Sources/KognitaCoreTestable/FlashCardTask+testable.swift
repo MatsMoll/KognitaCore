@@ -26,7 +26,7 @@ extension FlashCardTask {
     public static func create(task: TaskDatabaseModel, on database: Database) throws -> FlashCardTask {
         let task = try FlashCardTask(task: task)
 
-        return try task.create(on: database)
+        return try task.save(on: database)
             .transform(to: task)
             .wait()
     }

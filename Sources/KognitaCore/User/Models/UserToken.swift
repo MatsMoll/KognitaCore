@@ -69,7 +69,7 @@ extension User.Login.Token.Migrations {
             database.schema(schema)
                 .field("id", .uint, .identifier(auto: true))
                 .field("userID", .uint, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
-                .field("expiresAt", .date, .required)
+                .field("expiresAt", .datetime, .required)
                 .field("string", .string, .required)
                 .create()
         }

@@ -7,6 +7,7 @@
 
 import Vapor
 import FluentKit
+import FluentSQL
 
 protocol TaskRepository {
     func all() throws -> EventLoopFuture<[TaskDatabaseModel]>
@@ -35,9 +36,9 @@ extension TaskDatabaseModel {
 
         public let database: Database
 
-        private var userRepository: UserRepository { User.DatabaseRepository(database: database) }
-        private var taskSolutionRepository: TaskSolutionRepositoring { TaskSolution.DatabaseRepository(database: database) }
-        private var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: database) }
+        internal var userRepository: UserRepository
+        private var taskSolutionRepository: TaskSolutionRepositoring { TaskSolution.DatabaseRepository(database: database, userRepository: userRepository) }
+        private var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: database, userRepository: userRepository) }
     }
 }
 
@@ -48,6 +49,10 @@ extension TaskDatabaseModel.DatabaseRepository {
     }
 
     public func create(from content: TaskDatabaseModel.Create.Data, by user: User?) throws -> EventLoopFuture<TaskDatabaseModel> {
+
+        guard content.solution.removeCharacters(from: .whitespaces).isEmpty == false else {
+            return database.eventLoop.future(error: Abort(.badRequest))
+        }
 
         guard let user = user else { throw Abort(.unauthorized) }
 
@@ -71,30 +76,28 @@ extension TaskDatabaseModel.DatabaseRepository {
     }
 
     public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
-        throw Abort(.notImplemented)
-//        return Topic.DatabaseModel.query(on: database)
-//            .join(children: \Topic.DatabaseModel.$subtopics)
-//            .join(children: \Subtopic.DatabaseModel.$tasks)
-//            .join(parent: \TaskDatabaseModel.$creator)
-//            .filter(\Topic.DatabaseModel.$subject.$id == subject.id)
-////            .alsoDecode(TaskDatabaseModel.self)
-////            .alsoDecode(User.DatabaseModel.self)
-//            .all(TaskDatabaseModel.self)
-//            .flatMapEach(on: database.eventLoop) { (task: TaskDatabaseModel) in
-//                failable(eventLoop: self.db.eventLoop) {
-//                    try self.taskRepository
-//                        .getTaskTypePath(for: task.requireID())
-//                        .flatmapThrowing { path in
-//                            try TaskContent(
+
+        TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \TaskDatabaseModel.$creator)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
+            .all(with: \.$creator, \.$subtopic, \Subtopic.DatabaseModel.$topic)
+            .flatMapEach(on: database.eventLoop) { (task: TaskDatabaseModel) in
+                failable(eventLoop: self.database.eventLoop) {
+                    try self.taskRepository
+                        .getTaskTypePath(for: task.requireID())
+                        .flatMapThrowing { path in
+                            try TaskContent(
 //                                task: task,
-//                                topic: content.0.0.content(),
-//                                subject: subject,
-//                                creator: content.1.content(),
-//                                taskTypePath: path
-//                            )
-//                    }
-//                }
-//        }
+                                topic: task.subtopic.topic.content(),
+                                subject: subject,
+                                creator: task.creator.content(),
+                                taskTypePath: path
+                            )
+                    }
+                }
+        }
 //            .flatMap { tasks in
 //                try tasks.map { content in
 //                    try self.taskRepository.getTaskTypePath(for: content.0.1.requireID()).map { path in
@@ -158,48 +161,45 @@ extension TaskDatabaseModel.DatabaseRepository {
 
     public func getTasks(in subjectId: Subject.ID, user: User, query: CreatorOverviewQuery? = nil, maxAmount: Int? = nil, withSoftDeleted: Bool = false) throws -> EventLoopFuture<[CreatorTaskContent]> {
 
-        throw Abort(.notImplemented)
-//        try userRepository
-//            .isModerator(user: user, subjectID: subjectId)
-//            .map { true }
-//            .catchMap { _ in false }
-//            .flatMap { isModerator in
-//
-//                let useSoftDeleted = isModerator ? withSoftDeleted : false
-//                var databaseQuery = Task.query(on: self.conn, withSoftDeleted: useSoftDeleted)
-//                    .join(\User.DatabaseModel.id, to: \Task.creatorID)
-//                    .join(\Subtopic.DatabaseModel.id, to: \Task.subtopicID)
-//                    .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-//                    .join(\MultipleChoiceTask.DatabaseModel.id, to: \Task.id, method: .left)
-//                    .filter(\Topic.DatabaseModel.subjectId == subjectId)
-//                    .alsoDecode(User.DatabaseModel.self)
-//                    .alsoDecode(Topic.DatabaseModel.self)
-//                    .alsoDecode(MultipleChoiseTaskKey.self, "MultipleChoiseTask")
-//                    .range(lower: 0, upper: maxAmount)
-//
-//                if let topics = query?.topics, topics.isEmpty == false {
-//                    databaseQuery = databaseQuery.filter(\Topic.id ~~ topics)
-//                }
-//                if let question = query?.taskQuestion, question.isEmpty == false {
-//                    databaseQuery = databaseQuery.filter(\Task.question, .ilike, "%\(question)%")
-//                }
-//                if isModerator == false {
-//                    databaseQuery = databaseQuery.filter(\Task.isTestable == false)
-//                }
-//
-//                return databaseQuery
-//                    .all()
-//                    .map { content in
-//                        try content.map { taskContent in
-//                            try CreatorTaskContent(
-//                                task: taskContent.0.0.0,
-//                                topic: taskContent.0.1.content(),
-//                                creator: taskContent.0.0.1.content(),
-//                                isMultipleChoise: taskContent.1.isMultipleSelect != nil
-//                            )
-//                        }
-//                }
-//        }
+        userRepository
+            .isModerator(user: user, subjectID: subjectId)
+            .flatMap { isModerator in
+
+                var databaseQuery = TaskDatabaseModel.query(on: self.database)
+                    .join(parent: \TaskDatabaseModel.$creator)
+                    .join(parent: \TaskDatabaseModel.$subtopic)
+                    .join(parent: \Subtopic.DatabaseModel.$topic)
+                    .join(MultipleChoiceTask.DatabaseModel.self, on: \MultipleChoiceTask.DatabaseModel.$id == \TaskDatabaseModel.$id, method: .left)
+                    .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectId)
+                    .range(lower: 0, upper: maxAmount)
+
+                if isModerator {
+                    databaseQuery = databaseQuery.withDeleted()
+                }
+
+                if let topics = query?.topics, topics.isEmpty == false {
+                    databaseQuery = databaseQuery.filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$id ~~ topics)
+                }
+                if let question = query?.taskQuestion, question.isEmpty == false {
+                    databaseQuery = databaseQuery.filter(\TaskDatabaseModel.$question, .custom("ILIKE"), "%\(question)%")
+                }
+                if isModerator == false {
+                    databaseQuery = databaseQuery.filter(\TaskDatabaseModel.$isTestable == false)
+                }
+
+                return databaseQuery
+                    .all(TaskDatabaseModel.self, User.DatabaseModel.self, Topic.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+                    .flatMapThrowing { content in
+                        try content.map { taskContent in
+                            try CreatorTaskContent(
+//                                task: taskContent.0,
+                                topic: taskContent.2.content(),
+                                creator: taskContent.1.content(),
+                                isMultipleChoise: taskContent.3 != nil
+                            )
+                        }
+                }
+        }
     }
 
     struct NumberInputTaskKey: Content {
@@ -212,21 +212,20 @@ extension TaskDatabaseModel.DatabaseRepository {
 
     public func getTaskTypePath(for id: Task.ID) throws -> EventLoopFuture<String> {
 
-        throw Abort(.notImplemented)
-//        return TaskDatabaseModel.query(on: database, withSoftDeleted: true)
-//            .filter(\.$id == id)
-//            .join(\MultipleChoiceTask.DatabaseModel.id, to: \TaskDatabaseModel.id, method: .left)
-//            .decode(data: MultipleChoiseTaskKey.self, "MultipleChoiseTask")
-//            .first()
-//            .unwrap(or: Abort(.internalServerError))
-//            .map { multiple in
-//
-//                if multiple.isMultipleSelect != nil {
-//                    return "tasks/multiple-choise"
-//                } else {
-//                    return "tasks/flash-card"
-//                }
-//        }
+        // FIXME: Optimize better
+        return TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .filter(\.$id == id)
+            .join(MultipleChoiceTask.DatabaseModel.self, on: \MultipleChoiceTask.DatabaseModel.$id == \TaskDatabaseModel.$id, method: .left)
+            .first(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+            .unwrap(or: Abort(.internalServerError))
+            .map { (_, multiple) in
+                if multiple != nil {
+                    return "tasks/multiple-choise"
+                } else {
+                    return "tasks/flash-card"
+                }
+        }
     }
 
     public func getNumberOfTasks(in subtopicIDs: Subtopic.ID...) -> EventLoopFuture<Int> {

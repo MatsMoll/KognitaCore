@@ -29,7 +29,7 @@ extension MultipleChoiceTask {
             self.database = database
             self.subtopicRepository = repositories.subtopicRepository
             self.userRepository = repositories.userRepository
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, userRepository: repositories.userRepository)
         }
 
         public let database: Database
@@ -40,7 +40,8 @@ extension MultipleChoiceTask {
     }
 }
 
-//extension MultipleChoiceTask.Create.Data: Validatable {
+extension MultipleChoiceTask.Create.Data: Validatable {
+
 //    public static func validations() throws -> Validations<MultipleChoiceTask.Create.Data> {
 //        var validations = try basicValidations()
 //        validations.add(\.self, at: ["choices"], "Contains choices") { data in
@@ -56,12 +57,24 @@ extension MultipleChoiceTask {
 //        }
 //        return validations
 //    }
-//}
+}
 
 extension MultipleChoiceTask.DatabaseRepository {
 
     public func task(withID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask> {
-        throw Abort(.notImplemented)
+        MultipleChoiceTask.DatabaseModel.query(on: database)
+            .with(\.$choices)
+            .filter(\.$id == taskID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { multipleChoice in
+
+                TaskDatabaseModel.find(taskID, on: self.database)
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMapThrowing { task in
+                        try multipleChoice.content(task: task, choices: multipleChoice.choices)
+                }
+        }
     }
 
     public func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask> {
@@ -69,154 +82,130 @@ extension MultipleChoiceTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
-        throw Abort(.notImplemented)
-//        try content.validate()
-//        return subtopicRepository
-//            .find(content.subtopicId)
-//            .unwrap(or: TaskDatabaseModel.Create.Errors.invalidTopic)
-//            .flatMap { subtopic in
-//
-//                self.conn.transaction(on: .psql) { conn in
-//
-//                    try self
-//                        .taskRepository
-//                        .create(
-//                            from: TaskDatabaseModel.Create.Data(
-//                                content: content,
-//                                subtopicID: subtopic.id,
-//                                solution: content.solution
-//                            ),
-//                            by: user
-//                        )
-//                        .flatMap { task in
-//
-//                            try MultipleChoiceTask.DatabaseModel(
-//                                isMultipleSelect: content.isMultipleSelect,
-//                                task: task
-//                            )
-//                                .create(on: conn)
-//                        }
-//                    .flatMap { (task) in
-//                        try content.choises.map { choise in
-//                            try MultipleChoiseTaskChoise(content: choise, taskID: task.requireID())
-//                                .save(on: conn) // For some reason will .create(on: conn) throw a duplicate primary key error
-//                            }
-//                            .flatten(on: conn)
-//                            .flatMap { _ in
-//                                try task.content(on: conn)
-//                        }
-//                    }
-//                }
-//        }
+        return self.subtopicRepository
+            .find(content.subtopicId, or: TaskDatabaseModel.Create.Errors.invalidTopic)
+            .failableFlatMap { subtopic in
+                try self.taskRepository
+                    .create(
+                        from: TaskDatabaseModel.Create.Data(
+                            content: content,
+                            subtopicID: subtopic.id,
+                            solution: content.solution
+                        ),
+                        by: user
+                )
+        }
+        .failableFlatMap { task in
+            let multipleChoice = try MultipleChoiceTask.DatabaseModel(
+                isMultipleSelect: content.isMultipleSelect,
+                task: task
+            )
+            return multipleChoice
+                .create(on: self.database)
+                .map {
+                    content.choises.compactMap {
+                        try? MultipleChoiseTaskChoise(choise: $0.choice, isCorrect: $0.isCorrect, taskId: task.requireID())
+                    }
+            }.flatMap { choices in
+                choices.map { $0.save(on: self.database) }
+                    .flatten(on: self.database.eventLoop)
+                    .flatMapThrowing {
+                        try multipleChoice.content(task: task, choices: choices)
+                }
+            }
+        }
     }
 
     public func updateModelWith(id: Int, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
-//        try data.validate()
-        throw Abort(.notImplemented)
-//        return try userRepository
-//            .isModerator(user: user, taskID: id)
-//            .flatMap {
-//                try self.update(taskID: id, to: data, by: user)
-//        }
-//        .catchFlatMap { _ in
-//            TaskDatabaseModel.find(id, on: self.conn)
-//                .unwrap(or: Abort(.badRequest))
-//                .flatMap { taskModel in
-//                    guard taskModel.creatorID == user.id else {
-//                        throw Abort(.forbidden)
-//                    }
-//                    return try self.update(taskID: id, to: data, by: user)
-//            }
-//        }
-    }
-
-    private func update(taskID: Task.ID, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask> {
-        throw Abort(.notImplemented)
-//        try create(from: data, by: user)
-//            .flatMap { newTask in
-//
-//                TaskDatabaseModel.find(taskID, on: self.conn)
-//                    .unwrap(or: Abort(.badRequest))
-//                    .flatMap { task in
-//                        task.deletedAt = Date() // Equilent to .delete(on: conn)
-//                        task.editedTaskID = newTask.id
-//                        return task
-//                            .save(on: self.conn)
-//                            .transform(to: newTask)
-//                }
-//        }
+        guard data.choises.contains(where: { $0.isCorrect }) else { throw Abort(.badRequest) }
+        return taskRepository.taskFor(id: id)
+            .failableFlatMap { task in
+                guard task.$creator.id == user.id else {
+                    return self.userRepository.isModerator(user: user, taskID: id)
+                }
+                return self.database.eventLoop.future(true)
+        }
+        .ifFalse(throw: Abort(.forbidden))
+        .failableFlatMap {
+            try self.create(from: data, by: user)
+        }
+        .failableFlatMap { task in
+            try TaskDatabaseModel(content: data, subtopicID: data.subtopicId, creator: user, id: id)
+                .delete(on: self.database)
+                .transform(to: task)
+        }
     }
 
     public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
-        throw Abort(.notImplemented)
-//        guard let user = user else {
-//            throw Abort(.unauthorized)
-//        }
-//        return try userRepository
-//            .isModerator(user: user, taskID: id)
-//            .map { true }
-//            .catchMap { _ in false }
-//            .flatMap { isModerator in
-//
-//                TaskDatabaseModel.find(id, on: self.conn)
-//                    .unwrap(or: Abort(.badRequest))
-//                    .flatMap { task in
-//
-//                        guard isModerator || task.creatorID == user.id else {
-//                            throw Abort(.forbidden)
-//                        }
-//                        return task
-//                            .delete(on: self.conn)
-//                            .transform(to: ())
-//                }
-//        }
+
+        guard let user = user else {
+            throw Abort(.unauthorized)
+        }
+
+        return userRepository
+            .isModerator(user: user, taskID: id)
+            .flatMap { isModerator in
+
+                TaskDatabaseModel.find(id, on: self.database)
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { task in
+                        guard isModerator || task.$creator.id == user.id else {
+                            return self.database.eventLoop.future(error: Abort(.forbidden))
+                        }
+                        return task
+                            .delete(on: self.database)
+                            .transform(to: ())
+                }
+        }
     }
 
     public func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
 
-        throw Abort(.notImplemented)
-//        return TaskDatabaseModel(
-//            subtopicID: subtopic.id,
-//            description: taskContent.task.description,
-//            question: taskContent.task.question,
-//            creatorID: 1
-//        )
-//            .create(on: conn)
-//            .flatMap { savedTask -> EventLoopFuture<MultipleChoiceTask.DatabaseModel> in
-//
-//                if let solution = taskContent.task.solution {
-//                    return try TaskSolution.DatabaseModel(
-//                        data: TaskSolution.Create.Data(
-//                            solution: solution,
-//                            presentUser: true,
-//                            taskID: savedTask.requireID()),
-//                        creatorID: 1
-//                    )
-//                        .create(on: self.conn)
-//                        .flatMap { _ in
-//                            try MultipleChoiceTask.DatabaseModel(
-//                                isMultipleSelect: taskContent.isMultipleSelect,
-//                                taskID: savedTask.requireID()
-//                            )
-//                                .create(on: self.conn)
-//                    }
-//                } else {
-//                    return try MultipleChoiceTask.DatabaseModel(
-//                        isMultipleSelect: taskContent.isMultipleSelect,
-//                        taskID: savedTask.requireID()
-//                    )
-//                        .create(on: self.conn)
-//                }
-//        }.flatMap { task in
-//            try taskContent.choises
-//                .map { choise in
-//                    choise.id = nil
-//                    try choise.taskId = task.requireID()
-//                    return choise.create(on: self.conn)
-//                        .transform(to: ())
-//            }
-//            .flatten(on: self.conn)
-//        }
+        let savedTask = TaskDatabaseModel(
+            subtopicID: subtopic.id,
+            description: taskContent.task.description,
+            question: taskContent.task.question,
+            creatorID: 1
+        )
+
+        return savedTask.create(on: database)
+            .failableFlatMap {
+
+                if let solution = taskContent.task.solution {
+                    return try TaskSolution.DatabaseModel(
+                        data: TaskSolution.Create.Data(
+                            solution: solution,
+                            presentUser: true,
+                            taskID: savedTask.requireID()),
+                        creatorID: 1
+                    )
+                        .create(on: self.database)
+                        .failableFlatMap {
+                            try MultipleChoiceTask.DatabaseModel(
+                                isMultipleSelect: taskContent.isMultipleSelect,
+                                taskID: savedTask.requireID()
+                            )
+                            .create(on: self.database)
+                    }
+                } else {
+                    return try MultipleChoiceTask.DatabaseModel(
+                        isMultipleSelect: taskContent.isMultipleSelect,
+                        taskID: savedTask.requireID()
+                    )
+                        .create(on: self.database)
+                }
+        }.failableFlatMap {
+            try taskContent.choises
+                .map { choise in
+                    try MultipleChoiseTaskChoise(
+                        choise: choise.choice,
+                        isCorrect: choise.isCorrect,
+                        taskId: savedTask.requireID()
+                    )
+                    .create(on: self.database)
+            }
+            .flatten(on: self.database.eventLoop)
+        }
     }
 
     public func get(task: MultipleChoiceTask) throws -> EventLoopFuture<MultipleChoiceTask> {
@@ -288,34 +277,32 @@ extension MultipleChoiceTask.DatabaseRepository {
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
     public func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiseTaskChoise]) throws -> TaskSessionResult<[MultipleChoiseTaskChoise.Result]> {
 
-        throw Abort(.notImplemented)
+        var numberOfCorrect = 0
+        var numberOfIncorrect = 0
+        var missingAnswers = correctChoises.filter({ $0.isCorrect })
+        var results = [MultipleChoiseTaskChoise.Result]()
 
-//        var numberOfCorrect = 0
-//        var numberOfIncorrect = 0
-//        var missingAnswers = correctChoises.filter({ $0.isCorrect })
-//        var results = [MultipleChoiseTaskChoise.Result]()
-//
-//        for choise in choises {
-//            if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
-//                numberOfCorrect += 1
-//                missingAnswers.remove(at: index)
-//                results.append(.init(id: choise, isCorrect: true))
-//            } else {
-//                numberOfIncorrect += 1
-//                results.append(.init(id: choise, isCorrect: false))
-//            }
-//        }
-//        try results += missingAnswers.map {
-//            try .init(id: $0.requireID(), isCorrect: true)
-//        }
-//
-//        let score = Double(numberOfCorrect) / Double(correctChoises.count)
-//
-//        return TaskSessionResult(
-//            result: results,
-//            score: score,
-//            progress: 0
-//        )
+        for choise in choises {
+            if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
+                numberOfCorrect += 1
+                missingAnswers.remove(at: index)
+                results.append(.init(id: choise, isCorrect: true))
+            } else {
+                numberOfIncorrect += 1
+                results.append(.init(id: choise, isCorrect: false))
+            }
+        }
+        try results += missingAnswers.map {
+            try .init(id: $0.requireID(), isCorrect: true)
+        }
+
+        let score = Double(numberOfCorrect) / Double(correctChoises.count)
+
+        return TaskSessionResult(
+            result: results,
+            score: score,
+            progress: 0
+        )
     }
 
     public func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]> {

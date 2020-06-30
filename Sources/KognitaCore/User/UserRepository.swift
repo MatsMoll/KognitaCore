@@ -28,12 +28,12 @@ public protocol UserRepository: ResetPasswordRepositoring {
 
     func first(with email: String) -> EventLoopFuture<User?>
 
-    func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Bool>
+    func isModerator(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
     func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Bool>
-    func isModerator(user: User, taskID: Task.ID) throws -> EventLoopFuture<Bool>
+    func isModerator(user: User, taskID: Task.ID) -> EventLoopFuture<Bool>
     func isModerator(user: User, topicID: Topic.ID) throws -> EventLoopFuture<Bool>
 
-    func canPractice(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void>
+    func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
 
     func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void>
     func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token>
@@ -42,11 +42,13 @@ public protocol UserRepository: ResetPasswordRepositoring {
 extension User {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        public init(database: Database) {
+        public init(database: Database, password: Application.Password) {
             self.database = database
+            self.password = password
         }
 
         public let database: Database
+        let password: Application.Password
     }
 }
 
@@ -127,32 +129,30 @@ extension User.DatabaseRepository: UserRepository {
         }
 
         // hash user's password using BCrypt
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        let hash = try BCrypt.hash(content.password)
-//        // save new user
-//        let newUser = User.DatabaseModel(
-//            username: content.username,
-//            email: content.email,
-//            passwordHash: hash
-//        )
-//
-//        return User.DatabaseModel.query(on: database)
-//            .filter(\.email == newUser.email.lowercased())
-//            .first()
-//            .flatMap { existingUser in
-//
-//                guard existingUser == nil else {
-//                    throw Errors.existingUser(email: newUser.email)
-//                }
-//                return newUser.save(on: self.conn)
-//                    .flatMap { user in
-//
-//                        try User.VerifyEmail.Token.create(userID: user.requireID())
-//                            .save(on: self.conn)
-//                            .transform(to: user)
-//                }
-//                    .map { try $0.content() }
-//        }
+        let hash = try password.hash(content.password)
+        // save new user
+        let newUser = User.DatabaseModel(
+            username: content.username,
+            email: content.email,
+            passwordHash: hash
+        )
+
+        return User.DatabaseModel.query(on: database)
+            .filter(\.$email == newUser.email.lowercased())
+            .first()
+            .flatMap { existingUser in
+
+                guard existingUser == nil else {
+                    return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
+                }
+                return newUser.save(on: self.database)
+                    .failableFlatMap {
+
+                        try User.VerifyEmail.Token.create(userID: newUser.requireID())
+                            .save(on: self.database)
+                }
+                .flatMapThrowing { try newUser.content() }
+        }
     }
 
     public func first(with email: String) -> EventLoopFuture<User?> {
@@ -162,18 +162,15 @@ extension User.DatabaseRepository: UserRepository {
             .flatMapThrowing { try $0?.content() }
     }
 
-    public func isModerator(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Bool> {
+    public func isModerator(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool> {
         guard user.isAdmin == false else {
             return database.eventLoop.future(true)
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        return User.ModeratorPrivilege
-//            .query(on: conn)
-//            .filter(\.subjectID == subjectID)
-//            .filter(\User.ModeratorPrivilege.userID == user.id)
-//            .first()
-//            .unwrap(or: Abort(.forbidden))
-//            .transform(to: ())
+        return User.ModeratorPrivilege.query(on: database)
+            .filter(\.$subject.$id == subjectID)
+            .filter(\User.ModeratorPrivilege.$user.$id == user.id)
+            .first()
+            .map { $0 != nil }
     }
 
     public func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Bool> {
@@ -191,7 +188,7 @@ extension User.DatabaseRepository: UserRepository {
 //            .transform(to: ())
     }
 
-    public func isModerator(user: User, taskID: Task.ID) throws -> EventLoopFuture<Bool> {
+    public func isModerator(user: User, taskID: Task.ID) -> EventLoopFuture<Bool> {
         guard user.isAdmin == false else {
             return database.eventLoop.future(true)
         }
@@ -221,21 +218,19 @@ extension User.DatabaseRepository: UserRepository {
 //            .transform(to: ())
     }
 
-    public func canPractice(user: User, subjectID: Subject.ID) throws -> EventLoopFuture<Void> {
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        guard user.isAdmin == false else {
-//            return conn.future()
-//        }
-//        guard user.isEmailVerified else {
-//            throw Abort(.forbidden)
-//        }
-//        return User.ActiveSubject.query(on: conn)
-//            .filter(\.userID == user.id)
-//            .filter(\.subjectID == subjectID)
-//            .filter(\.canPractice == true)
-//            .first()
-//            .unwrap(or: Abort(.forbidden))
-//            .transform(to: ())
+    public func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool> {
+        guard user.isAdmin == false else {
+            return database.eventLoop.future(true)
+        }
+        guard user.isEmailVerified else {
+            return database.eventLoop.future(error: Abort(.forbidden))
+        }
+        return User.ActiveSubject.query(on: database)
+            .filter(\.$user.$id == user.id)
+            .filter(\.$subject.$id == subjectID)
+            .filter(\.$canPractice == true)
+            .first()
+            .map { $0 != nil }
     }
 
     public func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void> {

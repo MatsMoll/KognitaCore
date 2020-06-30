@@ -13,7 +13,7 @@ public final class FlashCardTask: KognitaCRUDModel {
 
     static let actionDescriptor = "Les spørsmålet og skriv et passende svar"
 
-    @DBID(custom: "id")
+    @DBID(custom: "id", generatedBy: .user)
     public var id: Int?
 
     @Timestamp(key: "createdAt", on: .create)

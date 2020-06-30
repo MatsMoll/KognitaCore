@@ -11,9 +11,9 @@ extension SubjectTest {
             func build(schema: SchemaBuilder) -> SchemaBuilder {
                 schema.field("subjectID", .uint, .required, .references(Subject.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("duration", .double, .required)
-                    .field("openedAt", .date)
-                    .field("endedAt", .date)
-                    .field("scheduledAt", .date, .required)
+                    .field("openedAt", .datetime)
+                    .field("endedAt", .datetime)
+                    .field("scheduledAt", .datetime, .required)
                     .field("password", .string)
                     .field("title", .string, .required)
                     .field("isTeamBasedLearning", .bool, .required)

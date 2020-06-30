@@ -21,8 +21,8 @@ class TaskResultRepoTests: VaporTestCase {
         let taskOne = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
 
-        let sessionOne = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
-        let sessionTwo = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let sessionOne = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
+        let sessionTwo = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
         _ = try TaskResult.create(task: taskOne, sessionID: sessionOne.requireID(), user: user, on: database)
         _ = try TaskResult.create(task: taskTwo, sessionID: sessionOne.requireID(), user: user, on: database)
@@ -65,11 +65,11 @@ class TaskResultRepoTests: VaporTestCase {
         let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         let otherTask = try TaskDatabaseModel.create(subtopic: otherSubtopic, on: app)
 
-        let otherSession = try PracticeSession.create(in: [subtopic.id], for: secondUser, on: database)
-        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
-        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let otherSession = try PracticeSession.create(in: [subtopic.id], for: secondUser, on: app)
+        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
+        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: database)
@@ -77,7 +77,7 @@ class TaskResultRepoTests: VaporTestCase {
 
         _ = try TaskResult.create(task: taskTwo, sessionID: otherSession.requireID(), user: secondUser, score: 0.2, on: database)
 
-        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
@@ -85,7 +85,7 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: database)
         _ = try TaskResult.create(task: otherTask, sessionID: lastSession.requireID(), user: user, score: 0.2, on: database)
 
-        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeTwo)
         XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
@@ -100,10 +100,10 @@ class TaskResultRepoTests: VaporTestCase {
         let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         let deletedTask = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
 
-        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
-        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
+        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: database)
@@ -113,14 +113,14 @@ class TaskResultRepoTests: VaporTestCase {
 
         try deletedTask.delete(on: database).wait()
 
-        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
         _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: database)
 
-        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeTwo)
         XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
@@ -135,10 +135,10 @@ class TaskResultRepoTests: VaporTestCase {
         let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         let testTask = try TaskDatabaseModel.create(subtopic: subtopic, isTestable: true, on: app)
 
-        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
-        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
+        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskType = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession.requireID(), sessionID: newSession.requireID(), on: database).wait()
         XCTAssertNil(taskType)
 
         _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: database)
@@ -146,61 +146,57 @@ class TaskResultRepoTests: VaporTestCase {
 
         _ = try TaskResult.create(task: testTask, sessionID: lastSession.requireID(), user: user, score: 0.2, on: database)
 
-        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeOne = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeOne)
         XCTAssertEqual(taskTypeOne?.taskID, taskOne.id)
 
         _ = try TaskResult.create(task: taskOne, sessionID: newSession.requireID(), user: user, score: 0.6, on: database)
 
-        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: newSession, on: database).wait()
+        let taskTypeTwo = try TaskResult.DatabaseRepository.getSpaceRepetitionTask(for: user.id, sessionID: newSession.requireID(), on: database).wait()
 
         XCTAssertNotNil(taskTypeTwo)
         XCTAssertEqual(taskTypeTwo?.taskID, taskTwo.id)
     }
 
     func testSubjectProgress() throws {
-        do {
-            let user = try User.create(on: app)
-            let subject = try Subject.create(name: "test", on: app)
+        let user = try User.create(on: app)
+        let subject = try Subject.create(name: "test", on: app)
 
-            let topic = try Topic.create(chapter: 1, subject: subject, on: app)
-            let secondTopic = try Topic.create(chapter: 2, subject: subject, on: app)
+        let topic = try Topic.create(chapter: 1, subject: subject, on: app)
+        let secondTopic = try Topic.create(chapter: 2, subject: subject, on: app)
 
-            let subtopic = try Subtopic.create(topic: topic, on: app)
-            let secondSubtopic = try Subtopic.create(topic: secondTopic, on: app)
+        let subtopic = try Subtopic.create(topic: topic, on: app)
+        let secondSubtopic = try Subtopic.create(topic: secondTopic, on: app)
 
-            let taskOne = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
-            let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
-            let testableTask = try TaskDatabaseModel.create(subtopic: secondSubtopic, isTestable: true, on: app)
+        let taskOne = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        let taskTwo = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
+        let testableTask = try TaskDatabaseModel.create(subtopic: secondSubtopic, isTestable: true, on: app)
 
-            let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
-            let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: database)
+        let lastSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
+        let newSession = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-            _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: database)
-            _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6, on: database)
-            _ = try TaskResult.create(task: testableTask, sessionID: lastSession.requireID(), user: user, score: 1, on: database)
+        _ = try TaskResult.create(task: taskOne, sessionID: lastSession.requireID(), user: user, score: 0.4, on: database)
+        _ = try TaskResult.create(task: taskTwo, sessionID: lastSession.requireID(), user: user, score: 0.6, on: database)
+        _ = try TaskResult.create(task: testableTask, sessionID: lastSession.requireID(), user: user, score: 1, on: database)
 
-            let subjectProgress = try TaskResult.DatabaseRepository.getUserLevel(in: subject, userId: user.id, on: database).wait()
-            let topicProgress = try TaskResult.DatabaseRepository.getUserLevel(for: user.id, in: [topic.id, secondTopic.id], on: database).wait()
+        let subjectProgress = try TaskResult.DatabaseRepository.getUserLevel(in: subject, userId: user.id, on: database).wait()
+        let topicProgress = try TaskResult.DatabaseRepository.getUserLevel(for: user.id, in: [topic.id, secondTopic.id], on: database).wait()
 
-            XCTAssertEqual(subjectProgress.correctScore, 2)
-            XCTAssertEqual(subjectProgress.maxScore, 3)
-            XCTAssertEqual(topicProgress.count, 2)
-            topicProgress.forEach { result in
-                if result.topicID == topic.id {
-                    XCTAssertEqual(result.correctScore, 1)
-                    XCTAssertEqual(result.maxScore, 2)
-                } else {
-                    XCTAssertEqual(result.correctScore, 1)
-                    XCTAssertEqual(result.maxScore, 1)
-                }
+        XCTAssertEqual(subjectProgress.correctScore, 2)
+        XCTAssertEqual(subjectProgress.maxScore, 3)
+        XCTAssertEqual(topicProgress.count, 2)
+        topicProgress.forEach { result in
+            if result.topicID == topic.id {
+                XCTAssertEqual(result.correctScore, 1)
+                XCTAssertEqual(result.maxScore, 2)
+            } else {
+                XCTAssertEqual(result.correctScore, 1)
+                XCTAssertEqual(result.maxScore, 1)
             }
-
-            _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5, on: database)
-        } catch {
-            XCTFail(error.localizedDescription)
         }
+
+        _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5, on: database)
     }
 
     static var allTests = [

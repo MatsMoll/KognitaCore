@@ -13,7 +13,7 @@ extension MultipleChoiceTask {
 
         public static var tableName: String = "MultipleChoiseTask"
 
-        @DBID(custom: "id")
+        @DBID(custom: "id", generatedBy: .user)
         public var id: Int?
 
         /// A bool indicating if the user should be able to select one or more choises
@@ -25,6 +25,9 @@ extension MultipleChoiceTask {
 
         @Timestamp(key: "updatedAt", on: .update)
         public var updatedAt: Date?
+
+        @Children(for: \.$task)
+        var choices: [MultipleChoiseTaskChoise]
 
         public convenience init(isMultipleSelect: Bool, task: TaskDatabaseModel) throws {
             try self.init(isMultipleSelect: isMultipleSelect,
@@ -41,6 +44,11 @@ extension MultipleChoiceTask {
             self.isMultipleSelect = isMultipleSelect
             self.id = taskID
         }
+
+        func update(with content: MultipleChoiceTask.Update.Data) -> DatabaseModel {
+            self.isMultipleSelect = content.isMultipleSelect
+            return self
+        }
     }
 }
 
@@ -49,10 +57,15 @@ extension MultipleChoiceTask {
         struct Create: KognitaModelMigration {
             typealias Model = MultipleChoiceTask.DatabaseModel
 
-            func build(schema: SchemaBuilder) -> SchemaBuilder {
-                schema.field("isMultipleSelect", .bool, .required)
+            func build(schema: SchemaBuilder) -> SchemaBuilder { schema }
+
+            func prepare(on database: Database) -> EventLoopFuture<Void> {
+                database.schema(MultipleChoiceTask.DatabaseModel.schema)
+                    .field("id", .uint, .identifier(auto: false))
+                    .field("isMultipleSelect", .bool, .required)
                     .defaultTimestamps()
                     .foreignKey("id", references: TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade)
+                    .create()
             }
         }
     }

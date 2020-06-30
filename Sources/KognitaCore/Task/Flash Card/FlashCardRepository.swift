@@ -40,7 +40,7 @@ extension FlashCardTask {
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
             self.repositories = repositories
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, userRepository: repositories.userRepository)
         }
 
         public let database: Database
@@ -95,12 +95,12 @@ extension FlashCardTask.DatabaseRepository {
                 if user.id == task.$creator.id {
                     return self.database.eventLoop.future(task)
                 }
-                return try self.userRepository
+                return self.userRepository
                     .isModerator(user: user, taskID: id)
                     .ifFalse(throw: Abort(.forbidden))
                     .transform(to: task)
-        }.flatMap { task in
-            task.update(content: data)
+        }.failableFlatMap { task in
+            try task.update(content: data)
                 .save(on: self.database)
                 .map { TypingTask(task: task) }
         }

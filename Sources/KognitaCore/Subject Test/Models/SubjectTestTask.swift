@@ -44,7 +44,7 @@ extension SubjectTest.Pivot.Task.Migrations {
                 .field("id", .uint, .identifier(auto: true))
                 .field("testID", .uint, .required, .references(SubjectTest.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                 .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
-                .field("createdAt", .date, .required)
+                .field("createdAt", .datetime, .required)
                 .unique(on: "taskID", "testID")
                 .create()
         }

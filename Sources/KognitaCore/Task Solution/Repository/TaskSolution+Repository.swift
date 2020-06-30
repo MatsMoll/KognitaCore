@@ -21,14 +21,15 @@ extension TaskSolution {
 
     public struct DatabaseRepository: TaskSolutionRepositoring, DatabaseConnectableRepository {
 
-        public init(database: Database) {
+        public init(database: Database, userRepository: UserRepository) {
             self.database = database
+            self.userRepository = userRepository
         }
 
         typealias DatabaseModel = TaskSolution
 
         public let database: Database
-        private var userRepository: some UserRepository { User.DatabaseRepository(database: database) }
+        private var userRepository: UserRepository
 
         struct Query {
             struct SolutionID: Codable {
@@ -81,9 +82,10 @@ extension TaskSolution {
         public func solutions(for taskID: Task.ID, for user: User) -> EventLoopFuture<[TaskSolution.Response]> {
 
             return TaskSolution.DatabaseModel.query(on: database)
+                .join(parent: \TaskSolution.DatabaseModel.$creator)
                 .with(\.$approvedBy)
-                .with(\.$creator)
-                .all()
+                .filter(\.$task.$id == taskID)
+                .all(with: \.$creator)
                 .flatMap { solutions in
 
                     TaskSolution.Pivot.Vote.query(on: self.database)
@@ -124,27 +126,28 @@ extension TaskSolution {
         }
 
         public func updateModelWith(id: Int, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            TaskSolution.DatabaseModel.find(id, on: conn)
-//                .unwrap(or: Abort(.badRequest))
-//                .flatMap { solution in
-//                    try self.update(model: solution, to: data, by: user)
-//            }
+            TaskSolution.DatabaseModel.find(id, on: database)
+                .unwrap(or: Abort(.badRequest))
+                .failableFlatMap { solution in
+                    try self.update(model: solution, to: data, by: user)
+            }
         }
 
         func update(model: TaskSolution.DatabaseModel, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            if model.creatorID == user.id {
-//                try model.update(with: data)
-//                return model.save(on: self.conn)
-//                    .map { try $0.content() }
-//            } else {
-//                return try self.userRepository.isModerator(user: user, taskID: model.taskID).flatMap {
-//                    try model.update(with: data)
-//                    return model.save(on: self.conn)
-//                        .map { try $0.content() }
-//                }
-//            }
+            if model.$creator.id == user.id {
+                try model.update(with: data)
+                return model.save(on: database)
+                    .flatMapThrowing { try model.content() }
+            } else {
+                return self.userRepository
+                    .isModerator(user: user, taskID: model.$task.id)
+                    .ifFalse(throw: Abort(.forbidden))
+                    .failableFlatMap {
+                        try model.update(with: data)
+                        return model.save(on: self.database)
+                            .flatMapThrowing { try model.content() }
+                }
+            }
         }
 
         public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
@@ -152,85 +155,83 @@ extension TaskSolution {
                 throw Abort(.unauthorized)
             }
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return TaskSolution.DatabaseModel.find(id, on: conn)
-//                .unwrap(or: Abort(.badRequest))
-//                .flatMap { solution in
-//
-//                    TaskSolution.DatabaseModel.query(on: self.conn)
-//                        .filter(\.taskID == solution.taskID)
-//                        .count()
-//                        .flatMap { numberOfSolutions in
-//
-//                            guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
-//
-//                            if solution.creatorID == user.id {
-//                                return solution.delete(on: self.conn)
-//                            } else {
-//                                return try self.userRepository.isModerator(user: user, taskID: solution.taskID).flatMap {
-//                                    solution.delete(on: self.conn)
-//                                }
-//                            }
-//                    }
-//            }
+            return TaskSolution.DatabaseModel.find(id, on: database)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { solution in
+
+                    TaskSolution.DatabaseModel.query(on: self.database)
+                        .filter(\.$task.$id == solution.$task.id)
+                        .count()
+                        .failableFlatMap { numberOfSolutions in
+
+                            guard numberOfSolutions > 1 else { throw TaskSolutionRepositoryError.toFewSolutions }
+
+                            if solution.$creator.id == user.id {
+                                return solution.delete(on: self.database)
+                            } else {
+                                return self.userRepository.isModerator(user: user, taskID: solution.$task.id)
+                                    .ifFalse(throw: Abort(.forbidden))
+                                    .flatMap {
+                                        solution.delete(on: self.database)
+                                }
+                            }
+                    }
+            }
         }
 
         public func approve(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            TaskSolution.DatabaseModel
-//                .find(solutionID, on: conn)
-//                .unwrap(or: Abort(.badRequest))
-//                .flatMap { (solution: TaskSolution.DatabaseModel) in
-//
-//                    try self.userRepository
-//                        .isModerator(user: user, taskID: solution.taskID)
-//                        .flatMap {
-//
-//                            try solution.approve(by: user)
-//                                .save(on: self.conn)
-//                    }
-//            }
-//            .transform(to: ())
+            TaskSolution.DatabaseModel
+                .find(solutionID, on: database)
+                .unwrap(or: Abort(.badRequest))
+                .flatMap { (solution: TaskSolution.DatabaseModel) in
+
+                    self.userRepository
+                        .isModerator(user: user, taskID: solution.$task.id)
+                        .ifFalse(throw: Abort(.forbidden))
+                        .flatMap {
+                            solution.approve(by: user)
+                                .save(on: self.database)
+                    }
+            }
         }
 
         /// Should be in `TaskSolutionRepositoring`
         public func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return try userRepository
-//                .isModerator(user: moderator, subjectID: subjectID)
-//                .flatMap {
-//
-//                    TaskDatabaseModel.query(on: self.conn)
-//                        .join(\TaskSolution.DatabaseModel.taskID, to: \TaskDatabaseModel.id)
-//                        .join(\Subtopic.DatabaseModel.id, to: \TaskDatabaseModel.subtopicID)
-//                        .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-//                        .filter(\Topic.DatabaseModel.subjectId == subjectID)
-//                        .filter(\TaskSolution.DatabaseModel.approvedBy == nil)
-//                        .range(0..<10)
-//                        .alsoDecode(TaskSolution.DatabaseModel.self)
-//                        .all()
-//                        .flatMap { tasks in
-//
-//                            MultipleChoiseTaskChoise.query(on: self.conn)
-//                                .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
-//                                .all()
-//                                .map { (choises: [MultipleChoiseTaskChoise]) in
-//
-//                                    let groupedChoises = choises.group(by: \.taskId)
-//
-//                                    return try tasks.map { task, solution in
-//                                        try TaskSolution.Unverified(
-//                                            task: task,
-//                                            solution: solution.content(),
-//                                            choises: groupedChoises[solution.taskID] ?? []
-//                                        )
-//                                    }
-//                            }
-//                    }
-//            }
-//            .catchMap { _ in [] }
+            return userRepository
+                .isModerator(user: moderator, subjectID: subjectID)
+                .ifFalse(throw: Abort(.forbidden))
+                .flatMap {
+
+                    TaskSolution.DatabaseModel.query(on: self.database)
+                        .join(parent: \TaskSolution.DatabaseModel.$task)
+                        .join(parent: \TaskDatabaseModel.$subtopic)
+                        .join(parent: \Subtopic.DatabaseModel.$topic)
+                        .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+                        .filter(\TaskSolution.DatabaseModel.$isApproved == false)
+                        .range(0..<10)
+                        .all(with: \.$task)
+                        .flatMap { tasks in
+
+                            MultipleChoiseTaskChoise.query(on: self.database)
+                                .filter(\MultipleChoiseTaskChoise.$task.$id ~~ tasks.map { $0.$task.id })
+                                .all()
+                                .flatMapThrowing { (choises: [MultipleChoiseTaskChoise]) in
+
+                                    let groupedChoises = choises.group(by: \.$task.id)
+
+                                    return try tasks.map { solution in
+                                        try TaskSolution.Unverified(
+                                            task: solution.task,
+                                            solution: solution.content(),
+                                            choises: groupedChoises[solution.$task.id] ?? []
+                                        )
+                                    }
+                            }
+                    }
+            }
+            .flatMapError { _ in self.database.eventLoop.future([]) }
         }
     }
 }

@@ -34,6 +34,11 @@ extension PracticeSession.Pivot {
             self.$subtopic.id = subtopicID
         }
 
+        init(subtopicID: KognitaCore.Subtopic.ID, sessionID: PracticeSession.ID) {
+            self.$session.id = sessionID
+            self.$subtopic.id = subtopicID
+        }
+
         init() {}
     }
 }
@@ -54,7 +59,7 @@ extension PracticeSession.Pivot.Subtopic {
             func build(schema: SchemaBuilder) -> SchemaBuilder {
                 schema.field("sessionID", .uint, .required, .references(PracticeSession.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("subtopicID", .uint, .required, .references(Subtopic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
-                    .field("createdAt", .date, .required)
+                    .field("createdAt", .datetime, .required)
                     .unique(on: "sessionID", "subtopicID")
             }
         }

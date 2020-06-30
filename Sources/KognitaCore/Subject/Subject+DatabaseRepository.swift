@@ -4,6 +4,7 @@
 //
 //  Created by Mats Mollestad on 23/12/2019.
 //
+// swiftlint:disable large_tuple
 
 import Vapor
 import FluentSQL
@@ -35,6 +36,53 @@ extension QueryBuilder {
         }
     }
 
+    public func all<Joined, JoinedTwo>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo)]>
+        where Joined: Schema, JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: JoinedThree.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), $0.joined(JoinedThree.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo, JoinedThree, Four>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: JoinedThree.Type,
+        _ four: Optional<Four>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree, Four?)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema, Four: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), $0.joined(JoinedThree.self), try? $0.joined(Four.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo>(
+        _ joined: Joined.Type,
+        _ joinedTwo: Optional<JoinedTwo>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo?)]>
+        where Joined: Schema, JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { (try $0.joined(Joined.self), try? $0.joined(JoinedTwo.self)) }
+        }
+    }
+
     public func first<Joined>(
         _ joined: Joined.Type
     ) -> EventLoopFuture<Joined?>
@@ -43,6 +91,32 @@ extension QueryBuilder {
         let copy = self.copy()
         return copy.first().flatMapThrowing {
             try $0?.joined(Joined.self)
+        }
+    }
+
+    public func first<Joined, JoinedTwo>(
+        _ joined: Joined.Type, _ joinedTwo: JoinedTwo.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self), let joinedTwo = try $0?.joined(JoinedTwo.self) else { return nil }
+            return (joined, joinedTwo)
+        }
+    }
+
+    public func first<Joined, JoinedTwo>(
+        _ joined: Joined.Type, _ joinedTwo: Optional<JoinedTwo>.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo?)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self) else { return nil }
+            return (joined, try? $0?.joined(JoinedTwo.self))
         }
     }
 }
@@ -154,19 +228,17 @@ extension Subject.DatabaseRepository {
     }
 
     public func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject> {
-        database.transaction { database in
-            let subject = Subject.DatabaseModel(
-                name: content.subject.name,
-                category: content.subject.category,
-                description: content.subject.description,
-                creatorId: 1
-            )
-            return subject.create(on: database)
-                .failableFlatMap {
-                    try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
-                        .flatten(on: database.eventLoop)
-                        .flatMapThrowing { try subject.content() }
-            }
+        let subject = Subject.DatabaseModel(
+            name: content.subject.name,
+            category: content.subject.category,
+            description: content.subject.description,
+            creatorId: 1
+        )
+        return subject.create(on: database)
+            .failableFlatMap {
+                try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
+                    .flatten(on: self.database.eventLoop)
+                    .flatMapThrowing { try subject.content() }
         }
     }
 
@@ -397,10 +469,9 @@ extension Subject.DatabaseRepository {
             .flatMap { subject in
 
                 var query = TaskDatabaseModel.query(on: self.database)
-                    .join(FlashCardTask.self, on: \FlashCardTask.$id == \TaskDatabaseModel.$id)
+                    .join(FlashCardTask.self, on: \FlashCardTask.$id == \TaskDatabaseModel.$id, method: .inner)
                     .join(parent: \TaskDatabaseModel.$subtopic)
                     .join(parent: \Subtopic.DatabaseModel.$topic)
-                    .join(children: \TaskDatabaseModel.$solutions)
                     .filter(\TaskDatabaseModel.$description == nil)
                     .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
 
@@ -408,38 +479,44 @@ extension Subject.DatabaseRepository {
                     query = query.filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id ~~ subtopicIDs)
                 }
 
-                return query.all()
-                    .map { data in
+                return query.all(with: \TaskDatabaseModel.$subtopic, \Subtopic.DatabaseModel.$topic)
+                    .flatMap { data in
 
-                        Subject.Compendium(
-                            subjectID: subjectID,
-                            subjectName: subject.name,
-                            topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
-                                .map { _, topicData in
+                        TaskSolution.DatabaseModel.query(on: self.database)
+                            .filter(\.$task.$id ~~ data.compactMap { $0.id })
+                            .all()
+                            .map { solutions in
 
-                                    Subject.Compendium.TopicData(
-                                        name: topicData.first!.subtopic.topic.name,
-                                        chapter: topicData.first!.subtopic.topic.chapter,
-                                        subtopics: topicData.group(by: \.$subtopic.id)
-                                            .map { subtopicID, questions in
+                                Subject.Compendium(
+                                    subjectID: subjectID,
+                                    subjectName: subject.name,
+                                    topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
+                                        .map { _, topicData in
 
-                                                Subject.Compendium.SubtopicData(
-                                                    subjectID: subjectID,
-                                                    subtopicID: subtopicID,
-                                                    name: questions.first!.subtopic.name,
-                                                    questions: questions.map { question in
+                                            Subject.Compendium.TopicData(
+                                                name: topicData.first!.subtopic.topic.name,
+                                                chapter: topicData.first!.subtopic.topic.chapter,
+                                                subtopics: topicData.group(by: \.$subtopic.id)
+                                                    .map { subtopicID, questions in
 
-                                                        Subject.Compendium.QuestionData(
-                                                            question: question.question,
-                                                            solution: question.solutions.first!.solution
+                                                        Subject.Compendium.SubtopicData(
+                                                            subjectID: subjectID,
+                                                            subtopicID: subtopicID,
+                                                            name: questions.first!.subtopic.name,
+                                                            questions: questions.map { question in
+
+                                                                Subject.Compendium.QuestionData(
+                                                                    question: question.question,
+                                                                    solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
+                                                                )
+                                                            }
                                                         )
-                                                    }
-                                                )
-                                        }
-                                    )
-                            }
-                            .sorted(by: { $0.chapter < $1.chapter })
-                        )
+                                                }
+                                            )
+                                    }
+                                    .sorted(by: { $0.chapter < $1.chapter })
+                                )
+                        }
                 }
         }
     }

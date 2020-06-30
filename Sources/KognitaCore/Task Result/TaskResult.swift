@@ -108,7 +108,7 @@ extension TaskResult.Migrations {
                 .field("sessionID", .uint, .required, .references(TaskSession.schema, .id, onDelete: .setNull, onUpdate: .cascade))
                 .field("resultScore", .double, .required)
                 .field("isSetManually", .bool, .required)
-                .field("revisitDate", .date)
+                .field("revisitDate", .datetime)
                 .field("timeUsed", .double)
                 .defaultTimestamps()
                 .unique(on: "sessionID", "taskID")

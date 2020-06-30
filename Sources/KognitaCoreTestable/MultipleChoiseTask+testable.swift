@@ -27,27 +27,27 @@ extension MultipleChoiceTask {
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
                           choises: choises,
-                          on: app.db)
+                          on: app)
     }
 
     public static func create(
         taskId: Task.ID,
         isMultipleSelect: Bool        = true,
         choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
-        on database: Database
+        on app: Application
     ) throws -> MultipleChoiceTask {
 
         let task = MultipleChoiceTask.DatabaseModel(isMultipleSelect: isMultipleSelect, taskID: taskId)
 
-        return try task.create(on: database)
+        return try task.create(on: app.db)
             .failableFlatMap {
                 try choises.map {
                     try MultipleChoiseTaskChoise(content: $0, taskID: task.requireID())
-                        .create(on: database)
+                        .create(on: app.db)
                 }
-                .flatten(on: database.eventLoop)
+                .flatten(on: app.db.eventLoop)
         }
-        .failableFlatMap { try TestableRepositories.testable(with: database).multipleChoiceTaskRepository.task(withID: task.requireID()) }
+        .failableFlatMap { try TestableRepositories.testable(with: app).multipleChoiceTaskRepository.task(withID: task.requireID()) }
         .wait()
     }
 }

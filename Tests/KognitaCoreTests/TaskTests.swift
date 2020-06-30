@@ -12,9 +12,9 @@ import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
-    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: database).taskSolutionRepository }()
-    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database) }()
-    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: database).typingTaskRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
+    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database, userRepository: TestableRepositories.testable(with: app).userRepository) }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
 
     func testTasksInSubject() throws {
 
@@ -34,244 +34,214 @@ class TaskTests: VaporTestCase {
     }
 
     func testSolutions() throws {
-        do {
-            let task = try TaskDatabaseModel.create(createSolution: false, on: app)
-            let user = try User.create(on: app)
-            let secondUser = try User.create(isAdmin: false, on: app)
-            let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: app)
-            let secondSolution = try TaskSolution.create(task: task, on: app)
-            let secondSolutionDB = try TaskSolution.DatabaseModel.find(secondSolution.id, on: database).unwrap(or: Errors.badTest).wait()
-            _ = try TaskSolution.create(on: app)
+        let task = try TaskDatabaseModel.create(createSolution: false, on: app)
+        let user = try User.create(on: app)
+        let secondUser = try User.create(isAdmin: false, on: app)
+        let firstSolution = try TaskSolution.create(task: task, presentUser: false, on: app)
+        let secondSolution = try TaskSolution.create(task: task, on: app)
+        let secondSolutionDB = try TaskSolution.DatabaseModel.find(secondSolution.id, on: database).unwrap(or: Errors.badTest).wait()
+        _ = try TaskSolution.create(on: app)
 
-            secondSolutionDB.isApproved = true
-            secondSolutionDB.$approvedBy.id = user.id
-            _ = try secondSolutionDB.save(on: database).wait()
+        secondSolutionDB.isApproved = true
+        secondSolutionDB.$approvedBy.id = user.id
+        _ = try secondSolutionDB.save(on: database).wait()
 
-            try taskSolutionRepository.upvote(for: firstSolution.id, by: user).wait()
-            try taskSolutionRepository.upvote(for: firstSolution.id, by: secondUser).wait()
+        try taskSolutionRepository.upvote(for: firstSolution.id, by: user).wait()
+        try taskSolutionRepository.upvote(for: firstSolution.id, by: secondUser).wait()
 
-            let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
 
-            XCTAssertEqual(solutions.count, 2)
+        XCTAssertEqual(solutions.count, 2)
 
-            let firstResponse = try XCTUnwrap(solutions.first(where: { $0.solution == firstSolution.solution }))
-            XCTAssertEqual(firstResponse.creatorUsername, "Unknown")
-            XCTAssertNil(firstResponse.approvedBy)
-            XCTAssertEqual(firstResponse.numberOfVotes, 2)
+        let firstResponse = try XCTUnwrap(solutions.first(where: { $0.solution == firstSolution.solution }))
+        XCTAssertEqual(firstResponse.creatorUsername, "Unknown")
+        XCTAssertNil(firstResponse.approvedBy)
+        XCTAssertEqual(firstResponse.numberOfVotes, 2)
 
-            let secondResponse = try XCTUnwrap(solutions.first(where: { $0.solution == secondSolution.solution }))
-            XCTAssertEqual(secondResponse.approvedBy, user.username)
-            XCTAssertNotNil(secondResponse.creatorUsername)
-            XCTAssertEqual(secondResponse.numberOfVotes, 0)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        let secondResponse = try XCTUnwrap(solutions.first(where: { $0.solution == secondSolution.solution }))
+        XCTAssertEqual(secondResponse.approvedBy, user.username)
+        XCTAssertNotNil(secondResponse.creatorUsername)
+        XCTAssertEqual(secondResponse.numberOfVotes, 0)
     }
 
-    func testCreateTaskWithEmptySolution() {
-        failableTest {
-            let subtopic = try Subtopic.create(on: app)
-            let user = try User.create(on: app)
-            let xssData = FlashCardTask.Create.Data(
-                subtopicId: subtopic.id,
-                description: "Test",
-                question: "Some question",
-                solution: "",
-                isTestable: false,
-                examPaperSemester: nil,
-                examPaperYear: nil
-            )
-            let createData = TaskDatabaseModel.Create.Data(
-                content: xssData,
-                subtopicID: xssData.subtopicId,
-                solution: xssData.solution
-            )
-            XCTAssertThrowsError(try taskRepository.create(from: createData, by: user).wait())
-        }
+    func testCreateTaskWithEmptySolution() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+        let xssData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
+            description: "Test",
+            question: "Some question",
+            solution: "",
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+        let createData = TaskDatabaseModel.Create.Data(
+            content: xssData,
+            subtopicID: xssData.subtopicId,
+            solution: xssData.solution
+        )
+        XCTAssertThrowsError(try taskRepository.create(from: createData, by: user).wait())
     }
 
-    func testCreateMultipleLineSolution() {
-        failableTest {
-            let subtopic = try Subtopic.create(on: app)
-            let user = try User.create(on: app)
-            let xssData = FlashCardTask.Create.Data(
-                subtopicId: subtopic.id,
-                description: "Test",
-                question: "Some question",
-                solution:
+    func testCreateMultipleLineSolution() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+        let xssData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
+            description: "Test",
+            question: "Some question",
+            solution:
 """
 Hallo
 
 Dette er flere linjer
 """,
-                isTestable: false,
-                examPaperSemester: nil,
-                examPaperYear: nil
-            )
-            let createData = TaskDatabaseModel.Create.Data(
-                content: xssData,
-                subtopicID: xssData.subtopicId,
-                solution: xssData.solution
-            )
-            let task = try taskRepository.create(from: createData, by: user).wait()
-            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+        let createData = TaskDatabaseModel.Create.Data(
+            content: xssData,
+            subtopicID: xssData.subtopicId,
+            solution: xssData.solution
+        )
+        let task = try taskRepository.create(from: createData, by: user).wait()
+        let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
-            XCTAssertEqual(solution.solution, "Hallo\n\nDette er flere linjer")
-        }
+        XCTAssertEqual(solution.solution, "Hallo\n\nDette er flere linjer")
     }
 
-    func testCreateTaskWithXSS() {
-        do {
-            let subtopic = try Subtopic.create(on: app)
-            let user = try User.create(on: app)
-            let xssData = FlashCardTask.Create.Data(
-                subtopicId: subtopic.id,
-                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
-                question: "Some question",
-                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
-                isTestable: false,
-                examPaperSemester: nil,
-                examPaperYear: nil
-            )
-            let createData = TaskDatabaseModel.Create.Data(
-                content: xssData,
-                subtopicID: xssData.subtopicId,
-                solution: xssData.solution
-            )
-            let task = try taskRepository.create(from: createData, by: user).wait()
-            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
+    func testCreateTaskWithXSS() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+        let xssData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
+            description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+            question: "Some question",
+            solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+        let createData = TaskDatabaseModel.Create.Data(
+            content: xssData,
+            subtopicID: xssData.subtopicId,
+            solution: xssData.solution
+        )
+        let task = try taskRepository.create(from: createData, by: user).wait()
+        let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.requireID(), for: user).wait().first)
 
-            XCTAssertEqual(task.description, "# XSS test")
-            XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertEqual(task.$description.value, "# XSS test")
+        XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
     }
 
-    func testUpdateTaskXSS() {
-        do {
-            let subtopic = try Subtopic.create(on: app)
-            let user = try User.create(on: app)
-            let xssData = FlashCardTask.Create.Data(
-                subtopicId: subtopic.id,
-                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
-                question: "Some question",
-                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
-                isTestable: false,
-                examPaperSemester: nil,
-                examPaperYear: nil
-            )
-            let task = try typingTaskRepository.create(from: xssData, by: user).wait()
-            let flashCardTask = try FlashCardTask.find(task.id, on: database).unwrap(or: Errors.badTest).wait()
-            let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
+    func testUpdateTaskXSS() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+        let xssData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
+            description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+            question: "Some question",
+            solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+        let task = try typingTaskRepository.create(from: xssData, by: user).wait()
+        let flashCardTask = try FlashCardTask.find(task.id, on: database).unwrap(or: Errors.badTest).wait()
+        let solution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
 
-            XCTAssertEqual(task.description, "# XSS test")
-            XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
+        XCTAssertEqual(task.description, "# XSS test")
+        XCTAssertEqual(solution.solution, "<img>More XSS $$\\frac{1}{2}$$")
 
-            let updatedTask = try typingTaskRepository.updateModelWith(id: flashCardTask.id!, to: xssData, by: user).wait()
-            let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
+        let updatedTask = try typingTaskRepository.updateModelWith(id: flashCardTask.id!, to: xssData, by: user).wait()
+        let updatedSolution = try XCTUnwrap(taskSolutionRepository.solutions(for: task.id, for: user).wait().first)
 
-            XCTAssertEqual(updatedTask.description, "# XSS test")
-            XCTAssertEqual(updatedSolution.solution, "<img>More XSS $$\\frac{1}{2}$$")
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertEqual(updatedTask.description, "# XSS test")
+        XCTAssertEqual(updatedSolution.solution, "<img>More XSS $$\\frac{1}{2}$$")
     }
 
-    func testUpdateSolutionXSS() {
-        do {
-            let subtopic = try Subtopic.create(on: app)
-            let user = try User.create(on: app)
-            let xssData = FlashCardTask.Create.Data(
-                subtopicId: subtopic.id,
-                description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
-                question: "Some question",
-                solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
-                isTestable: false,
-                examPaperSemester: nil,
-                examPaperYear: nil
-            )
-            let task = try typingTaskRepository.create(from: xssData, by: user).wait()
+    func testUpdateSolutionXSS() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+        let xssData = FlashCardTask.Create.Data(
+            subtopicId: subtopic.id,
+            description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
+            question: "Some question",
+            solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
+            isTestable: false,
+            examPaperSemester: nil,
+            examPaperYear: nil
+        )
+        let task = try typingTaskRepository.create(from: xssData, by: user).wait()
 
-            let solutionUpdateDate = TaskSolution.Update.Data(
-                solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
-                presentUser: false
-            )
-            let solution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
-            _ = try taskSolutionRepository.updateModelWith(id: solution.id!, to: solutionUpdateDate, by: user).wait()
-            let updatedSolution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
+        let solutionUpdateDate = TaskSolution.Update.Data(
+            solution: #"<IMG """><SCRIPT>alert("XSS")</SCRIPT>"\> Hello"#,
+            presentUser: false
+        )
+        let solution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
+        _ = try taskSolutionRepository.updateModelWith(id: solution.id!, to: solutionUpdateDate, by: user).wait()
+        let updatedSolution = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.id).first().unwrap(or: Errors.badTest).wait()
 
-            XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertEqual(updatedSolution.solution, #"<img>"\&gt; Hello"#)
     }
 
-    func testSolutionsCascadeDelete() {
-        do {
-            let task = try TaskDatabaseModel.create(on: app)
-            let user = try User.create(on: app)
-            let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            XCTAssertEqual(solutions.count, 1)
-            try task.delete(on: database).wait()
-            let newSolution = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            XCTAssertTrue(newSolution.isEmpty)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+    func testSolutionsCascadeDelete() throws {
+        let task = try TaskDatabaseModel.create(on: app)
+        let user = try User.create(on: app)
+        let solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        XCTAssertEqual(solutions.count, 1)
+        try task.delete(force: true, on: database).wait()
+        let newSolution = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        XCTAssertEqual(newSolution.count, 0)
     }
 
-    func testApproveSolution() {
-        failableTest {
-            let user = try User.create(on: app)
-            let unauthorizedUser = try User.create(isAdmin: false, on: app)
-            let task = try TaskDatabaseModel.create(creator: unauthorizedUser, on: app)
+    func testApproveSolution() throws {
+        let user = try User.create(on: app)
+        let unauthorizedUser = try User.create(isAdmin: false, on: app)
+        let task = try TaskDatabaseModel.create(creator: unauthorizedUser, on: app)
 
-            var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            var solution = try XCTUnwrap(solutions.first)
-            XCTAssertNil(solution.approvedBy)
+        var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        var solution = try XCTUnwrap(solutions.first)
+        XCTAssertNil(solution.approvedBy)
 
-            try taskSolutionRepository.approve(for: solution.id, by: user).wait()
-            solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            solution = try XCTUnwrap(solutions.first)
+        try taskSolutionRepository.approve(for: solution.id, by: user).wait()
+        solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        solution = try XCTUnwrap(solutions.first)
 
-            XCTAssertEqual(solution.approvedBy, user.username)
-        }
+        XCTAssertEqual(solution.approvedBy, user.username)
     }
 
-    func testApproveSolutionUnauthorized() {
-        failableTest {
-            let user = try User.create(isAdmin: false, on: app)
-            let task = try TaskDatabaseModel.create(creator: user, on: app)
+    func testApproveSolutionUnauthorized() throws {
+        let user = try User.create(isAdmin: false, on: app)
+        let task = try TaskDatabaseModel.create(creator: user, on: app)
 
-            var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            var solution = try XCTUnwrap(solutions.first)
-            XCTAssertNil(solution.approvedBy)
+        var solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        var solution = try XCTUnwrap(solutions.first)
+        XCTAssertNil(solution.approvedBy)
 
-            XCTAssertThrowsError(try taskSolutionRepository.approve(for: solution.id, by: user).wait())
-            solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
-            solution = try XCTUnwrap(solutions.first)
+        XCTAssertThrowsError(try taskSolutionRepository.approve(for: solution.id, by: user).wait())
+        solutions = try taskSolutionRepository.solutions(for: task.requireID(), for: user).wait()
+        solution = try XCTUnwrap(solutions.first)
 
-            XCTAssertNil(solution.approvedBy)
-        }
+        XCTAssertNil(solution.approvedBy)
     }
 
-    func testDeleteSolution() {
-        failableTest {
-            let user = try User.create(on: app)
-            let task = try TaskDatabaseModel.create(on: app)
+    func testDeleteSolution() throws {
+        let user = try User.create(on: app)
+        let task = try TaskDatabaseModel.create(on: app)
 
-            let solutions = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.requireID()).all().wait()
+        let solutions = try TaskSolution.DatabaseModel.query(on: database).filter(\.$task.$id == task.requireID()).all().wait()
 
-            XCTAssertEqual(solutions.count, 1)
-            let solution = try XCTUnwrap(solutions.first)
+        XCTAssertEqual(solutions.count, 1)
+        let solution = try XCTUnwrap(solutions.first)
 
-            throwsError(of: TaskSolutionRepositoryError.self) {
-                try taskSolutionRepository.deleteModelWith(id: solution.id!, by: user).wait()
-            }
-            throwsError(of: Abort.self) {
-                try taskSolutionRepository.deleteModelWith(id: solution.id!, by: nil).wait()
-            }
+        throwsError(of: TaskSolutionRepositoryError.self) {
+            try taskSolutionRepository.deleteModelWith(id: solution.id!, by: user).wait()
+        }
+        throwsError(of: Abort.self) {
+            try taskSolutionRepository.deleteModelWith(id: solution.id!, by: nil).wait()
         }
     }
 

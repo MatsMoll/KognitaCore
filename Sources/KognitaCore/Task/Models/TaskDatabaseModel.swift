@@ -87,6 +87,9 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     @Children(for: \.$task)
     var solutions: [TaskSolution.DatabaseModel]
 
+    @Children(for: \.$task)
+    var results: [TaskResult.DatabaseModel]
+
     init(
         subtopicID: Subtopic.ID,
         description: String?,
@@ -94,8 +97,10 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         creatorID: User.ID,
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
-        isTestable: Bool = false
+        isTestable: Bool = false,
+        id: IDValue? = nil
     ) {
+        self.id             = id
         self.$subtopic.id   = subtopicID
         self.description    = description
         self.question       = question
@@ -111,8 +116,10 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     init(
         content: TaskCreationContentable,
         subtopicID: Subtopic.ID,
-        creator: User
+        creator: User,
+        id: IDValue? = nil
     ) throws {
+        self.id             = id
         self.$subtopic.id     = subtopicID
         self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
         self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
@@ -130,9 +137,9 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
 }
 
 extension TaskDatabaseModel {
-    func update(content: TaskCreationContentable) -> TaskDatabaseModel {
-        self.description = content.description
-        self.question = content.question
+    func update(content: TaskCreationContentable) throws -> TaskDatabaseModel {
+        self.description = try? content.description?.cleanXSS(whitelist: .basicWithImages())
+        self.question = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable = content.isTestable
         self.examPaperYear = content.examPaperYear
         return self
@@ -156,7 +163,7 @@ extension TaskDatabaseModel.Migrations {
                 .field("isTestable", .bool, .required)
                 .field("examPaperYear", .int)
                 .field("examPaperSemester", .string)
-                .field("deletedAt", .date)
+                .field("deletedAt", .datetime)
                 .defaultTimestamps()
         }
     }

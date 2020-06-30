@@ -21,11 +21,12 @@ extension Subtopic {
 
         public let database: Database
 
-        public init(database: Database) {
+        public init(database: Database, userRepository: UserRepository) {
             self.database = database
+            self.userRepository = userRepository
         }
 
-        private var userRepository: UserRepository { User.DatabaseRepository(database: database) }
+        private var userRepository: UserRepository
     }
 }
 

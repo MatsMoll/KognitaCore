@@ -32,7 +32,7 @@ extension TaskDatabaseModel {
                           explenation: explenation,
                           createSolution: createSolution,
                           isTestable: isTestable,
-                          on: app.db)
+                          on: app)
     }
 
     public static func create(
@@ -43,19 +43,19 @@ extension TaskDatabaseModel {
         explenation: String          = "Some explenation",
         createSolution: Bool            = true,
         isTestable: Bool            = false,
-        on database: Database
+        on app: Application
     ) throws -> TaskDatabaseModel {
 
         let task = TaskDatabaseModel(subtopicID: subtopicId,
-                        description: description,
-                        question: question,
-                        creatorID: creator.id,
-                        isTestable: isTestable)
+                                     description: description,
+                                     question: question,
+                                     creatorID: creator.id,
+                                     isTestable: isTestable)
 
-        return try task.save(on: database)
+        return try task.save(on: app.db)
             .failableFlatMap {
                 if createSolution {
-                    return try TaskSolution.DatabaseRepository(database: database)
+                    return try TestableRepositories.testable(with: app).taskSolutionRepository
                         .create(from:
                             TaskSolution.Create.Data(
                                 solution: explenation,
@@ -66,7 +66,7 @@ extension TaskDatabaseModel {
                     )
                     .transform(to: task)
                 } else {
-                    return database.eventLoop.future(task)
+                    return app.db.eventLoop.future(task)
                 }
         }.wait()
     }

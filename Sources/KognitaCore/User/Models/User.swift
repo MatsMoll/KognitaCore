@@ -31,7 +31,7 @@ extension User {
 
         /// BCrypt hash of the user's password.
         @Field(key: "passwordHash")
-        public private(set) var passwordHash: String
+        public var passwordHash: String
 
         /// The role of the User
         @Field(key: "isAdmin")
@@ -67,11 +67,6 @@ extension User {
             self.isAdmin = isAdmin
             self.isEmailVerified = isEmailVerified
         }
-
-        public func update(password: String) throws -> User.DatabaseModel {
-//            passwordHash = try BCrypt.hash(password)
-            return self
-        }
     }
 }
 
@@ -103,7 +98,7 @@ extension User.Migrations {
                 .field("passwordHash", .string, .required)
                 .field("isAdmin", .bool, .required)
                 .field("isEmailVerified", .bool, .required)
-                .field("viewedNotificationsAt", .date)
+                .field("viewedNotificationsAt", .datetime)
                 .defaultTimestamps()
                 .unique(on: "email")
                 .unique(on: "username")

@@ -13,9 +13,9 @@ import KognitaCoreTestable
 
 class FlashCardTaskTests: VaporTestCase {
 
-    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: database).typingTaskRepository }()
-    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: database).practiceSessionRepository }()
-    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: database).taskSolutionRepository }()
+    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: app).practiceSessionRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
 
     func testCreateAsAdmin() throws {
 

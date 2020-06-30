@@ -63,7 +63,7 @@ extension TaskSolution {
 //            try validate()
         }
 
-        public func approve(by user: User) throws -> TaskSolution.DatabaseModel {
+        public func approve(by user: User) -> TaskSolution.DatabaseModel {
             guard approvedBy == nil else {
                 return self
             }

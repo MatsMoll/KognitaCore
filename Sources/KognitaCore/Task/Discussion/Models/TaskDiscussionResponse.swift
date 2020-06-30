@@ -79,7 +79,7 @@ extension TaskDiscussionResponse.Migrations {
 
 extension SchemaBuilder {
     func defaultTimestamps() -> Self {
-        field("createdAt", .date, .required)
-            .field("updatedAt", .date, .required)
+        field("createdAt", .datetime, .required)
+            .field("updatedAt", .datetime, .required)
     }
 }

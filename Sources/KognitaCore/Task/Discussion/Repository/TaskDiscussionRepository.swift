@@ -1,9 +1,18 @@
 import Vapor
 import Fluent
+import FluentSQL
 
 extension QueryBuilder {
     func join<From, To>(parent: KeyPath<From, ParentProperty<From, To>>) -> Self {
         join(To.self, on: parent.appending(path: \.$id) == \To._$id)
+    }
+
+    func join<From, To>(parent: KeyPath<From, OptionalParentProperty<From, To>>) -> Self {
+        join(To.self, on: parent.appending(path: \.$id) == \To._$id, method: .left)
+    }
+
+    func join<From, To>(superclass: To.Type, with: From.Type, method: DatabaseQuery.Join.Method = .inner) -> Self where From: FluentKit.Model, To: FluentKit.Model, To.IDValue == From.IDValue {
+        join(To.self, on: \From._$id == \To._$id, method: method)
     }
 
     func join<From, To>(children: KeyPath<From, ChildrenProperty<From, To>>) -> Self {
@@ -17,6 +26,12 @@ extension QueryBuilder {
         let siblings = From()[keyPath: siblings]
         return join(Through.self, on: siblings.from.appending(path: \.$id) == \From._$id)
             .join(To.self, on: siblings.to.appending(path: \.$id) == \To._$id)
+    }
+}
+
+extension SQLSelectBuilder {
+    func join<From, To>(parent: KeyPath<From, ParentProperty<From, To>>) -> Self {
+        join(To.schema, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: parent.appending(path: \.$id)].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()._$id.key.description)\"")
     }
 }
 
@@ -34,13 +49,13 @@ extension TaskDiscussion {
             return TaskDiscussion.DatabaseModel.query(on: database)
                 .filter(\.$task.$id == taskID)
                 .join(parent: \TaskDiscussion.DatabaseModel.$user)
-                .all()
-                .mapEach { discussion in
+                .all(TaskDiscussion.DatabaseModel.self, User.DatabaseModel.self)
+                .mapEach { (discussion, user) in
                     TaskDiscussion(
                         id: discussion.id ?? 0,
                         description: discussion.description,
                         createdAt: discussion.createdAt,
-                        username: discussion.user.username,
+                        username: user.username,
                         newestResponseCreatedAt: .now
                     )
             }
@@ -90,7 +105,9 @@ extension TaskDiscussion {
         }
 
         public func create(from content: TaskDiscussion.Create.Data, by user: User?) throws -> EventLoopFuture<NoData> {
-
+            guard content.description.removeCharacters(from: .whitespaces).count > 3 else {
+                return database.eventLoop.future(error: Abort(.badRequest))
+            }
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
@@ -117,7 +134,9 @@ extension TaskDiscussion {
         }
 
         public func respond(with response: TaskDiscussionResponse.Create.Data, by user: User) throws -> EventLoopFuture<Void> {
-
+            guard response.response.removeCharacters(from: .whitespaces).count > 3 else {
+                return database.eventLoop.future(error: Abort(.badRequest))
+            }
             return try TaskDiscussionResponse.DatabaseModel(data: response, userID: user.id)
                 .create(on: database)
                 .transform(to: ())

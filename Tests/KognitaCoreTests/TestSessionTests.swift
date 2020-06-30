@@ -6,8 +6,8 @@ import XCTest
 @available(OSX 10.15, *)
 class TestSessionTests: VaporTestCase {
 
-    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: database).subjectTestRepository }()
-    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: database).testSessionRepository }()
+    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: app).subjectTestRepository }()
+    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: app).testSessionRepository }()
 
     func testSubmittingAndUpdatingAnswerMultipleUsers() throws {
 
@@ -172,95 +172,91 @@ class TestSessionTests: VaporTestCase {
     }
 
     func testResultsAfterSubmittion() throws {
-        failableTest {
-            let test = try setupTestWithTasks()
+        let test = try setupTestWithTasks()
 
-            let userOne = try User.create(on: app)
-            let userTwo = try User.create(on: app)
-            let userThree = try User.create(on: app)
+        let userOne = try User.create(on: app)
+        let userTwo = try User.create(on: app)
+        let userThree = try User.create(on: app)
 
-            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
-            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
+        let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+        let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
+        let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+        let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
-            let firstSubmittion     = try submittionAt(index: 1, for: test)
-            let secondSubmittion    = try submittionAt(index: 2, for: test)
-            let thirdSubmittion     = try submittionAt(index: 3, for: test)
+        let firstSubmittion     = try submittionAt(index: 1, for: test)
+        let secondSubmittion    = try submittionAt(index: 2, for: test)
+        let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
 
-            try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
 
-            let userOneResults = try testSessionRepository.results(in: sessionOne, for: userOne).wait()
-            let userTwoResults = try testSessionRepository.results(in: sessionTwo, for: userTwo).wait()
+        let userOneResults = try testSessionRepository.results(in: sessionOne, for: userOne).wait()
+        let userTwoResults = try testSessionRepository.results(in: sessionTwo, for: userTwo).wait()
 
-            XCTAssertThrowsError(
-                try testSessionRepository.results(in: sessionOne, for: userThree).wait()
-            )
-            XCTAssertThrowsError(
-                try testSessionRepository.results(in: sessionOne, for: userTwo).wait()
-            )
+        XCTAssertThrowsError(
+            try testSessionRepository.results(in: sessionOne, for: userThree).wait()
+        )
+        XCTAssertThrowsError(
+            try testSessionRepository.results(in: sessionOne, for: userTwo).wait()
+        )
 
-            XCTAssertEqual(userOneResults.score, 3)
-            XCTAssertEqual(userOneResults.scoreProsentage, 1)
-            XCTAssertEqual(userOneResults.maximumScore, 3)
+        XCTAssertEqual(userOneResults.score, 3)
+        XCTAssertEqual(userOneResults.scoreProsentage, 1)
+        XCTAssertEqual(userOneResults.maximumScore, 3)
 
-            XCTAssertEqual(userTwoResults.score, 2)
-            XCTAssertEqual(userTwoResults.scoreProsentage, 2/3)
-            XCTAssertEqual(userTwoResults.maximumScore, 3)
-        }
+        XCTAssertEqual(userTwoResults.score, 2)
+        XCTAssertEqual(userTwoResults.scoreProsentage, 2/3)
+        XCTAssertEqual(userTwoResults.maximumScore, 3)
     }
 
-    func testOverview() {
-        failableTest {
-            let test = try setupTestWithTasks()
+    func testOverview() throws {
+        let test = try setupTestWithTasks()
 
-            let userOne = try User.create(on: app)
-            let userTwo = try User.create(on: app)
-            let userThree = try User.create(on: app)
+        let userOne = try User.create(on: app)
+        let userTwo = try User.create(on: app)
+        let userThree = try User.create(on: app)
 
-            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
-            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
+        let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+        let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
+        let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+        let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
-            let firstSubmittion     = try submittionAt(index: 1, for: test)
-            let secondSubmittion    = try submittionAt(index: 2, for: test)
-            let thirdSubmittion     = try submittionAt(index: 3, for: test)
+        let firstSubmittion     = try submittionAt(index: 1, for: test)
+        let secondSubmittion    = try submittionAt(index: 2, for: test)
+        let thirdSubmittion     = try submittionAt(index: 3, for: test)
 
-            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: firstSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: secondSubmittion, for: sessionOne, by: userOne).wait()
 
-            try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: thirdSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: thirdSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            let overviewOne = try testSessionRepository.overview(in: sessionOne, for: userOne).wait()
-            let overviewTwo = try testSessionRepository.overview(in: sessionTwo, for: userTwo).wait()
+        let overviewOne = try testSessionRepository.overview(in: sessionOne, for: userOne).wait()
+        let overviewTwo = try testSessionRepository.overview(in: sessionTwo, for: userTwo).wait()
 
-            XCTAssertThrowsError(
-                try testSessionRepository.overview(in: sessionTwo, for: userThree).wait()
-            )
+        XCTAssertThrowsError(
+            try testSessionRepository.overview(in: sessionTwo, for: userThree).wait()
+        )
 
-            XCTAssertEqual(overviewOne.test.id, test.id)
-            XCTAssertEqual(overviewOne.tasks.count, 3)
-            XCTAssertEqual(overviewOne.tasks.filter({ $0.isAnswered }).count, 3)
+        XCTAssertEqual(overviewOne.test.id, test.id)
+        XCTAssertEqual(overviewOne.tasks.count, 3)
+        XCTAssertEqual(overviewOne.tasks.filter({ $0.isAnswered }).count, 3)
 
-            XCTAssertEqual(overviewTwo.test.id, test.id)
-            XCTAssertEqual(overviewTwo.tasks.count, 3)
-            XCTAssertEqual(overviewTwo.tasks.filter({ $0.isAnswered }).count, 2)
-        }
+        XCTAssertEqual(overviewTwo.test.id, test.id)
+        XCTAssertEqual(overviewTwo.tasks.count, 3)
+        XCTAssertEqual(overviewTwo.tasks.filter({ $0.isAnswered }).count, 2)
     }
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiceTask.Submit {

@@ -9,8 +9,8 @@ import FluentKit
 @available(OSX 10.15, *)
 class SubjectTestTests: VaporTestCase {
 
-    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: database).subjectTestRepository }()
-    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: database).testSessionRepository }()
+    lazy var subjectTestRepository: SubjectTestRepositoring = { TestableRepositories.testable(with: app).subjectTestRepository }()
+    lazy var testSessionRepository: TestSessionRepositoring = { TestableRepositories.testable(with: app).testSessionRepository }()
 
     func testCreateTest() throws {
 
@@ -85,10 +85,10 @@ class SubjectTestTests: VaporTestCase {
             let test = try setupTestWithTasks(
                 scheduledAt: Date().addingTimeInterval(.minutes(2))
             )
-            XCTAssertThrowsError(
-                try subjectTestRepository
+            throwsError(of: SubjectTest.DatabaseRepository.Errors.self) {
+                _ = try subjectTestRepository
                     .enter(test: test, with: enterRequest, by: user).wait()
-            )
+            }
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -100,10 +100,11 @@ class SubjectTestTests: VaporTestCase {
 
         do {
             let test = try setupTestWithTasks()
-            XCTAssertThrowsError(
-                try subjectTestRepository
+
+            throwsError(of: SubjectTest.DatabaseRepository.Errors.self) {
+                _ = try subjectTestRepository
                     .enter(test: test, with: .init(password: "incorrect"), by: user).wait()
-            )
+            }
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -128,10 +129,10 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(sessionTwo.testID, test.id)
             XCTAssertEqual(sessionTwo.userID, userTwo.id)
 
-            XCTAssertThrowsError(
+            throwsError(ofType: SubjectTest.DatabaseRepository.Errors.self) {
                 _ = try subjectTestRepository
                     .enter(test: test, with: enterRequest, by: userOne).wait()
-            )
+            }
 
             let sessions = try TestSession.DatabaseModel.query(on: database).all().wait()
             XCTAssertEqual(sessions.count, 2)
@@ -186,287 +187,265 @@ class SubjectTestTests: VaporTestCase {
     }
 
     func testRetrivingTaskContent() throws {
-        failableTest {
-            let test = try setupTestWithTasks(numberOfTasks: 3)
+        let test = try setupTestWithTasks(numberOfTasks: 3)
 
-            XCTAssertTrue(test.isOpen)
+        XCTAssertTrue(test.isOpen)
 
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
-            let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
+        let sessionOneEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userOne).wait()
+        let sessionTwoEntry = try subjectTestRepository.enter(test: test, with: enterRequest, by: userTwo).wait()
 
-            let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
-            let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
+        let sessionOne = try TestSession.TestParameter.resolveWith(sessionOneEntry.id, database: database).wait()
+        let sessionTwo = try TestSession.TestParameter.resolveWith(sessionTwoEntry.id, database: database).wait()
 
-            let firstSubmittion     = try submittionAt(index: 1, for: test)
-            let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
+        let firstSubmittion     = try submittionAt(index: 1, for: test)
+        let secondSubmittion    = try submittionAt(index: 2, for: test, isCorrect: false)
 
-            var userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
-            var userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
+        var userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
+        var userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
 
-            XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
-            XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
-            XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
-            XCTAssertTrue(userOneTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+        XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
+        XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
+        XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
+        XCTAssertTrue(userOneTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
-            XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
-            XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
-            XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+        XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+        XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
+        XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
+        XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-            try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
-            try testSessionRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
+        try testSessionRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo).wait()
 
-            userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
-            userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
+        userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
+        userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
 
-            XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
-            XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
-            XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
-            XCTAssertEqual(userOneTaskContent.choises.count, 3)
-            XCTAssertEqual(userOneTaskContent.choises.filter({ $0.isCorrect && $0.isSelected }).count, 1)
+        XCTAssertEqual(userOneTaskContent.testTasks.count, 3)
+        XCTAssertEqual(userOneTaskContent.testTasks.first?.isCurrent, true)
+        XCTAssertEqual(userOneTaskContent.testTasks.last?.isCurrent, false)
+        XCTAssertEqual(userOneTaskContent.choises.count, 3)
+        XCTAssertEqual(userOneTaskContent.choises.filter({ $0.isCorrect && $0.isSelected }).count, 1)
 
-            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
-            XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
-            XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
-            XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
+        XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+        XCTAssertEqual(userTwoTaskContent.testTasks.first?.isCurrent, true)
+        XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
+        XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-            userTwoTaskContent = try subjectTestRepository.taskWith(id: 2, in: sessionTwo, for: userTwo).wait()
+        userTwoTaskContent = try subjectTestRepository.taskWith(id: 2, in: sessionTwo, for: userTwo).wait()
 
-            XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
-            XCTAssertEqual(userTwoTaskContent.testTasks.filter({ $0.testTaskID == 2 }).first?.isCurrent, true)
-            XCTAssertEqual(userTwoTaskContent.choises.count, 3)
-            XCTAssertEqual(userTwoTaskContent.choises.filter({ $0.isSelected && $0.isCorrect == false }).count, 2)
+        XCTAssertEqual(userTwoTaskContent.testTasks.count, 3)
+        XCTAssertEqual(userTwoTaskContent.testTasks.filter({ $0.testTaskID == 2 }).first?.isCurrent, true)
+        XCTAssertEqual(userTwoTaskContent.choises.count, 3)
+        XCTAssertEqual(userTwoTaskContent.choises.filter({ $0.isSelected && $0.isCorrect == false }).count, 2)
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userOne).wait()
-            )
-        }
+        XCTAssertThrowsError(
+            try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userOne).wait()
+        )
     }
 
-    func testResultStatistics() {
-        do {
-            let test = try setupTestWithTasks()
+    func testResultStatistics() throws {
+        let test = try setupTestWithTasks()
 
-            let teacher = try User.create(on: app)
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let teacher = try User.create(on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let firstSubmittion             = try submittionAt(index: 1, for: test)
-            let secondSubmittion            = try submittionAt(index: 2, for: test)
-            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
-            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+        let firstSubmittion             = try submittionAt(index: 1, for: test)
+        let secondSubmittion            = try submittionAt(index: 2, for: test)
+        let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+        let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
-            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
-            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+        let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+        let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+        let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
 
-            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
-            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect, thirdSubmittion])
 
-            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
+        let result = try subjectTestRepository.results(for: test, user: teacher).wait()
 
-            XCTAssertEqual(result.title, test.title)
-            XCTAssertEqual(result.heldAt, test.openedAt)
+        XCTAssertEqual(result.title, test.title)
+        XCTAssertEqual(result.heldAt, test.openedAt)
 
-            let firstTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == firstTaskID }))
-            XCTAssertEqual(firstTaskResult.choises.count, 3)
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
+        let firstTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == firstTaskID }))
+        XCTAssertEqual(firstTaskResult.choises.count, 3)
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
-            let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
-            XCTAssertEqual(secondTaskResult.choises.count, 3)
-            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
-            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
+        let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
+        XCTAssertEqual(secondTaskResult.choises.count, 3)
+        XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
+        XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
 
-            let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
-            XCTAssertEqual(thirdTaskResult.choises.count, 3)
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
+        let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
+        XCTAssertEqual(thirdTaskResult.choises.count, 3)
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.results(for: test, user: userOne).wait()
-            )
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertThrowsError(
+            try subjectTestRepository.results(for: test, user: userOne).wait()
+        )
     }
 
-    func testResultStatisticsTaskReuseBug() {
-        do {
-            let test = try setupTestWithTasks()
+    func testResultStatisticsTaskReuseBug() throws {
+        let test = try setupTestWithTasks()
 
-            let teacher = try User.create(on: app)
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let teacher = try User.create(on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let firstSubmittion             = try submittionAt(index: 1, for: test)
-            let secondSubmittion            = try submittionAt(index: 2, for: test)
-            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
-            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+        let firstSubmittion             = try submittionAt(index: 1, for: test)
+        let secondSubmittion            = try submittionAt(index: 2, for: test)
+        let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+        let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
-            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
-            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+        let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+        let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+        let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
 
-            let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
+        let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
 
-            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
-            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+        try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
+        let result = try subjectTestRepository.results(for: test, user: teacher).wait()
 
-            try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
-            try submitTestWithAnswers(secondTest, for: userTwo, with: [firstSubmittion, secondSubmittion])
+        try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(secondTest, for: userTwo, with: [firstSubmittion, secondSubmittion])
 
-            let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
+        let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
 
-            XCTAssertEqual(secondResult.title, secondTest.title)
-            XCTAssertEqual(secondResult.heldAt, secondTest.openedAt)
+        XCTAssertEqual(secondResult.title, secondTest.title)
+        XCTAssertEqual(secondResult.heldAt, secondTest.openedAt)
 
-            let firstTaskResult = try XCTUnwrap(secondResult.taskResults.first(where: { $0.taskID == firstTaskID }))
-            XCTAssertEqual(firstTaskResult.choises.count, 3)
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
-            XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
+        let firstTaskResult = try XCTUnwrap(secondResult.taskResults.first(where: { $0.taskID == firstTaskID }))
+        XCTAssertEqual(firstTaskResult.choises.count, 3)
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.numberOfSubmissions == 2 }))
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 1 }))
+        XCTAssertTrue(firstTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
-            let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
-            XCTAssertEqual(secondTaskResult.choises.count, 3)
-            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
-            XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
+        let secondTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == secondTaskID }))
+        XCTAssertEqual(secondTaskResult.choises.count, 3)
+        XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.numberOfSubmissions == 1 }))
+        XCTAssertTrue(secondTaskResult.choises.allSatisfy({ $0.percentage == 1/3 }))
 
-            let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
-            XCTAssertEqual(thirdTaskResult.choises.count, 3)
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 1 }))
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
-            XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
+        let thirdTaskResult = try XCTUnwrap(result.taskResults.first(where: { $0.taskID == thirdTaskID }))
+        XCTAssertEqual(thirdTaskResult.choises.count, 3)
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.numberOfSubmissions == 1 }))
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 1 }))
+        XCTAssertTrue(thirdTaskResult.choises.contains(where: { $0.percentage == 0 }))
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.results(for: test, user: userOne).wait()
-            )
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertThrowsError(
+            try subjectTestRepository.results(for: test, user: userOne).wait()
+        )
     }
 
-    func testResultStatisticsTaskWithMultipleCorrectAnswers() {
-        do {
-            let choises: [MultipleChoiceTaskChoice.Create.Data] = [
-                .init(choice: "first", isCorrect: false),
-                .init(choice: "correct", isCorrect: true),
-                .init(choice: "yeah", isCorrect: true)
-            ]
+    func testResultStatisticsTaskWithMultipleCorrectAnswers() throws {
+        let choises: [MultipleChoiceTaskChoice.Create.Data] = [
+            .init(choice: "first", isCorrect: false),
+            .init(choice: "correct", isCorrect: true),
+            .init(choice: "yeah", isCorrect: true)
+        ]
 
-            let test = try setupTestWithTasks(choises: choises)
+        let test = try setupTestWithTasks(choises: choises)
 
-            let teacher = try User.create(on: app)
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let teacher = try User.create(on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let firstSubmittion             = try submittionAt(index: 1, for: test)
-            let secondSubmittion            = try submittionAt(index: 2, for: test)
-            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
-            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+        let firstSubmittion             = try submittionAt(index: 1, for: test)
+        let secondSubmittion            = try submittionAt(index: 2, for: test)
+        let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+        let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
-            let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
-            let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
+        let firstTaskID     = try taskID(for: firstSubmittion.taskIndex)
+        let secondTaskID    = try taskID(for: secondSubmittion.taskIndex)
+        let thirdTaskID     = try taskID(for: thirdSubmittion.taskIndex)
 
-            let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
+        let secondTest = try setupTestWithTasks(with: [firstTaskID, secondTaskID, thirdTaskID], subjectID: test.subjectID)
 
-            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
-            try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+        try submitTestWithAnswers(secondTest, for: userOne, with: [firstSubmittion, secondSubmittion, thirdSubmittion])
 
-            let result = try subjectTestRepository.results(for: test, user: teacher).wait()
-            let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
+        let result = try subjectTestRepository.results(for: test, user: teacher).wait()
+        let secondResult = try subjectTestRepository.results(for: secondTest, user: teacher).wait()
 
-            XCTAssertEqual(result.averageScore, 1/3)
-            XCTAssertEqual(secondResult.averageScore, 1)
+        XCTAssertEqual(result.averageScore, 1/3)
+        XCTAssertEqual(secondResult.averageScore, 1)
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.results(for: test, user: userOne).wait()
-            )
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertThrowsError(
+            try subjectTestRepository.results(for: test, user: userOne).wait()
+        )
     }
 
     func testTestResultHistogram() throws {
-        do {
-            let test = try setupTestWithTasks()
+        let test = try setupTestWithTasks()
 
-            let admin = try User.create(on: app)
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let admin = try User.create(on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let firstSubmittion             = try submittionAt(index: 1, for: test)
-            let secondSubmittion            = try submittionAt(index: 2, for: test)
-            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
-            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+        let firstSubmittion             = try submittionAt(index: 1, for: test)
+        let secondSubmittion            = try submittionAt(index: 2, for: test)
+        let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+        let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
-            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+        try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let histogram = try subjectTestRepository.scoreHistogram(for: test, user: admin).wait()
+        let histogram = try subjectTestRepository.scoreHistogram(for: test, user: admin).wait()
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.scoreHistogram(for: test, user: userOne).wait()
-            )
+        XCTAssertThrowsError(
+            try subjectTestRepository.scoreHistogram(for: test, user: userOne).wait()
+        )
 
-            XCTAssertEqual(histogram.scores.count, 4)
+        XCTAssertEqual(histogram.scores.count, 4)
 
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.amount, 1)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.amount, 0)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.amount, 1)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.amount, 0)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.amount, 1)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.amount, 0)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.amount, 1)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.amount, 0)
 
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.percentage, 0.5)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.percentage, 0)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.percentage, 0.5)
-            XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.percentage, 0)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 3 })?.percentage, 0.5)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 2 })?.percentage, 0)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 1 })?.percentage, 0.5)
+        XCTAssertEqual(histogram.scores.first(where: { $0.score == 0 })?.percentage, 0)
     }
 
-    func testUserResults() {
-        do {
-            let test = try setupTestWithTasks()
+    func testUserResults() throws {
+        let test = try setupTestWithTasks()
 
-            let admin = try User.create(on: app)
-            let userOne = try User.create(isAdmin: false, on: app)
-            let userTwo = try User.create(isAdmin: false, on: app)
+        let admin = try User.create(on: app)
+        let userOne = try User.create(isAdmin: false, on: app)
+        let userTwo = try User.create(isAdmin: false, on: app)
 
-            let firstSubmittion             = try submittionAt(index: 1, for: test)
-            let secondSubmittion            = try submittionAt(index: 2, for: test)
-            let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
-            let thirdSubmittion             = try submittionAt(index: 3, for: test)
+        let firstSubmittion             = try submittionAt(index: 1, for: test)
+        let secondSubmittion            = try submittionAt(index: 2, for: test)
+        let secondSubmittionIncorrect   = try submittionAt(index: 2, for: test, isCorrect: false)
+        let thirdSubmittion             = try submittionAt(index: 3, for: test)
 
-            try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
-            try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
+        try submitTestWithAnswers(test, for: userOne, with: [firstSubmittion, secondSubmittionIncorrect, secondSubmittion, thirdSubmittion])
+        try submitTestWithAnswers(test, for: userTwo, with: [firstSubmittion, secondSubmittionIncorrect])
 
-            let results = try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: admin).wait()
+        let results = try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: admin).wait()
 
-            XCTAssertThrowsError(
-                try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: userOne).wait()
-            )
+        XCTAssertThrowsError(
+            try subjectTestRepository.detailedUserResults(for: test, maxScore: 3, user: userOne).wait()
+        )
 
-            XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results.count, 2)
 
-            let userOneResult = try XCTUnwrap(results.first(where: { $0.userEmail == userOne.email }))
-            let userTwoResult = try XCTUnwrap(results.first(where: { $0.userEmail == userTwo.email }))
+        let userOneResult = try XCTUnwrap(results.first(where: { $0.userEmail == userOne.email }))
+        let userTwoResult = try XCTUnwrap(results.first(where: { $0.userEmail == userTwo.email }))
 
-            XCTAssertEqual(userOneResult.score, 3)
-            XCTAssertEqual(userTwoResult.score, 1)
-            XCTAssertEqual(userOneResult.percentage, 1)
-            XCTAssertEqual(userTwoResult.percentage, 1/3)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertEqual(userOneResult.score, 3)
+        XCTAssertEqual(userTwoResult.score, 1)
+        XCTAssertEqual(userOneResult.percentage, 1)
+        XCTAssertEqual(userTwoResult.percentage, 1/3)
     }
 
     func submitTestWithAnswers(_ test: SubjectTest, for user: User, with submittions: [MultipleChoiceTask.Submit]) throws {

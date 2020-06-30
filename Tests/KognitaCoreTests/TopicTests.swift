@@ -12,8 +12,8 @@ import KognitaCoreTestable
 
 class TopicTests: VaporTestCase {
 
-    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: database).topicRepository }()
-    lazy var subtopicRepository: SubtopicRepositoring = { TestableRepositories.testable(with: database).subtopicRepository }()
+    lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: app).topicRepository }()
+    lazy var subtopicRepository: SubtopicRepositoring = { TestableRepositories.testable(with: app).subtopicRepository }()
 
     func testCreate() throws {
 

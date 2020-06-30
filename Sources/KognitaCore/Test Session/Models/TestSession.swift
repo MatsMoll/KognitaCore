@@ -29,6 +29,7 @@ extension TestSession {
         init(sessionID: TaskSession.IDValue, testID: SubjectTest.ID) {
             self.id = sessionID
             self.$test.id = testID
+            self.submittedAt = nil
         }
 
         func representable(with session: TaskSession) -> TestSessionRepresentable {
@@ -61,7 +62,7 @@ extension TestSession {
             typealias Model = TestSession.DatabaseModel
 
             func build(schema: SchemaBuilder) -> SchemaBuilder {
-                schema.field("submittedAt", .date)
+                schema.field("submittedAt", .datetime)
                     .field("testID", .uint, .required, .references(SubjectTest.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .foreignKey("id", references: TaskSession.schema, .id, onDelete: .cascade, onUpdate: .cascade)
                     .defaultTimestamps()
@@ -100,16 +101,12 @@ extension TestSession {
         public typealias ParameterModel = TestParameter
 
         public static func resolveWith(_ id: Int, database: Database) -> EventLoopFuture<TestParameter.ParameterModel> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return TaskSession.query(on: conn)
-//                .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
-//                .filter(\TaskSession.id == id)
-//                .alsoDecode(TestSession.DatabaseModel.self)
-//                .first()
-//                .unwrap(or: Abort(.internalServerError))
-//                .map {
-//                    return TestParameter(session: $0.0, testSession: $0.1)
-//            }
+            return TaskSession.query(on: database)
+                .join(TestSession.DatabaseModel.self, on: \TestSession.DatabaseModel.$id == \TaskSession.$id)
+                .filter(\TaskSession.$id == id)
+                .first(TaskSession.self, TestSession.DatabaseModel.self)
+                .unwrap(or: Abort(.badRequest))
+                .map { TestParameter(session: $0.0, testSession: $0.1) }
         }
     }
 }

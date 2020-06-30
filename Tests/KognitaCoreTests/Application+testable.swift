@@ -14,6 +14,7 @@ extension Application {
 //        try app.autoMigrate().wait()
         // Register the commands (used to reset the database)
 //        services.register(SendVerifyEmailMock(), as: VerifyEmailSendable.self)
+        app.logger.logLevel = .debug
         return app
     }
 }

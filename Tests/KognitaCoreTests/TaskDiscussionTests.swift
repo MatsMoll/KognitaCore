@@ -4,7 +4,7 @@ import KognitaCoreTestable
 
 final class TaskDiscussionTests: VaporTestCase {
 
-    lazy var taskDiscussionRepository: TaskDiscussionRepositoring = { TestableRepositories.testable(with: database).taskDiscussionRepository }()
+    lazy var taskDiscussionRepository: TaskDiscussionRepositoring = { TestableRepositories.testable(with: app).taskDiscussionRepository }()
 
     func testCreateDiscussionNotLoggedIn() {
         do {
@@ -66,8 +66,8 @@ final class TaskDiscussionTests: VaporTestCase {
                 taskID: task.requireID()
             )
 
-            XCTAssertThrowsError(try taskDiscussionRepository.create(from: insufficientData, by: user))
-            XCTAssertThrowsError(try taskDiscussionRepository.create(from: noDescriptionData, by: user))
+            XCTAssertThrowsError(try taskDiscussionRepository.create(from: insufficientData, by: user).wait())
+            XCTAssertThrowsError(try taskDiscussionRepository.create(from: noDescriptionData, by: user).wait())
 
         } catch {
             XCTFail(error.localizedDescription)
@@ -143,8 +143,8 @@ final class TaskDiscussionTests: VaporTestCase {
                 discussionID: discussion.requireID()
             )
 
-            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: insufficientData, by: user))
-            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: noResponse, by: user))
+            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: insufficientData, by: user).wait())
+            XCTAssertThrowsError(try taskDiscussionRepository.respond(with: noResponse, by: user).wait())
 
         } catch {
             XCTFail(error.localizedDescription)
