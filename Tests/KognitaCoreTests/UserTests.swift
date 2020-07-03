@@ -21,7 +21,7 @@ class UserTests: VaporTestCase {
 
         let user = try userRepository.create(from: createRequest, by: nil).wait()
         XCTAssertNoThrow(
-            try User.VerifyEmail.Token.query(on: app.db).filter(\.$user.$id == user.id).first().unwrap(or: Abort(.internalServerError)).wait()
+            try User.VerifyEmail.Token.DatabaseModel.query(on: app.db).filter(\.$user.$id == user.id).first().unwrap(or: Abort(.internalServerError)).wait()
         )
     }
 
@@ -111,7 +111,7 @@ class UserTests: VaporTestCase {
         let user = try User.create(on: app)
 
         let tokenResponse = try resetPasswordRepository.startReset(for: user).wait()
-        var token = try User.ResetPassword.Token.query(on: database)
+        var token = try User.ResetPassword.Token.DatabaseModel.query(on: database)
             .filter(\.$string == tokenResponse.token)
             .first()
             .unwrap(or: Abort(.badRequest))

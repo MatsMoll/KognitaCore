@@ -40,6 +40,7 @@ import Vapor
 //
 public func config(app: Application) {
     DatabaseMigrations.migrationConfig(app)
+    app.repositoriesFactory.use(DatabaseRepositories.init(request: ))
 //    services.register(RepositoriesRepresentable.self) { (container: Container) in
 //        try DatabaseRepositories(conn: container.connectionPool(to: .psql))
 //    }

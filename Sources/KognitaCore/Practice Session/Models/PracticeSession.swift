@@ -21,7 +21,7 @@ extension PracticeSession {
         public static var tableName: String = "PracticeSession"
 
         /// The session id
-        @DBID(custom: "id")
+        @DBID(custom: "id", generatedBy: .user)
         public var id: Int?
 
         /// The date the session was ended
@@ -140,25 +140,27 @@ extension PracticeSession: Content {}
 
 public struct TaskType: Content {
 
-    let task: TaskDatabaseModel
-    let multipleChoise: MultipleChoiceTask.DatabaseModel?
+    public let task: GenericTask
+    public let isMultipleSelect: Bool?
 
-    init(content: (task: TaskDatabaseModel, chosie: MultipleChoiceTask.DatabaseModel?)) {
-        self.task = content.task
-        self.multipleChoise = content.chosie
+    public var taskID: Task.ID { task.id }
+
+    init(content: (task: TaskDatabaseModel, chocie: MultipleChoiceTask.DatabaseModel?)) {
+        self.task = GenericTask(task: content.task)
+        self.isMultipleSelect = content.chocie?.isMultipleSelect
     }
 }
 
 extension PracticeSession {
     public struct CurrentTask: Content {
 
-        public let session: PracticeSession
+        public let sessionID: PracticeSession.ID
         public let task: TaskType
         public let index: Int
         public let user: User
 
-        public init(session: PracticeSession, task: TaskType, index: Int, user: User) {
-            self.session = session
+        public init(sessionID: PracticeSession.ID, task: TaskType, index: Int, user: User) {
+            self.sessionID = sessionID
             self.task = task
             self.index = index
             self.user = user

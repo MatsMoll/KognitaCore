@@ -107,6 +107,20 @@ extension QueryBuilder {
         }
     }
 
+    public func first<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type, _ joinedTwo: JoinedTwo.Type, _ joinedThree: JoinedThree.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo, JoinedThree)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema,
+        JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self), let joinedTwo = try $0?.joined(JoinedTwo.self), let joinedThree = try $0?.joined(JoinedThree.self) else { return nil }
+            return (joined, joinedTwo, joinedThree)
+        }
+    }
+
     public func first<Joined, JoinedTwo>(
         _ joined: Joined.Type, _ joinedTwo: Optional<JoinedTwo>.Type
     ) -> EventLoopFuture<(Joined, JoinedTwo?)?>
@@ -570,53 +584,17 @@ extension Subject.ListOverview {
     }
 }
 
-extension Subject {
-    public struct Compendium: Content {
+extension TaskSolution.Unverified {
 
-        public struct QuestionData: Codable {
-            public let question: String
-            public let solution: String
-        }
-
-        public struct SubtopicData: Codable {
-            public let subjectID: Subject.ID
-            public let subtopicID: Subtopic.ID
-            public let name: String
-            public let questions: [QuestionData]
-        }
-
-        public struct TopicData: Codable {
-            public let name: String
-            public let chapter: Int
-            public let subtopics: [SubtopicData]
-        }
-
-        public let subjectID: Subject.ID
-        public let subjectName: String
-        public let topics: [TopicData]
-    }
-}
-
-extension TaskSolution {
-
-    public struct Unverified: Codable {
-
-        public let taskID: Task.ID
-        public let solutionID: TaskSolution.ID
-        public let description: String?
-        public let question: String
-        public let solution: String
-
-        public let choises: [MultipleChoiceTaskChoice]
-
-        init(task: TaskDatabaseModel, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) throws {
-            self.taskID = try task.requireID()
-            self.solutionID = solution.id
-            self.description = task.description
-            self.question = task.question
-            self.solution = solution.solution
-            self.choises = try choises.map { try .init(choice: $0) }
-        }
+    init(task: TaskDatabaseModel, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) throws {
+        self.init(
+            taskID: try task.requireID(),
+            solutionID: solution.id,
+            description: task.description,
+            question: task.question,
+            solution: solution.solution,
+            choises: try choises.map { try .init(choice: $0) }
+        )
     }
 }
 
@@ -624,7 +602,7 @@ extension MultipleChoiceTaskChoice {
     init(choice: MultipleChoiseTaskChoise) throws {
         try self.init(
             id: choice.requireID(),
-            choise: choice.choice,
+            choice: choice.choice,
             isCorrect: choice.isCorrect
         )
     }
@@ -637,7 +615,7 @@ extension Subject.ListOverview {
             name: subject.name,
             description: subject.description,
             category: subject.category,
-            isActive: active.contains(where: { $0.subject.id == subject.id })
+            isActive: active.contains(where: { $0.$subject.id == subject.id })
         )
     }
 }

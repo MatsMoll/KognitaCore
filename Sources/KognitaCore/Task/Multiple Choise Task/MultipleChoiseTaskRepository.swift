@@ -8,18 +8,22 @@
 import FluentSQL
 import Vapor
 
+extension MultipleChoiceTaskChoice.Answered: Content {}
+extension MultipleChoiceTaskChoice.Result: Content {}
+
 public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
     func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask.Create.Response>
     func updateModelWith(id: Int, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask.Update.Response>
     func task(withID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask>
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details>
     func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]>
-    func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
+    func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>>
     func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
     func createAnswer(choiseID: MultipleChoiceTaskChoice.ID, sessionID: TestSession.ID) -> EventLoopFuture<TaskAnswer>
-    func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]>
-    func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]>
-    func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiseTaskChoise]) throws -> TaskSessionResult<[MultipleChoiseTaskChoise.Result]>
+    func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]>
+    func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]>
+    func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiceTaskChoice]) throws -> TaskSessionResult<[MultipleChoiceTaskChoice.Result]>
+    func multipleChoiseAnswers(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice.Answered]>
 }
 
 extension MultipleChoiceTask {
@@ -37,6 +41,7 @@ extension MultipleChoiceTask {
         private let subtopicRepository: SubtopicRepositoring
         private let userRepository: UserRepository
         private let taskRepository: TaskRepository
+        private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
 
@@ -60,6 +65,13 @@ extension MultipleChoiceTask.Create.Data: Validatable {
 }
 
 extension MultipleChoiceTask.DatabaseRepository {
+
+    public func multipleChoiseAnswers(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice.Answered]> {
+        choisesFor(taskID: taskID)
+            .flatMap { choices in
+                self.taskAnswerRepository.multipleChoiseAnswers(in: sessionID, taskID: taskID, choices: choices)
+        }
+    }
 
     public func task(withID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask> {
         MultipleChoiceTask.DatabaseModel.query(on: database)
@@ -263,24 +275,25 @@ extension MultipleChoiceTask.DatabaseRepository {
     }
 
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
-    public func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    public func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>> {
 
         return MultipleChoiseTaskChoise.query(on: database)
             .filter(\MultipleChoiseTaskChoise.$task.$id == taskID)
             .filter(\MultipleChoiseTaskChoise.$isCorrect == true)
             .all()
+            .flatMapEachThrowing { try MultipleChoiceTaskChoice(choice: $0) }
             .flatMapThrowing { correctChoises in
                 try self.evaluate(choises, agenst: correctChoises)
         }
     }
 
     /// Evaluates the submited data and returns a score indicating *how much correct* the answer was
-    public func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiseTaskChoise]) throws -> TaskSessionResult<[MultipleChoiseTaskChoise.Result]> {
+    public func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiceTaskChoice]) throws -> TaskSessionResult<[MultipleChoiceTaskChoice.Result]> {
 
         var numberOfCorrect = 0
         var numberOfIncorrect = 0
         var missingAnswers = correctChoises.filter({ $0.isCorrect })
-        var results = [MultipleChoiseTaskChoise.Result]()
+        var results = [MultipleChoiceTaskChoice.Result]()
 
         for choise in choises {
             if let index = missingAnswers.firstIndex(where: { $0.id == choise }) {
@@ -292,8 +305,8 @@ extension MultipleChoiceTask.DatabaseRepository {
                 results.append(.init(id: choise, isCorrect: false))
             }
         }
-        try results += missingAnswers.map {
-            try .init(id: $0.requireID(), isCorrect: true)
+        results += missingAnswers.map {
+            .init(id: $0.id, isCorrect: true)
         }
 
         let score = Double(numberOfCorrect) / Double(correctChoises.count)
@@ -328,11 +341,12 @@ extension MultipleChoiceTask.DatabaseRepository {
             .transform(to: answer)
     }
 
-    public func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]> {
+    public func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]> {
         MultipleChoiseTaskChoise.query(on: database)
             .filter(\MultipleChoiseTaskChoise.$task.$id == taskID)
             .filter(\.$isCorrect == true)
             .all()
+            .flatMapEachThrowing { try MultipleChoiceTaskChoice(choice: $0) }
     }
 
     public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details> {
@@ -389,17 +403,11 @@ extension MultipleChoiceTask.DatabaseRepository {
 
     }
 
-    public func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiseTaskChoise]> {
+    public func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]> {
         MultipleChoiseTaskChoise.query(on: database)
             .withDeleted()
             .filter(\MultipleChoiseTaskChoise.$task.$id == taskID)
             .all()
+            .flatMapEachThrowing { try MultipleChoiceTaskChoice(choice: $0) }
     }
-}
-
-public struct TaskPreviewContent {
-    public let subject: Subject
-    public let topic: Topic
-    let task: TaskDatabaseModel
-    public let actionDescription: String
 }

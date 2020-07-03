@@ -13,17 +13,29 @@ public protocol RepositoriesRepresentable {
     var typingTaskRepository: FlashCardTaskRepository { get }
     var taskSolutionRepository: TaskSolutionRepositoring { get }
     var taskDiscussionRepository: TaskDiscussionRepositoring { get }
+    var taskResultRepository: TaskResultRepositoring { get }
+}
+
+struct DatabaseRepositoriesProvider: LifecycleHandler {
+    func willBoot(_ application: Application) throws {
+        application.repositoriesFactory.use(DatabaseRepositories.init)
+    }
 }
 
 public class DatabaseRepositories: RepositoriesRepresentable {
 
-    internal init(database: Database, password: Application.Password) {
+    internal init(request: Request) {
+        self.database = request.db
+        self.password = request.password
+    }
+
+    internal init(database: Database, password: PasswordHasher) {
         self.database = database
         self.password = password
     }
 
-    let database: Database
-    let password: Application.Password
+    var password: PasswordHasher
+    var database: Database
 
     public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self)
 
@@ -46,4 +58,31 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     public lazy var taskSolutionRepository: TaskSolutionRepositoring = TaskSolution.DatabaseRepository(database: database, userRepository: self.userRepository)
 
     public lazy var taskDiscussionRepository: TaskDiscussionRepositoring = TaskDiscussion.DatabaseRepository(database: database)
+
+    public lazy var taskResultRepository: TaskResultRepositoring = TaskResult.DatabaseRepository(database: database)
+}
+
+struct RepositoriesFactory {
+    var make: ((Request) -> RepositoriesRepresentable)?
+
+    mutating func use(_ make: @escaping ((Request) -> RepositoriesRepresentable)) {
+        self.make = make
+    }
+}
+
+extension Application {
+    private struct RepositoriesKey: StorageKey {
+        typealias Value = RepositoriesFactory
+    }
+
+    var repositoriesFactory: RepositoriesFactory {
+        get { self.storage[RepositoriesKey.self] ?? .init() }
+        set { self.storage[RepositoriesKey.self] = newValue }
+    }
+}
+
+extension Request {
+    public var repositories: RepositoriesRepresentable {
+        self.application.repositoriesFactory.make!(self)
+    }
 }

@@ -1,12 +1,6 @@
 import Vapor
 import FluentKit
 
-public protocol UserContent {
-    var userId: Int { get }
-    var username: String { get }
-    var email: String { get }
-}
-
 extension User {
 
     /// A registered user, capable of owning todo items.
@@ -108,10 +102,10 @@ extension User.Migrations {
 
 public struct BasicUserAuthenticator: BasicAuthenticator {
 
-    let userRepository: UserRepository
-
     public func authenticate(basic: BasicAuthorization, for request: Request) -> EventLoopFuture<Void> {
-        userRepository.verify(email: basic.username, with: basic.password)
+        request.repositories
+            .userRepository
+            .verify(email: basic.username, with: basic.password)
             .map { user in
                 if let user = user {
                     request.auth.login(user)
@@ -122,10 +116,9 @@ public struct BasicUserAuthenticator: BasicAuthenticator {
 
 public struct BearerUserAuthenticator: BearerAuthenticator {
 
-    let userRepository: UserRepository
-
     public func authenticate(bearer: BearerAuthorization, for request: Request) -> EventLoopFuture<Void> {
-        userRepository.user(with: bearer.token)
+        request.repositories.userRepository
+            .user(with: bearer.token)
             .map { user in
                 if let user = user {
                     request.auth.login(user)
@@ -142,16 +135,20 @@ public struct SessionUserAuthenticator: SessionAuthenticator {
 
     public typealias User = KognitaContent.User
 
-    let userRepository: UserRepository
-
     public func authenticate(sessionID: User.ID, for request: Request) -> EventLoopFuture<Void> {
-        userRepository.find(sessionID)
+        request.repositories.userRepository.find(sessionID)
             .map { user in
                 if let user = user {
                     request.auth.login(user)
                 }
         }
     }
+}
+
+extension User {
+    public static func basicAuthMiddleware() -> BasicUserAuthenticator { BasicUserAuthenticator() }
+    public static func sessionAuthMiddleware() -> SessionUserAuthenticator { SessionUserAuthenticator() }
+    public static func bearerAuthMiddleware() -> BearerUserAuthenticator { BearerUserAuthenticator() }
 }
 
 /// Allows `User` to be used as a dynamic parameter in route definitions.

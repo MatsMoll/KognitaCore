@@ -36,7 +36,7 @@ extension Topic {
         public var id: Int?
 
         /// The subject the topic is assigned to
-        @Parent(key: "subjectId")
+        @Parent(key: "subjectID")
         public var subject: Subject.DatabaseModel
 
         @Children(for: \.$topic)

@@ -114,15 +114,12 @@ extension TaskSolution {
         }
 
         public func revokeVote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            TaskSolution.Pivot.Vote.query(on: database)
-//                .filter(\.userID == user.id)
-//                .filter(\.solutionID == solutionID)
-//                .first()
-//                .unwrap(or: Abort(.badRequest))
-//                .flatMap { vote in
-//                    vote.delete(on: self.conn)
-//            }
+            TaskSolution.Pivot.Vote.query(on: database)
+                .filter(\.$user.$id == user.id)
+                .filter(\.$solution.$id == solutionID)
+                .first()
+                .unwrap(or: Abort(.badRequest))
+                .delete(on: database)
         }
 
         public func updateModelWith(id: Int, to data: TaskSolution.Update.Data, by user: User) throws -> EventLoopFuture<TaskSolution> {

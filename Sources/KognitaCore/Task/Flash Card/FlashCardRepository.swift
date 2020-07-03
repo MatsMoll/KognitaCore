@@ -9,14 +9,53 @@ import Vapor
 import FluentKit
 
 public protocol FlashCardTaskRepository: DeleteModelRepository {
-    func create(from content: FlashCardTask.Create.Data, by user: User?) throws -> EventLoopFuture<FlashCardTask.Create.Response>
-    func updateModelWith(id: Int, to data: FlashCardTask.Edit.Data, by user: User) throws -> EventLoopFuture<FlashCardTask.Edit.Response>
+    func create(from content: TypingTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask.Create.Response>
+    func updateModelWith(id: Int, to data: TypingTask.Update.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response>
     func importTask(from task: TaskBetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
-    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<FlashCardTask.ModifyContent>
-    func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit) -> EventLoopFuture<TaskAnswer>
+    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
+    func createAnswer(for task: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer>
+    func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
+}
+
+extension TypingTask.Create.Data: TaskCreationContentable {
+    public var examPaperSemester: TaskExamSemester? { nil }
 }
 
 extension KognitaContent.TypingTask {
+    init(task: Task) {
+        self.init(
+            id: task.id,
+            subtopicID: task.subtopicID,
+            description: task.description,
+            question: task.question,
+            creatorID: task.creatorID,
+            examType: task.examType,
+            examYear: task.examYear,
+            isTestable: task.isTestable,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            editedTaskID: task.editedTaskID
+        )
+    }
+
+    init(task: TaskDatabaseModel) {
+        self.init(
+            id: task.id ?? 0,
+            subtopicID: task.$subtopic.id,
+            description: task.description,
+            question: task.question,
+            creatorID: task.$creator.id,
+            examType: nil,
+            examYear: task.examPaperYear,
+            isTestable: task.isTestable,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            editedTaskID: nil
+        )
+    }
+}
+
+extension KognitaContent.GenericTask {
     init(task: TaskDatabaseModel) {
         self.init(
             id: task.id ?? 0,
@@ -50,12 +89,17 @@ extension FlashCardTask {
         private var userRepository: UserRepository { repositories.userRepository }
         private let taskRepository: TaskRepository
         private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
+        private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
 
 extension FlashCardTask.DatabaseRepository {
 
-    public func create(from content: FlashCardTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask> {
+    public func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?> {
+        self.taskAnswerRepository.typingTaskAnswer(in: sessionID, taskID: taskID)
+    }
+
+    public func create(from content: TypingTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask> {
 
         guard let user = user else {
             throw Abort(.unauthorized)
@@ -86,7 +130,7 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public func updateModelWith(id: Int, to data: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<FlashCardTask.Edit.Response> {
+    public func updateModelWith(id: Int, to data: TypingTask.Create.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response> {
         FlashCardTask.find(id, on: database)
             .unwrap(or: Abort(.badRequest))
             .flatMapThrowing { try $0.requireID() }
@@ -204,7 +248,7 @@ extension FlashCardTask.DatabaseRepository {
             .all(TaskDatabaseModel.self)
     }
 
-    public func content(for flashCard: FlashCardTask) -> EventLoopFuture<TaskPreviewContent> {
+    public func content(for flashCard: TypingTask) -> EventLoopFuture<TaskPreviewContent> {
 
         database.eventLoop.future(error: Abort(.notImplemented))
 //        return TaskDatabaseModel.query(on: db, withSoftDeleted: true)
@@ -226,14 +270,15 @@ extension FlashCardTask.DatabaseRepository {
 //        }
     }
 
-    public func createAnswer(for task: FlashCardTask, with submit: FlashCardTask.Submit) -> EventLoopFuture<TaskAnswer> {
+    public func createAnswer(for taskID: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer> {
+
         let answer = TaskAnswer()
 
         return answer.create(on: database)
             .flatMapThrowing {
                 try FlashCardAnswer(
                     answerID: answer.requireID(),
-                    taskID: task.requireID(),
+                    taskID: taskID,
                     answer: submit.answer
                 )
         }
@@ -241,7 +286,7 @@ extension FlashCardTask.DatabaseRepository {
         .transform(to: answer)
     }
 
-    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<FlashCardTask.ModifyContent> {
+    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent> {
 
         throw Abort(.notImplemented)
 //        TaskDatabaseModel.query(on: db)

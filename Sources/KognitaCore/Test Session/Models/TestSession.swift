@@ -7,7 +7,7 @@ extension TestSession {
 
         public static var tableName: String = "TestSession"
 
-        @DBID(custom: "id")
+        @DBID(custom: "id", generatedBy: .user)
         public var id: Int?
 
         @Timestamp(key: "createdAt", on: .create)

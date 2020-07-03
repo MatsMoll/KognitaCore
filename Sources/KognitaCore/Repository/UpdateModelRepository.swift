@@ -37,7 +37,7 @@ extension DatabaseConnectableRepository {
 }
 
 extension EventLoopFuture {
-    func failableFlatMap<Result>(event: @escaping (Value) throws -> EventLoopFuture<Result>) -> EventLoopFuture<Result> {
+    public func failableFlatMap<Result>(event: @escaping (Value) throws -> EventLoopFuture<Result>) -> EventLoopFuture<Result> {
         flatMap { value in
             do {
                 return try event(value)

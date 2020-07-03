@@ -13,7 +13,7 @@ final class MultipleChoiseTaskAnswer: Model, Codable {
 
     static var schema: String = "MultipleChoiseTaskAnswer"
 
-    @DBID(custom: "id")
+    @DBID(custom: "id", generatedBy: .user)
     public var id: Int?
 
     @Parent(key: "choiseID")

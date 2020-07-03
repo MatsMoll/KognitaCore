@@ -9,9 +9,15 @@ import Vapor
 import FluentKit
 
 extension EventLoopFuture where Value == Bool {
-    func ifFalse(throw error: Error) -> EventLoopFuture<Void> {
+    public func ifFalse(throw error: Error) -> EventLoopFuture<Void> {
         flatMapThrowing {
             if $0 == false { throw error }
+        }
+    }
+
+    public func ifTrue(throw error: Error) -> EventLoopFuture<Void> {
+        flatMapThrowing {
+            if $0 { throw error }
         }
     }
 }

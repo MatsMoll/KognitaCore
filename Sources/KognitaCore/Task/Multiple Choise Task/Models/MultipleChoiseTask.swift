@@ -86,7 +86,7 @@ extension MultipleChoiceTask {
             updatedAt: task.updatedAt,
             editedTaskID: nil,
             isMultipleSelect: isMultipleSelect,
-            choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choise: $0.choice, isCorrect: $0.isCorrect) }
+            choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choice: $0.choice, isCorrect: $0.isCorrect) }
         )
     }
 }

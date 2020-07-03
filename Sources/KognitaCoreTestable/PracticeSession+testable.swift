@@ -48,12 +48,18 @@ public class TestableRepositories: RepositoriesRepresentable {
     }
 
     private static var shared: TestableRepositories!
+
     public static func testable(with app: Application) -> TestableRepositories {
+        testable(database: app.db, password: app.password)
+    }
+
+    public static func testable(database: Database, password: PasswordHasher) -> TestableRepositories {
         if shared == nil {
-            shared = TestableRepositories(repositories: DatabaseRepositories(database: app.db, password: app.password))
+            shared = TestableRepositories(repositories: DatabaseRepositories(database: database, password: password))
         }
         return shared
     }
+
     public static func reset() {
         shared = nil
     }

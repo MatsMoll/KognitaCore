@@ -21,18 +21,15 @@ public protocol TaskSubmitResultable {
 
 extension TaskResult {
 
-    final class DatabaseModel: KognitaPersistenceModel {
+    final class DatabaseModel: Model {
 
-        static var tableName: String = "TaskResult"
+        static var schema: String = "TaskResult"
 
         @DBID(custom: "id")
         public var id: Int?
 
         @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
-
-        @Timestamp(key: "updatedAt", on: .update)
-        public var updatedAt: Date?
 
         /// The date this task should be revisited
         @Field(key: "revisitDate")
@@ -85,7 +82,7 @@ extension TaskResult.DatabaseModel: ContentConvertable {
             createdAt: createdAt ?? .now,
             revisitDate: revisitDate,
             userID: $user.id ?? 0,
-            taskID: $task.id ?? 0,
+            taskID: $task.id,
             resultScore: resultScore,
             timeUsed: timeUsed,
             sessionID: $session.id ?? 0
@@ -110,7 +107,7 @@ extension TaskResult.Migrations {
                 .field("isSetManually", .bool, .required)
                 .field("revisitDate", .datetime)
                 .field("timeUsed", .double)
-                .defaultTimestamps()
+                .field("createdAt", .date, .required)
                 .unique(on: "sessionID", "taskID")
         }
     }

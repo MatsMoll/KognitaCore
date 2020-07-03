@@ -192,7 +192,7 @@ extension TaskDatabaseModel.DatabaseRepository {
                     .flatMapThrowing { content in
                         try content.map { taskContent in
                             try CreatorTaskContent(
-//                                task: taskContent.0,
+                                task: taskContent.0.content(),
                                 topic: taskContent.2.content(),
                                 creator: taskContent.1.content(),
                                 isMultipleChoise: taskContent.3 != nil

@@ -10,19 +10,24 @@ import FluentPostgresDriver
 import Fluent
 import Vapor
 
+extension TypingTask.Submit: Content, TaskSubmitable {}
+
 public protocol PracticeSessionRepository {
     func create(from content: PracticeSession.Create.Data, by user: User?) throws -> EventLoopFuture<PracticeSession.Create.Response>
-    func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.HighOverview]>
+    func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.Overview]>
     func extend(session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<Void>
-    func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>>
-    func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>>
+    func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>>
+    func submit(_ submit: TypingTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<TypingTask.Submit>>
     func currentActiveTask(in session: PracticeSession) throws -> EventLoopFuture<TaskType>
-    func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable>
+    func end(_ session: PracticeSessionRepresentable, for user: User) -> EventLoopFuture<PracticeSessionRepresentable>
+    func end(sessionID: PracticeSession.ID, for user: User) -> EventLoopFuture<Void>
     func find(_ id: Int) -> EventLoopFuture<PracticeSessionRepresentable>
     func taskID(index: Int, in sessionID: PracticeSession.ID) -> EventLoopFuture<Task.ID>
     func getResult(for sessionID: PracticeSession.ID) throws -> EventLoopFuture<[PracticeSession.TaskResult]>
     func taskAt(index: Int, in sessionID: PracticeSession.ID) throws -> EventLoopFuture<TaskType>
     func sessionWith(id: PracticeSession.ID, isOwnedBy userID: User.ID) -> EventLoopFuture<Bool>
+    func getAllSessionsWithSubject(by user: User) throws -> EventLoopFuture<[PracticeSession.Overview]>
+    func goalProgress(in sessionID: PracticeSession.ID) -> EventLoopFuture<Int>
 }
 
 extension PracticeSession {
@@ -35,7 +40,7 @@ extension PracticeSession {
             self.subjectRepository = repositories.subjectRepository
             self.userRepository = repositories.userRepository
             self.subtopicRepository = repositories.subtopicRepository
-            self.taskResultRepository = KognitaCore.TaskResult.DatabaseRepository.self
+            self.taskResultRepository = repositories.taskResultRepository
         }
 
         init(database: Database, repository: DatabaseRepository) {
@@ -55,7 +60,7 @@ extension PracticeSession {
         private let subjectRepository: SubjectRepositoring
         private let userRepository: UserRepository
         private let subtopicRepository: SubtopicRepositoring
-        private let taskResultRepository: TaskResultRepositoring.Type
+        private let taskResultRepository: TaskResultRepositoring
     }
 }
 
@@ -66,6 +71,14 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
         case nextTaskNotAssigned
         case incorrectTaskType
         case noMoreTasks
+    }
+
+    public func end(sessionID: PracticeSession.ID, for user: User) -> EventLoopFuture<Void> {
+        find(sessionID)
+            .flatMap { session in
+                self.end(session, for: user)
+        }
+        .transform(to: ())
     }
 
     public func find(_ id: Int) -> EventLoopFuture<PracticeSessionRepresentable> {
@@ -124,19 +137,18 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
     func create(topicIDs: Set<Topic.ID>, numberOfTaskGoal: Int, user: User) throws -> EventLoopFuture<PracticeSession.Create.Response> {
 
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        guard topicIDs.count > 0 else {
-//            throw Abort(.badRequest)
-//        }
-//        return topicIDs.map {
-//            self.subtopicRepository
-//                .subtopics(with: $0)
-//        }
-//        .flatten(on: database.eventLoop)
-//        .flatMap { subtopics in
-//            let subtopicIDs = Set(subtopics.flatMap { $0 }.compactMap { $0.id })
-//            return try self.create(subtopicIDs: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, user: user)
-//        }
+        guard topicIDs.count > 0 else {
+            return database.eventLoop.future(error: Abort(.badRequest))
+        }
+        return topicIDs.map {
+            self.subtopicRepository
+                .subtopics(with: $0)
+        }
+        .flatten(on: database.eventLoop)
+        .failableFlatMap { subtopics in
+            let subtopicIDs = Set(subtopics.flatMap { $0 }.compactMap { $0.id })
+            return try self.create(subtopicIDs: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, user: user)
+        }
     }
 
     func create(subtopicIDs: Set<Subtopic.ID>, numberOfTaskGoal: Int, user: User) throws -> EventLoopFuture<PracticeSession.Create.Response> {
@@ -223,10 +235,10 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             return assignUncompletedTask(to: sessionID)
         } else {
             return owner(of: sessionID)
-                .failableFlatMap { userID in
+                .flatMap { userID in
 
-                    try self.taskResultRepository
-                        .getSpaceRepetitionTask(for: userID, sessionID: sessionID, on: self.database)
+                    self.taskResultRepository
+                        .getSpaceRepetitionTask(for: userID, sessionID: sessionID)
                         .flatMap { repetitionTask in
 
                             guard let task = repetitionTask else {
@@ -287,35 +299,24 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
 
     public func taskAt(index: Int, in sessionID: PracticeSession.ID) throws -> EventLoopFuture<TaskType> {
 
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        conn.databaseConnection(to: .psql).flatMap { conn in
-//            conn.select()
-//                .all(table: TaskDatabaseModel.self)
-//                .all(table: MultipleChoiceTask.DatabaseModel.self)
-//                .from(PracticeSession.Pivot.Task.self)
-//                .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
-//                .where(\PracticeSession.Pivot.Task.index == index)
-//                .orderBy(\PracticeSession.Pivot.Task.index, .descending)
-//                .join(\PracticeSession.Pivot.Task.taskID, to: \TaskDatabaseModel.id)
-//                .join(\TaskDatabaseModel.id, to: \MultipleChoiceTask.DatabaseModel.id, method: .left)
-//                .first(decoding: TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
-//                .unwrap(or: Abort(.badRequest))
-//                .map { taskContent in
-//                    TaskType(content: taskContent)
-//            }
-//        }
+        PracticeSession.Pivot.Task.query(on: database)
+            .join(parent: \PracticeSession.Pivot.Task.$task)
+            .join(MultipleChoiceTask.DatabaseModel.self, on: \MultipleChoiceTask.DatabaseModel.$id == \TaskDatabaseModel.$id, method: .left)
+            .filter(\.$session.$id == sessionID)
+            .filter(\.$index == index)
+            .first(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+            .unwrap(or: Abort(.internalServerError))
+            .map { TaskType(content: $0) }
     }
 
     public func taskID(index: Int, in sessionID: PracticeSession.ID) -> EventLoopFuture<Task.ID> {
 
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        PracticeSession.Pivot.Task
-//            .query(on: conn)
-//            .filter(\.index == index)
-//            .filter(\.sessionID == sessionID)
-//            .first()
-//            .unwrap(or: Abort(.badRequest))
-//            .map { $0.taskID }
+        PracticeSession.Pivot.Task.query(on: database)
+            .filter(\.$index == index)
+            .filter(\.$session.$id == sessionID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .map { $0.$task.id }
     }
 }
 
@@ -329,7 +330,7 @@ extension PracticeSession.DatabaseRepository {
             .map { $0.$user.id }
     }
 
-    public func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiseTaskChoise.Result]>> {
+    public func submit(_ submit: MultipleChoiceTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>> {
 
         guard let sessionID = try? session.requireID() else {
             return database.eventLoop.future(error: Abort(.badRequest))
@@ -340,6 +341,7 @@ extension PracticeSession.DatabaseRepository {
 
         return get(MultipleChoiceTask.DatabaseModel.self, at: submit.taskIndex, for: sessionID)
             .flatMap { (task: MultipleChoiceTask.DatabaseModel) in
+
                 self.multipleChoiceRepository
                     .create(answer: submit, sessionID: sessionID)
                     .failableFlatMap { _ in
@@ -356,7 +358,7 @@ extension PracticeSession.DatabaseRepository {
                         .transform(to: result)
                 }
         }
-        .flatMap { (result: TaskSessionResult<[MultipleChoiseTaskChoise.Result]>) in
+        .flatMap { (result: TaskSessionResult<[MultipleChoiceTaskChoice.Result]>) in
             self.goalProgress(in: sessionID)
                 .map { progress in
                     result.progress = Double(progress)
@@ -365,7 +367,7 @@ extension PracticeSession.DatabaseRepository {
         }
     }
 
-    public func submit(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<FlashCardTask.Submit>> {
+    public func submit(_ submit: TypingTask.Submit, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskSessionResult<TypingTask.Submit>> {
 
         guard let sessionID = try? session.requireID() else {
             return database.eventLoop.future(error: Abort(.badRequest))
@@ -375,9 +377,9 @@ extension PracticeSession.DatabaseRepository {
             .ifFalse(throw: Abort(.forbidden))
             .flatMap {
                 self.get(FlashCardTask.self, at: submit.taskIndex, for: sessionID)
-            }.flatMap { task in
-                self.flashCardRepository
-                    .createAnswer(for: task, with: submit)
+            }.failableFlatMap { task in
+                try self.flashCardRepository
+                    .createAnswer(for: task.requireID(), with: submit)
                     .flatMap { answer in
                         self.update(submit, in: sessionID)
                             .map { return TaskSessionResult(result: submit, score: 0, progress: 0) }
@@ -467,11 +469,11 @@ extension PracticeSession.DatabaseRepository {
 //        }
     }
 
-    public func update(_ submit: FlashCardTask.Submit, in session: PracticeSessionRepresentable) throws -> EventLoopFuture<Void> {
+    public func update(_ submit: TypingTask.Submit, in session: PracticeSessionRepresentable) throws -> EventLoopFuture<Void> {
         try update(submit, in: session.requireID())
     }
 
-    public func update(_ submit: FlashCardTask.Submit, in sessionID: PracticeSession.ID) -> EventLoopFuture<Void> {
+    public func update(_ submit: TypingTask.Submit, in sessionID: PracticeSession.ID) -> EventLoopFuture<Void> {
         PracticeSession.Pivot.Task.query(on: database)
             .filter(TaskResult.DatabaseModel.self, \TaskResult.DatabaseModel.$session.$id == sessionID)
             .filter(\PracticeSession.Pivot.Task.$session.$id   == sessionID)
@@ -516,20 +518,15 @@ extension PracticeSession.DatabaseRepository {
         }
     }
 
-    public func end(_ session: PracticeSessionRepresentable, for user: User) throws -> EventLoopFuture<PracticeSessionRepresentable> {
+    public func end(_ session: PracticeSessionRepresentable, for user: User) -> EventLoopFuture<PracticeSessionRepresentable> {
 
-        guard let sessionID = try? session.requireID() else {
-            return database.eventLoop.future(error: Abort(.internalServerError))
+        guard session.userID == user.id else {
+            return database.eventLoop.future(error: Abort(.forbidden))
         }
-
-        return sessionWith(id: sessionID, isOwnedBy: user.id)
-            .ifFalse(throw: Abort(.forbidden))
-            .flatMap {
-                guard session.endedAt == nil else {
-                    return self.database.eventLoop.future(session)
-                }
-                return session.end(on: self.database)
+        guard session.endedAt == nil else {
+            return self.database.eventLoop.future(session)
         }
+        return session.end(on: self.database)
     }
 
     public func goalProgress(in sessionID: PracticeSession.ID) -> EventLoopFuture<Int> {
@@ -564,29 +561,28 @@ extension PracticeSession.DatabaseRepository {
 
     public func getResult(for sessionID: PracticeSession.ID) throws -> EventLoopFuture<[PracticeSession.TaskResult]> {
 
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        return conn.databaseConnection(to: .psql)
-//            .flatMap { conn in
-//
-//                conn.select()
-//                    .column(\Topic.DatabaseModel.name, as: "topicName")
-//                    .column(\Topic.DatabaseModel.id, as: "topicID")
-//                    .column(\PracticeSession.Pivot.Task.index, as: "taskIndex")
-//                    .column(\TaskResult.DatabaseModel.createdAt, as: "date")
-//                    .column(\TaskDatabaseModel.question, as: "question")
-//                    .column(\TaskResult.DatabaseModel.resultScore, as: "score")
-//                    .column(\TaskResult.DatabaseModel.timeUsed, as: "timeUsed")
-//                    .column(\TaskResult.DatabaseModel.revisitDate, as: "revisitDate")
-//                    .column(\TaskResult.DatabaseModel.isSetManually, as: "isSetManually")
-//                    .from(PracticeSession.Pivot.Task.self)
-//                    .join(\PracticeSession.Pivot.Task.taskID, to: \TaskDatabaseModel.id)
-//                    .join(\TaskDatabaseModel.subtopicID, to: \Subtopic.DatabaseModel.id)
-//                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-//                    .join(\TaskDatabaseModel.id, to: \TaskResult.DatabaseModel.taskID)
-//                    .where(\TaskResult.DatabaseModel.sessionID == sessionID)
-//                    .where(\PracticeSession.Pivot.Task.sessionID == sessionID)
-//                    .all(decoding: PracticeSession.TaskResult.self)
-//        }
+        guard let sql = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
+        }
+
+        return sql.select()
+            .column(\Topic.DatabaseModel.$name, as: "topicName")
+            .column(\Topic.DatabaseModel.$id, as: "topicID")
+            .column(\PracticeSession.Pivot.Task.$index, as: "taskIndex")
+            .column(\TaskResult.DatabaseModel.$createdAt, as: "date")
+            .column(\TaskResult.DatabaseModel.$resultScore, as: "score")
+            .column(\TaskResult.DatabaseModel.$timeUsed, as: "timeUsed")
+            .column(\TaskResult.DatabaseModel.$revisitDate, as: "revisitDate")
+            .column(\TaskResult.DatabaseModel.$isSetManually, as: "isSetManually")
+            .column(\TaskDatabaseModel.$question, as: "question")
+            .from(PracticeSession.Pivot.Task.schema)
+            .join(parent: \PracticeSession.Pivot.Task.$task)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .join(from: \TaskDatabaseModel.$id, to: \TaskResult.DatabaseModel.$task.$id)
+            .where(SQLColumn("sessionID", table: TaskResult.DatabaseModel.schema), .equal, SQLBind(sessionID))
+            .where(SQLColumn("sessionID", table: PracticeSession.Pivot.Task.schema), .equal, SQLBind(sessionID))
+            .all(decoding: PracticeSession.TaskResult.self)
     }
 
     public func getAllSessions(by user: User) throws -> EventLoopFuture<[PracticeSession]> {
@@ -606,7 +602,7 @@ extension PracticeSession.DatabaseRepository {
 
     public func getAllSessionsWithSubject(
         by user: User
-    ) throws -> EventLoopFuture<PracticeSession.HistoryList> {
+    ) throws -> EventLoopFuture<[PracticeSession.Overview]> {
 
         return database.eventLoop.future(error: Abort(.notImplemented))
 //        return conn.select()
@@ -636,31 +632,30 @@ extension PracticeSession.DatabaseRepository {
 //        }
     }
 
-    public func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.HighOverview]> {
+    public func getSessions(for user: User) throws -> EventLoopFuture<[PracticeSession.Overview]> {
 
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        conn.databaseConnection(to: .psql)
-//            .flatMap { conn in
-//
-//                conn.select()
-//                    .column(\Subject.DatabaseModel.name, as: "subjectName")
-//                    .column(\Subject.DatabaseModel.id, as: "subjectID")
-//                    .column(\PracticeSession.DatabaseModel.id, as: "id")
-//                    .column(\PracticeSession.DatabaseModel.createdAt, as: "createdAt")
-//                    .column(\PracticeSession.DatabaseModel.endedAt, as: "endedAt")
-//                    .from(PracticeSession.DatabaseModel.self)
-//                    .join(\PracticeSession.DatabaseModel.id, to: \TaskSession.id)
-//                    .join(\PracticeSession.DatabaseModel.id, to: \PracticeSession.Pivot.Subtopic.sessionID)
-//                    .join(\PracticeSession.Pivot.Subtopic.subtopicID, to: \Subtopic.DatabaseModel.id)
-//                    .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-//                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
-//                    .where(\PracticeSession.DatabaseModel.endedAt != nil)
-//                    .where(\TaskSession.userID == user.id)
-//                    .orderBy(\PracticeSession.DatabaseModel.createdAt, .descending)
-//                    .groupBy(\PracticeSession.DatabaseModel.id)
-//                    .groupBy(\Subject.DatabaseModel.id)
-//                    .all(decoding: PracticeSession.HighOverview.self)
-//        }
+        guard let sql = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
+        }
+
+        return sql.select()
+            .column(\Subject.DatabaseModel.$name, as: "subjectName")
+            .column(\Subject.DatabaseModel.$id, as: "subjectID")
+            .column(\PracticeSession.DatabaseModel.$id, as: "id")
+            .column(\PracticeSession.DatabaseModel.$createdAt, as: "createdAt")
+            .column(\PracticeSession.DatabaseModel.$endedAt, as: "endedAt")
+            .from(PracticeSession.DatabaseModel.schema)
+            .join(from: \PracticeSession.DatabaseModel.$id, to: \TaskSession.$id)
+            .join(from: \PracticeSession.DatabaseModel.$id, to: \PracticeSession.Pivot.Subtopic.$session.$id)
+            .join(parent: \PracticeSession.Pivot.Subtopic.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .join(parent: \Topic.DatabaseModel.$subject)
+            .where(SQLRaw("\"endedAt\" IS NOT NULL"))
+            .where("userID", .equal, user.id)
+            .orderBy(SQLColumn("createdAt", table: PracticeSession.DatabaseModel.schemaOrAlias), SQLDirection.descending)
+            .groupBy(\PracticeSession.DatabaseModel.$id)
+            .groupBy(\Subject.DatabaseModel.$id)
+            .all(decoding: PracticeSession.Overview.self)
     }
 
     func register<T: Content>(_ submitResult: TaskSubmitResult, result: TaskSessionResult<T>, in session: PracticeSessionRepresentable, by user: User) throws -> EventLoopFuture<TaskResult> {
@@ -669,8 +664,8 @@ extension PracticeSession.DatabaseRepository {
 
     func register<T: Content>(_ submitResult: TaskSubmitResult, result: TaskSessionResult<T>, in sessionID: PracticeSession.ID, by user: User) -> EventLoopFuture<TaskResult> {
 
-        return TaskResult.DatabaseRepository
-            .createResult(from: submitResult, userID: user.id, with: sessionID, on: database)
+        return taskResultRepository
+            .createResult(from: submitResult, userID: user.id, with: sessionID)
             .flatMap { result in
                 self.markAsComplete(taskID: submitResult.taskID, in: sessionID)
                     .flatMapError { error in

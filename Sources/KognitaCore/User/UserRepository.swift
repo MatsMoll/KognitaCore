@@ -35,20 +35,20 @@ public protocol UserRepository: ResetPasswordRepositoring {
 
     func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
 
-    func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void>
+    func verify(user: User, with token: User.VerifyEmail.Token) throws -> EventLoopFuture<Void>
     func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token>
 }
 
 extension User {
     public struct DatabaseRepository: DatabaseConnectableRepository {
 
-        public init(database: Database, password: Application.Password) {
+        public init(database: Database, password: PasswordHasher) {
             self.database = database
             self.password = password
         }
 
         public let database: Database
-        let password: Application.Password
+        let password: PasswordHasher
     }
 }
 
@@ -66,11 +66,27 @@ extension String {
 extension User.DatabaseRepository: UserRepository {
 
     public func verify(email: String, with password: String) -> EventLoopFuture<User?> {
-        database.eventLoop.future(error: Abort(.notImplemented))
+
+        User.DatabaseModel.query(on: database)
+            .filter(\.$email == email)
+            .first()
+            .flatMapThrowing { user in
+                if
+                    let user = user,
+                    (try? self.password.verify(password, created: user.passwordHash)) == true
+                {
+                    return try user.content()
+                }
+                return nil
+        }
     }
 
     public func user(with token: String) -> EventLoopFuture<User?> {
-        database.eventLoop.future(error: Abort(.notImplemented))
+        User.Login.Token.DatabaseModel.query(on: database)
+            .filter(\.$string == token)
+            .join(parent: \User.Login.Token.DatabaseModel.$user)
+            .first(User.DatabaseModel.self)
+            .flatMapThrowing { try $0?.content() }
     }
 
     public func find(_ id: Int) -> EventLoopFuture<User?> {
@@ -148,7 +164,7 @@ extension User.DatabaseRepository: UserRepository {
                 return newUser.save(on: self.database)
                     .failableFlatMap {
 
-                        try User.VerifyEmail.Token.create(userID: newUser.requireID())
+                        try User.VerifyEmail.Token.DatabaseModel.create(userID: newUser.requireID())
                             .save(on: self.database)
                 }
                 .flatMapThrowing { try newUser.content() }
@@ -233,7 +249,7 @@ extension User.DatabaseRepository: UserRepository {
             .map { $0 != nil }
     }
 
-    public func verify(user: User, with token: User.VerifyEmail.Request) throws -> EventLoopFuture<Void> {
+    public func verify(user: User, with token: User.VerifyEmail.Token) throws -> EventLoopFuture<Void> {
         return database.eventLoop.future(error: Abort(.notImplemented))
 //
 //        guard user.isEmailVerified == false else {
@@ -258,10 +274,11 @@ extension User.DatabaseRepository: UserRepository {
     }
 
     public func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token> {
-        User.VerifyEmail.Token
+        User.VerifyEmail.Token.DatabaseModel
             .query(on: database)
-            .filter(\User.VerifyEmail.Token.$user.$id == userID)
+            .filter(\User.VerifyEmail.Token.DatabaseModel.$user.$id == userID)
             .first()
             .unwrap(or: Abort(.internalServerError))
+            .map { User.VerifyEmail.Token(token: $0.token) }
     }
 }

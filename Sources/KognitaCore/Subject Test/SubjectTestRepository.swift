@@ -20,6 +20,10 @@ extension SQLSelectBuilder {
         return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
     }
 
+    func column<T: Model, Format: TimestampFormat>(_ path: KeyPath<T, TimestampProperty<T, Format>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLColumn(T()[keyPath: path].$timestamp.key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
+    }
+
     func column<T: Model, Value>(_ path: KeyPath<T, IDProperty<T, Value>>, as identifier: String) -> Self {
         return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
     }
@@ -33,6 +37,10 @@ extension SQLSelectBuilder {
     }
 
     func groupBy<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>) -> Self {
+        self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
+    }
+
+    func groupBy<T: Model, Value>(_ path: KeyPath<T, IDProperty<T, Value>>) -> Self {
         self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
     }
 
@@ -66,6 +74,18 @@ extension SQLSelectBuilder {
 
     func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
         self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    }
+
+    public func all<A, B>(decoding: A.Type, _ bType: B.Type) -> EventLoopFuture<[(A, B)]>
+        where A: Decodable, B: Decodable {
+        self.all().flatMapThrowing {
+            try $0.map {
+                try (
+                    $0.decode(model: A.self),
+                    $0.decode(model: B.self)
+                )
+            }
+        }
     }
 }
 
@@ -150,6 +170,7 @@ public protocol SubjectTestRepositoring: DeleteModelRepository {
     func detailedUserResults(for test: SubjectTest, maxScore: Double, user: User) throws -> EventLoopFuture<[SubjectTest.UserResult]>
 
     func stats(for subject: Subject) throws -> EventLoopFuture<[SubjectTest.DetailedResult]>
+
 }
 
 extension SubjectTest {
@@ -571,85 +592,71 @@ extension SubjectTest {
 
         public func currentlyOpenTest(for user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return conn.databaseConnection(to: .psql)
-//                .flatMap { conn in
-//
-//                    conn.select()
-//                        .all(table: SubjectTest.DatabaseModel.self)
-//                        .all(table: Subject.DatabaseModel.self)
-//                        .from(SubjectTest.DatabaseModel.self)
-//                        .join(\SubjectTest.DatabaseModel.subjectID, to: \User.ActiveSubject.subjectID)
-//                        .join(\SubjectTest.DatabaseModel.subjectID, to: \Subject.DatabaseModel.id)
-//                        .where(\SubjectTest.DatabaseModel.openedAt != nil)
-//                        .where(\User.ActiveSubject.userID == user.id)
-//                        .all(decoding: SubjectTest.DatabaseModel.self, Subject.self)
-//                        .flatMap { tests in
-//                            guard let test = tests.first(where: { $0.0.isOpen }) else {
-//                                return conn.future(nil)
-//                            }
-//                            return try conn.select()
-//                                .all(table: TestSession.DatabaseModel.self)
-//                                .from(TestSession.DatabaseModel.self)
-//                                .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
-//                                .where(\TaskSession.userID == user.id)
-//                                .where(\TestSession.DatabaseModel.testID == test.0.requireID())
-//                                .limit(1)
-//                                .first(decoding: TestSession?.self)
-//                                .map { session in
-//                                    try SubjectTest.UserOverview(
-//                                        test: test.0.content(),
-//                                        subjectName: test.1.name,
-//                                        subjectID: test.1.id,
-//                                        hasSubmitted: session?.hasSubmitted ?? false,
-//                                        testSessionID: session?.id
-//                                    )
-//                            }
-//                    }
-//            }
+            return SubjectTest.DatabaseModel.query(on: database)
+                .join(parent: \SubjectTest.DatabaseModel.$subject)
+                .join(User.ActiveSubject.self, on: \User.ActiveSubject.$subject.$id == \SubjectTest.DatabaseModel.$subject.$id)
+                .filter(\.$openedAt != nil)
+                .filter(User.ActiveSubject.self, \User.ActiveSubject.$user.$id == user.id)
+                .all(with: \.$subject)
+                .flatMap { tests in
+                    guard
+                        let test = tests.first(where: { $0.isOpen }),
+                        let testID = test.id
+                    else {
+                        return self.database.eventLoop.future(nil)
+                    }
+
+                    return TestSession.DatabaseModel.query(on: self.database)
+                        .join(TaskSession.self, on: \TaskSession.$id == \TestSession.DatabaseModel.$id)
+                        .filter(TaskSession.self, \TaskSession.$user.$id == user.id)
+                        .filter(\TestSession.DatabaseModel.$test.$id == testID)
+                        .limit(1)
+                        .first()
+                        .flatMapThrowing { session in
+                            try SubjectTest.UserOverview(
+                                test: test.content(),
+                                subjectName: test.subject.name,
+                                subjectID: test.subject.requireID(),
+                                hasSubmitted: session?.hasSubmitted ?? false,
+                                testSessionID: session?.requireID()
+                            )
+                    }
+            }
         }
 
         public func currentlyOpenTest(in subject: Subject, user: User) throws -> EventLoopFuture<SubjectTest.UserOverview?> {
 
-            return database.eventLoop.future(error: Abort(.notImplemented))
-//            return conn.databaseConnection(to: .psql)
-//                .flatMap { conn in
-//
-//                    conn.select()
-//                        .all(table: SubjectTest.DatabaseModel.self)
-//                        .all(table: Subject.DatabaseModel.self)
-//                        .from(SubjectTest.DatabaseModel.self)
-//                        .join(\SubjectTest.DatabaseModel.subjectID, to: \User.ActiveSubject.subjectID)
-//                        .join(\SubjectTest.DatabaseModel.subjectID, to: \Subject.DatabaseModel.id)
-//                        .where(\SubjectTest.DatabaseModel.openedAt != nil)
-//                        .where(\User.ActiveSubject.userID == user.id)
-//                        .where(\SubjectTest.DatabaseModel.subjectID == subject.id)
-//                        .all(decoding: SubjectTest.DatabaseModel.self, Subject.self)
-//                        .flatMap { tests in
-//                            guard let test = tests.first(where: { $0.0.isOpen }) else {
-//                                return conn.future(nil)
-//                            }
-//                            return try conn.select()
-//                                .all(table: TestSession.DatabaseModel.self)
-//                                .from(TestSession.DatabaseModel.self)
-//                                .join(\TestSession.DatabaseModel.id, to: \TaskSession.id)
-//                                .where(\TaskSession.userID == user.id)
-//                                .where(\TestSession.DatabaseModel.testID == test.0.requireID())
-//                                .limit(1)
-//                                .first(decoding: TestSession?.self)
-//                                .map(to: SubjectTest.UserOverview?.self) { session in
-//
-////                                    throw Abort(.notImplemented)
-//                                    try SubjectTest.UserOverview(
-//                                        test: test.0.content(),
-//                                        subjectName: test.1.name,
-//                                        subjectID: test.1.id,
-//                                        hasSubmitted: session?.hasSubmitted ?? false,
-//                                        testSessionID: session?.id
-//                                    )
-//                            }
-//                    }
-//            }
+            return SubjectTest.DatabaseModel.query(on: database)
+                .join(parent: \SubjectTest.DatabaseModel.$subject)
+                .join(User.ActiveSubject.self, on: \User.ActiveSubject.$subject.$id == \SubjectTest.DatabaseModel.$subject.$id)
+                .filter(\.$openedAt != nil)
+                .filter(\.$subject.$id == subject.id)
+                .filter(User.ActiveSubject.self, \User.ActiveSubject.$user.$id == user.id)
+                .all(with: \.$subject)
+                .flatMap { tests in
+                    guard
+                        let test = tests.first(where: { $0.isOpen }),
+                        let testID = test.id
+                    else {
+                        return self.database.eventLoop.future(nil)
+                    }
+
+                    return TestSession.DatabaseModel.query(on: self.database)
+                        .join(TaskSession.self, on: \TaskSession.$id == \TestSession.DatabaseModel.$id)
+                        .filter(TaskSession.self, \TaskSession.$user.$id == user.id)
+                        .filter(\TestSession.DatabaseModel.$test.$id == testID)
+                        .limit(1)
+                        .first()
+                        .flatMapThrowing { session in
+                            try SubjectTest.UserOverview(
+                                test: test.content(),
+                                subjectName: test.subject.name,
+                                subjectID: test.subject.requireID(),
+                                hasSubmitted: session?.hasSubmitted ?? false,
+                                testSessionID: session?.requireID()
+                            )
+                    }
+            }
         }
 
         public func all(in subject: Subject, for user: User) throws -> EventLoopFuture<[SubjectTest]> {

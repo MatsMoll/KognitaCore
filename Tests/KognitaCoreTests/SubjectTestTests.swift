@@ -166,7 +166,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(status.amountOfCompletedUsers, 0)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try testSessionRepository.submit(test: sessionOne, by: userOne).wait()
+            try testSessionRepository.submit(testID: sessionOne.requireID(), by: userOne).wait()
 
             status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
@@ -174,7 +174,7 @@ class SubjectTestTests: VaporTestCase {
             XCTAssertEqual(status.amountOfCompletedUsers, 1)
             XCTAssertEqual(status.hasEveryoneCompleted, false)
 
-            try testSessionRepository.submit(test: sessionTwo, by: userTwo).wait()
+            try testSessionRepository.submit(testID: sessionTwo.requireID(), by: userTwo).wait()
 
             status = try subjectTestRepository.userCompletionStatus(in: test, user: teacher).wait()
 
@@ -216,8 +216,8 @@ class SubjectTestTests: VaporTestCase {
         XCTAssertEqual(userTwoTaskContent.testTasks.last?.isCurrent, false)
         XCTAssertTrue(userTwoTaskContent.choises.allSatisfy({ $0.isSelected == false }))
 
-        try testSessionRepository.submit(content: firstSubmittion, for: sessionOne, by: userOne).wait()
-        try testSessionRepository.submit(content: secondSubmittion, for: sessionTwo, by: userTwo).wait()
+        try testSessionRepository.submit(content: firstSubmittion, sessionID: sessionOne.requireID(), by: userOne).wait()
+        try testSessionRepository.submit(content: secondSubmittion, sessionID: sessionTwo.requireID(), by: userTwo).wait()
 
         userOneTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionOne, for: userOne).wait()
         userTwoTaskContent = try subjectTestRepository.taskWith(id: 1, in: sessionTwo, for: userTwo).wait()
@@ -454,10 +454,10 @@ class SubjectTestTests: VaporTestCase {
         let session = try TestSession.TestParameter.resolveWith(sessionEntry.id, database: database).wait()
 
         try submittions.forEach {
-            try testSessionRepository.submit(content: $0, for: session, by: user).wait()
+            try testSessionRepository.submit(content: $0, sessionID: session.requireID(), by: user).wait()
         }
 
-        try testSessionRepository.submit(test: session, by: user).wait()
+        try testSessionRepository.submit(testID: session.requireID(), by: user).wait()
     }
 
     func submittionAt(index: Int, for test: SubjectTest, isCorrect: Bool = true) throws -> MultipleChoiceTask.Submit {

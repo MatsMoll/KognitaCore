@@ -15,6 +15,10 @@ extension QueryBuilder {
         join(To.self, on: \From._$id == \To._$id, method: method)
     }
 
+    func join<From, To>(from: From.Type, to toType: To.Type, method: DatabaseQuery.Join.Method = .inner) -> Self where From: FluentKit.Model, To: FluentKit.Model, To.IDValue == From.IDValue {
+        join(To.self, on: \From._$id == \To._$id, method: method)
+    }
+
     func join<From, To>(children: KeyPath<From, ChildrenProperty<From, To>>) -> Self {
         switch From()[keyPath: children].parentKey {
         case .optional(let parent): return join(To.self, on: \From._$id == parent.appending(path: \.$id))

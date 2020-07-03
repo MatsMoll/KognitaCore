@@ -5,7 +5,7 @@ extension TaskSolution {
     enum Pivot {
         final class Vote: Model {
 
-            public static var schema: String = "TaskSolution.Vote"
+            public static var schema: String = "TaskSolution.Pivot.Vote"
 
             @DBID(custom: "id")
             var id: Int?

@@ -22,10 +22,3 @@ extension MultipleChoiceTask {
         public internal(set) var taskIndex: Int
     }
 }
-
-extension MultipleChoiseTaskChoise {
-    public struct Result: Content {
-        public let id: MultipleChoiceTaskChoice.ID
-        public let isCorrect: Bool
-    }
-}

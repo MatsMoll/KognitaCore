@@ -57,7 +57,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     public var question: String
 
     /// The id of the user who created the task
-    @Parent(key: "creatorId")
+    @Parent(key: "creatorID")
     var creator: User.DatabaseModel
 
     /// The semester of the exam
@@ -166,6 +166,24 @@ extension TaskDatabaseModel.Migrations {
                 .field("deletedAt", .datetime)
                 .defaultTimestamps()
         }
+    }
+}
+
+extension TaskDatabaseModel: ContentConvertable {
+    func content() throws -> GenericTask {
+        try GenericTask(
+            id: requireID(),
+            subtopicID: $subtopic.id,
+            description: description,
+            question: question,
+            creatorID: $creator.id,
+            examType: nil,
+            examYear: nil,
+            isTestable: isTestable,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            editedTaskID: nil
+        )
     }
 }
 

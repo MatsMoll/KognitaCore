@@ -11,8 +11,15 @@ import FluentKit
 public class DatabaseMigrations {
 
     public static func migrationConfig(_ app: Application) {
-        setupTables(app.migrations)
-        extraDatabase(migrations: app.migrations)
+        if Environment.get("CLEAN_SETUP_MIGRATIONS")?.lowercased() == "true" {
+            setupTables(app.migrations)
+            extraDatabase(migrations: app.migrations)
+        }
+        if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
+            app.migrations.add(VaporFourMigration())
+            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
+            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
+        }
         if app.environment != .testing {
             versionBump(app.migrations)
         }

@@ -8,41 +8,38 @@
 import Vapor
 import FluentKit
 
-extension User {
+extension User.ResetPassword.Token {
 
-    public enum ResetPassword {
+    public final class DatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
 
-        public final class Token: KognitaPersistenceModel, SoftDeleatableModel {
+        public static var tableName: String = "User.ResetPassword.Token"
 
-            public static var tableName: String = "User.ResetPassword.Token"
+        @DBID(custom: "id")
+        public var id: Int?
 
-            @DBID(custom: "id")
-            public var id: Int?
+        @Parent(key: "userId")
+        var user: User.DatabaseModel
 
-            @Parent(key: "userId")
-            var user: User.DatabaseModel
+        @Field(key: "string")
+        var string: String
 
-            @Field(key: "string")
-            var string: String
+        /// The date the token expires
+        @Timestamp(key: "deletedAt", on: .delete)
+        public var deletedAt: Date?
 
-            /// The date the token expires
-            @Timestamp(key: "deletedAt", on: .delete)
-            public var deletedAt: Date?
+        @Timestamp(key: "createdAt", on: .create)
+        public var createdAt: Date?
 
-            @Timestamp(key: "createdAt", on: .create)
-            public var createdAt: Date?
+        @Timestamp(key: "updatedAt", on: .update)
+        public var updatedAt: Date?
 
-            @Timestamp(key: "updatedAt", on: .update)
-            public var updatedAt: Date?
-
-            init(userId: User.ID) throws {
-                self.$user.id = userId
-                self.deletedAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
-                self.string = [UInt8].random(count: 16).base64
-            }
-
-            public init() {}
+        init(userId: User.ID) throws {
+            self.$user.id = userId
+            self.deletedAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
+            self.string = [UInt8].random(count: 16).base64
         }
+
+        public init() {}
     }
 }
 
@@ -53,7 +50,7 @@ extension User.ResetPassword.Token {
 extension User.ResetPassword.Token.Migrations {
     struct Create: KognitaModelMigration {
 
-        typealias Model = User.ResetPassword.Token
+        typealias Model = User.ResetPassword.Token.DatabaseModel
 
         func build(schema: SchemaBuilder) -> SchemaBuilder {
             schema.field("string", .string, .required)
@@ -65,18 +62,6 @@ extension User.ResetPassword.Token.Migrations {
 }
 
 extension User.ResetPassword.Token {
-
-//    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-//        PostgreSQLDatabase.create(User.ResetPassword.Token.self, on: conn) { builder in
-//            try addProperties(to: builder)
-//            builder.reference(from: \.userId, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .setDefault)
-//        }.flatMap {
-//            PostgreSQLDatabase.update(User.ResetPassword.Token.self, on: conn) { builder in
-//                builder.deleteField(for: \.userId)
-//                builder.field(for: \.userId, type: .int, .default(1))
-//            }
-//        }
-//    }
 
     public enum Create {
         public struct Data {
@@ -119,7 +104,7 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
 
     public func startReset(for user: User) throws -> EventLoopFuture<User.ResetPassword.Token.Create.Response> {
 
-        let token = try User.ResetPassword.Token(userId: user.id)
+        let token = try User.ResetPassword.Token.DatabaseModel(userId: user.id)
 
         return token.save(on: database)
             .map { .init(token: token.string) }
@@ -129,7 +114,7 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
 
         guard content.password == content.verifyPassword else { throw User.DatabaseRepository.Errors.passwordMismatch }
 
-        return User.ResetPassword.Token
+        return User.ResetPassword.Token.DatabaseModel
             .query(on: database)
             .filter(\.$string == token)
             .first()

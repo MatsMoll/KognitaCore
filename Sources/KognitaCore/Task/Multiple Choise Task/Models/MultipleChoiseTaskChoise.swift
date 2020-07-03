@@ -8,7 +8,7 @@
 import Vapor
 import FluentKit
 
-public final class MultipleChoiseTaskChoise: Model {
+final class MultipleChoiseTaskChoise: Model {
 
     public static var schema: String = "MultipleChoiseTaskChoise"
 
@@ -25,7 +25,7 @@ public final class MultipleChoiseTaskChoise: Model {
 
     /// The id of the taks this choise relates to
     @Parent(key: "taskId")
-    var task: MultipleChoiceTask.DatabaseModel
+    internal var task: MultipleChoiceTask.DatabaseModel
 
     public init(choise: String, isCorrect: Bool, taskId: MultipleChoiceTask.ID) {
         self.choice = choise

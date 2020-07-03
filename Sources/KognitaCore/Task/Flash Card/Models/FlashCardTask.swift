@@ -7,7 +7,7 @@
 import FluentKit
 import Vapor
 
-public final class FlashCardTask: KognitaCRUDModel {
+internal final class FlashCardTask: KognitaCRUDModel {
 
     public static var tableName: String = "FlashCardTask"
 

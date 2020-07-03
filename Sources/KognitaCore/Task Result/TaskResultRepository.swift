@@ -9,8 +9,13 @@ import FluentPostgresDriver
 import Vapor
 
 extension TaskResult {
-    public class DatabaseRepository: TaskResultRepositoring {
-        public init() {}
+    public struct DatabaseRepository: TaskResultRepositoring {
+
+        let database: Database
+
+        public init(database: Database) {
+            self.database = database
+        }
     }
 }
 
@@ -95,7 +100,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getResults(on database: Database) -> EventLoopFuture<[UserResultOverview]> {
+    public func getResults() -> EventLoopFuture<[UserResultOverview]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
@@ -113,7 +118,7 @@ extension TaskResult.DatabaseRepository {
 //            .all(decoding: UserResultOverview.self)
     }
 
-    public static func getAllResults(for userId: User.ID, with database: Database) throws -> EventLoopFuture<[TaskResult]> {
+    public func getAllResults(for userId: User.ID) -> EventLoopFuture<[TaskResult]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
@@ -135,24 +140,26 @@ extension TaskResult.DatabaseRepository {
 //        }
     }
 
-    public static func getSpaceRepetitionTask(for userID: User.ID, sessionID: PracticeSession.ID, on database: Database) throws -> EventLoopFuture<SpaceRepetitionTask?> {
+    public func getSpaceRepetitionTask(for userID: User.ID, sessionID: PracticeSession.ID) -> EventLoopFuture<SpaceRepetitionTask?> {
 
-        return try Query.flowTasks(
-            userID: userID,
-            sessionID: sessionID
-        )
-            .query(for: database)
-            .all(decoding: SpaceRepetitionTask.self)
-            .map { tasks in
-                let uncompletedTasks = tasks.filter { $0.sessionID != sessionID }
-                let now = Date()
-                let timeInADay: TimeInterval = 60 * 60 * 24
+        failable(eventLoop: database.eventLoop) {
+            try Query.flowTasks(
+                userID: userID,
+                sessionID: sessionID
+            )
+                .query(for: self.database)
+                .all(decoding: SpaceRepetitionTask.self)
+                .map { tasks in
+                    let uncompletedTasks = tasks.filter { $0.sessionID != sessionID }
+                    let now = Date()
+                    let timeInADay: TimeInterval = 60 * 60 * 24
 
-                return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
-                .filter { $0.key < 10 }
-                .min { first, second in
-                    first.key > second.key
-                }?.value.randomElement()
+                    return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+                    .filter { $0.key < 10 }
+                    .min { first, second in
+                        first.key > second.key
+                    }?.value.randomElement()
+            }
         }
     }
 
@@ -189,7 +196,7 @@ extension TaskResult.DatabaseRepository {
 //        }
 //    }
 
-    public static func getAllResultsContent(for user: User, with database: Database, limit: Int = 2) throws -> EventLoopFuture<[TopicResultContent]> {
+    public func getAllResultsContent(for user: User, limit: Int = 2) -> EventLoopFuture<[TopicResultContent]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
@@ -236,11 +243,14 @@ extension TaskResult.DatabaseRepository {
 //        }
     }
 
-    public static func getAmountHistory(for user: User, on database: Database, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
+    public func getAmountHistory(for user: User, numberOfWeeks: Int = 4) -> EventLoopFuture<[TaskResult.History]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
+
+        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
+            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
 
         return sqlDB.select()
             .count(\TaskResult.DatabaseModel.$id, as: "numberOfTasksCompleted")
@@ -248,25 +258,12 @@ extension TaskResult.DatabaseRepository {
             .date(part: .week, from: \TaskResult.DatabaseModel.$createdAt, as: "week")
             .from(TaskResult.DatabaseModel.schema)
             .where("userID", .equal, user.id)
+            .where("createdAt", .greaterThanOrEqual, dateThreshold)
             .groupBy("year")
             .groupBy("week")
             .all(decoding: TaskResult.History.self)
             .flatMapThrowing { days in
 
-//        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
-//            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
-//
-//        return conn.select()
-//            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
-//            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
-//            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
-//            .from(TaskResult.DatabaseModel.self)
-//            .where(\TaskResult.DatabaseModel.userID == user.id)
-//            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
-//            .groupBy(.column(.column(nil, "year")))
-//            .groupBy(.column(.column(nil, "week")))
-//            .all(decoding: TaskResult.History.self)
-//            .map { days in
 //                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
                 let now = Date()
 
@@ -307,14 +304,14 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public static func getAmountHistory(for user: User, in subjectId: Subject.ID, on database: Database, numberOfWeeks: Int = 4) throws -> EventLoopFuture<[TaskResult.History]> {
+    public func getAmountHistory(for user: User, in subjectId: Subject.ID, numberOfWeeks: Int = 4) -> EventLoopFuture<[TaskResult.History]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
 
-//        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
-//            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
+            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
 
         return sqlDB.select()
             .count(\TaskResult.DatabaseModel.$id, as: "numberOfTasksCompleted")
@@ -325,7 +322,8 @@ extension TaskResult.DatabaseRepository {
             .join(from: \TaskDatabaseModel.$subtopic.$id, to: \Subtopic.DatabaseModel.$id)
             .join(from: \Subtopic.DatabaseModel.$topic.$id, to: \Topic.DatabaseModel.$id)
             .where("userID", .equal, user.id)
-            .where("subtopicId", .equal, subjectId)
+            .where("subjectID", .equal, subjectId)
+            .where(SQLColumn("createdAt", table: TaskResult.DatabaseModel.schemaOrAlias), .greaterThanOrEqual, SQLBind(dateThreshold))
             .groupBy("year")
             .groupBy("week")
             .all(decoding: TaskResult.History.self)
@@ -368,107 +366,96 @@ extension TaskResult.DatabaseRepository {
                         }
                 })
         }
-//
-//        return conn.select()
-//            .column(.count(\TaskResult.DatabaseModel.id), as: "numberOfTasksCompleted")
-//            .column(.function("date_part", [.expression(.literal("year")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "year")
-//            .column(.function("date_part", [.expression(.literal("week")), .expression(.column(.keyPath(\TaskResult.DatabaseModel.createdAt)))]), as: "week")
-//            .from(TaskResult.DatabaseModel.self)
-//            .join(\TaskResult.DatabaseModel.taskID, to: \TaskDatabaseModel.id)
-//            .join(\TaskDatabaseModel.subtopicID, to: \Subtopic.DatabaseModel.id)
-//            .join(\Subtopic.DatabaseModel.topicID, to: \Topic.DatabaseModel.id)
-//            .where(\TaskResult.DatabaseModel.userID == user.id)
-//            .where(\TaskResult.DatabaseModel.createdAt, .greaterThanOrEqual, dateThreshold)
-//            .where(\Topic.DatabaseModel.subjectId == subjectId)
-//            .groupBy(.column(.column(nil, "year")))
-//            .groupBy(.column(.column(nil, "week")))
-//            .all(decoding: TaskResult.History.self)
-//        }
     }
 
-    static func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: TaskSession.IDValue, on database: Database) -> EventLoopFuture<TaskResult> {
+    public func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: Sessions.ID) -> EventLoopFuture<TaskResult> {
         let result = TaskResult.DatabaseModel(result: result, userID: userID, sessionID: sessionID)
         return result.save(on: database)
             .flatMapThrowing { try result.content() }
     }
 
-    public static func getUserLevel(for userId: User.ID, in topics: [Topic.ID], on database: Database) throws -> EventLoopFuture<[User.TopicLevel]> {
+    public func getUserLevel(for userId: User.ID, in topics: [Topic.ID]) -> EventLoopFuture<[Topic.UserLevel]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
 
-        return try Query.resultsInTopics(topics, for: userId)
-            .query(for: database)
-            .all(decoding: SubqueryTopicResult.self)
-            .flatMap { _ in
+        return failable(eventLoop: database.eventLoop) {
+            try Query.resultsInTopics(topics, for: userId)
+                .query(for: database)
+                .all(decoding: SubqueryTopicResult.self)
+                .flatMap { results in
 
-                return sqlDB.select()
-                    .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
-                    .column(\Topic.DatabaseModel.$id, as: "topicID")
-                    .from(TaskResult.DatabaseModel.schema)
-                    .join(parent: \TaskResult.DatabaseModel.$task)
-                    .join(parent: \TaskDatabaseModel.$subtopic)
-                    .join(parent: \Subtopic.DatabaseModel.$topic)
-                    .all(decoding: UserLevelScore.self)
-                    .flatMap { scores in
-                        return scores.group(by: \UserLevelScore.topicID)
-                            .map { topicID, grouped in
+                    sqlDB.select()
+                        .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
+                        .column(\Topic.DatabaseModel.$id, as: "topicID")
+                        .from(TaskResult.DatabaseModel.schema)
+                        .where(SQLColumn("id", table: TaskResult.DatabaseModel.schemaOrAlias), .in, SQLBind.group(results.map { $0.id }))
+                        .join(parent: \TaskResult.DatabaseModel.$task)
+                        .join(parent: \TaskDatabaseModel.$subtopic)
+                        .join(parent: \Subtopic.DatabaseModel.$topic)
+                        .all(decoding: UserLevelScore.self)
+                        .flatMap { scores in
+                            return scores.group(by: \UserLevelScore.topicID)
+                                .map { topicID, grouped in
 
-                                TaskDatabaseModel.query(on: database)
-                                    .join(parent: \TaskDatabaseModel.$subtopic)
-                                    .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
-                                    .count()
-                                    .map { maxScore in
-                                        User.TopicLevel(
-                                            topicID: topicID,
-                                            correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
-                                            maxScore: Double(maxScore)
-                                        )
-                                }
-                        }.flatten(on: database.eventLoop)
-                }
+                                    TaskDatabaseModel.query(on: self.database)
+                                        .join(parent: \TaskDatabaseModel.$subtopic)
+                                        .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
+                                        .count()
+                                        .map { maxScore in
+                                            Topic.UserLevel(
+                                                topicID: topicID,
+                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
+                                                maxScore: Double(maxScore)
+                                            )
+                                    }
+                            }.flatten(on: self.database.eventLoop)
+                    }
+            }
         }
     }
 
-    public static func getUserLevel(in subject: Subject, userId: User.ID, on database: Database) throws -> EventLoopFuture<User.SubjectLevel> {
+    public func getUserLevel(in subject: Subject, userId: User.ID) -> EventLoopFuture<User.SubjectLevel> {
 
-        return try Query.resultsInSubject(subject.id, for: userId)
-            .query(for: database)
-            .all(decoding: SubqueryResult.self)
-            .flatMap { result in
+        failable(eventLoop: database.eventLoop) {
+            try Query.resultsInSubject(subject.id, for: userId)
+                .query(for: database)
+                .all(decoding: SubqueryResult.self)
+                .flatMap { result in
 
-                let ids = result.map { $0.id }
+                    let ids = result.map { $0.id }
 
-                guard ids.isEmpty == false else {
-                    return database.eventLoop.future(
-                        User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
-                    )
-                }
+                    guard ids.isEmpty == false else {
+                        return self.database.eventLoop.future(
+                            User.SubjectLevel(subjectID: subject.id, correctScore: 0, maxScore: 1)
+                        )
+                    }
 
-                return TaskResult.DatabaseModel.query(on: database)
-                    .filter(\.$id ~~ ids)
-                    .sum(\.$resultScore)
-                    .flatMap { score in
+                    return TaskResult.DatabaseModel.query(on: self.database)
+                        .filter(\.$id ~~ ids)
+                        .sum(\.$resultScore)
+                        .flatMap { score in
 
-                        TaskDatabaseModel.query(on: database)
-                            .join(parent: \TaskDatabaseModel.$subtopic)
-                            .join(parent: \Subtopic.DatabaseModel.$topic)
-                            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
-                            .count()
-                            .map { maxScore in
+                            TaskDatabaseModel.query(on: self.database)
+                                .join(parent: \TaskDatabaseModel.$subtopic)
+                                .join(parent: \Subtopic.DatabaseModel.$topic)
+                                .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
+                                .count()
+                                .map { maxScore in
 
-                                User.SubjectLevel(
-                                    subjectID: subject.id,
-                                    correctScore: score ?? 0,
-                                    maxScore: Double(maxScore)
-                                )
-                        }
-                }
+                                    User.SubjectLevel(
+                                        subjectID: subject.id,
+                                        correctScore: score ?? 0,
+                                        maxScore: Double(maxScore)
+                                    )
+                            }
+                    }
+            }
         }
     }
 
-    public static func getLastResult(for taskID: Task.ID, by userId: User.ID, on database: Database) throws -> EventLoopFuture<TaskResult?> {
+    public func getLastResult(for taskID: Task.ID, by userId: User.ID) -> EventLoopFuture<TaskResult?> {
         return TaskResult.DatabaseModel.query(on: database)
             .filter(\TaskResult.DatabaseModel.$task.$id == taskID)
             .filter(\TaskResult.DatabaseModel.$user.$id == userId)
@@ -477,7 +464,7 @@ extension TaskResult.DatabaseRepository {
             .flatMapThrowing { try $0?.content() }
     }
 
-    public static func exportResults(on database: Database) throws -> EventLoopFuture<[TaskResult.Answer]> {
+    public func exportResults() -> EventLoopFuture<[TaskResult.Answer]> {
 
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
@@ -520,16 +507,6 @@ struct TaskSubmitResult: TaskSubmitResultRepresentable {
 }
 
 extension User {
-    public struct TopicLevel: Codable {
-        public let topicID: Topic.ID
-        public let correctScore: Double
-        public let maxScore: Double
-
-        public var correctScoreInteger: Int { return Int(correctScore.rounded()) }
-        public var correctProsentage: Double {
-            return (correctScore * 1000 / maxScore).rounded() / 10
-        }
-    }
 
     public struct SubjectLevel: Codable {
         public let subjectID: Subject.ID

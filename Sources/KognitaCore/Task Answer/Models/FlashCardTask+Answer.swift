@@ -13,7 +13,7 @@ final class FlashCardAnswer: Model {
 
     static var schema: String = "FlashCardAnswer"
 
-    @DBID(custom: "id")
+    @DBID(custom: "id", generatedBy: .user)
     public var id: Int?
 
     @Parent(key: "taskID")

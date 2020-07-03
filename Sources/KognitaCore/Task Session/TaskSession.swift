@@ -69,12 +69,13 @@ extension PracticeSession {
 
         public static func resolveWith(_ id: Int, database: Database) -> EventLoopFuture<PracticeSessionRepresentable> {
             return TaskSession.query(on: database)
-                .with(\.$practiceSession)
+                .join(PracticeSession.DatabaseModel.self, on: \PracticeSession.DatabaseModel.$id == \TaskSession.$id)
                 .filter(\TaskSession.$id == id)
-                .first()
-                .unwrap(or: Abort(.internalServerError))
-                .map {
-                    PracticeParameter(session: $0, practiceSession: $0.practiceSession)
+                .limit(1)
+                .all(with: \.$practiceSession)
+                .flatMapThrowing { sessions in
+                    guard let first = sessions.first else { throw Abort(.internalServerError) }
+                    return PracticeParameter(session: first, practiceSession: first.practiceSession)
             }
         }
 

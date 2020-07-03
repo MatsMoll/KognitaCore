@@ -21,6 +21,8 @@ extension User {
         @Parent(key: "subjectID")
         var subject: Subject.DatabaseModel
 
+        public var subjectID: Subject.ID { $subject.id }
+
         @Field(key: "canPractice")
         public var canPractice: Bool
 

@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import FluentKit
+import Fluent
 
 final class TaskSessionAnswer: KognitaPersistenceModel {
 
@@ -46,8 +47,8 @@ extension TaskSessionAnswer.Migrations {
 }
 
 protocol TaskSessionAnswerRepository {
-    func multipleChoiseAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]>
-    func flashCardAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?>
+    func multipleChoiseAnswers(in sessionID: Sessions.ID, taskID: Task.ID, choices: [MultipleChoiceTaskChoice]) -> EventLoopFuture<[MultipleChoiceTaskChoice.Answered]>
+    func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
 }
 
 extension TaskSessionAnswer {
@@ -56,24 +57,34 @@ extension TaskSessionAnswer {
 
         public let database: Database
 
-        public func multipleChoiseAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiseTaskAnswer]> {
-            database.eventLoop.future([])
-//            MultipleChoiseTaskAnswer.query(on: db)
-//                .withDeleted()
-//                .join(\TaskSessionAnswer.taskAnswerID, to: \MultipleChoiseTaskAnswer.id)
-//                .join(\MultipleChoiseTaskChoise.id, to: \MultipleChoiseTaskAnswer.choiseID)
-//                .filter(\TaskSessionAnswer.sessionID == sessionID)
-//                .filter(\MultipleChoiseTaskChoise.taskId == taskID)
-//                .all()
+        public func multipleChoiseAnswers(in sessionID: Sessions.ID, taskID: Task.ID, choices: [MultipleChoiceTaskChoice]) -> EventLoopFuture<[MultipleChoiceTaskChoice.Answered]> {
+
+            MultipleChoiseTaskAnswer.query(on: database)
+                .withDeleted()
+                .join(TaskSessionAnswer.self, on: \TaskSessionAnswer.$taskAnswer.$id == \MultipleChoiseTaskAnswer.$id)
+                .filter(\MultipleChoiseTaskAnswer.$choice.$id ~~ choices.map { $0.id })
+                .filter(TaskSessionAnswer.self, \TaskSessionAnswer.$session.$id == sessionID)
+                .all()
+                .map { answers in
+                    choices.map { choice in
+                        MultipleChoiceTaskChoice.Answered(
+                            id: choice.id,
+                            choice: choice.choice,
+                            wasSelected: answers.contains(where: { $0.$choice.id == choice.id }),
+                            isCorrect: choice.isCorrect
+                        )
+                    }
+            }
         }
 
-        public func flashCardAnswers(in sessionID: TaskSession.IDValue, taskID: Task.ID) -> EventLoopFuture<FlashCardAnswer?> {
-            database.eventLoop.future(nil)
-//            FlashCardAnswer.query(on: conn)
-//                .join(\TaskSessionAnswer.taskAnswerID, to: \FlashCardAnswer.id)
-//                .filter(\TaskSessionAnswer.sessionID == sessionID)
-//                .filter(\FlashCardAnswer.taskID == taskID)
-//                .first()
+        public func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?> {
+
+            FlashCardAnswer.query(on: database)
+                .join(TaskSessionAnswer.self, on: \TaskSessionAnswer.$taskAnswer.$id == \FlashCardAnswer.$id)
+                .filter(TaskSessionAnswer.self, \TaskSessionAnswer.$session.$id == sessionID)
+                .filter(\FlashCardAnswer.$task.$id == taskID)
+                .first()
+                .optionalMap { TypingTask.Answer(answer: $0.answer) }
         }
     }
 }
