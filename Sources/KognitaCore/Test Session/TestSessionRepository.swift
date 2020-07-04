@@ -260,7 +260,7 @@ extension TestSession {
             }
         }
 
-        func update(answer content: FlashCardTask.Submit, for session: TestSessionRepresentable, by user: User) -> EventLoopFuture<Void> {
+        func update(answer content: TypingTask.Submit, for session: TestSessionRepresentable, by user: User) -> EventLoopFuture<Void> {
             return database.eventLoop.future(error: Abort(.notImplemented))
 //            return conn.databaseConnection(to: .psql)
 //                .flatMap { psqlConn in

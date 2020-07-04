@@ -174,7 +174,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             examPaperSemester: nil,
             examPaperYear: startingMultiple.examYear,
             isTestable: startingMultiple.isTestable,
-            choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choise, isCorrect: $0.isCorrect) }
+            choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
         )
 
         let editedMultiple = try multipleChoiceRepository
@@ -236,7 +236,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
         let representable = try session.representable(on: database).wait()
 
         let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
-        let firstChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.multipleChoise!.id!).wait()
+        let firstChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.taskID).wait()
 
         let firstSubmit = MultipleChoiceTask.Submit(
             timeUsed: 20,
@@ -247,7 +247,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             .submit(firstSubmit, in: representable, by: user).wait()
 
         let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
-        let secondChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.multipleChoise!.id!).wait()
+        let secondChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.taskID).wait()
 
         let secondSubmit = MultipleChoiceTask.Submit(
             timeUsed: 20,

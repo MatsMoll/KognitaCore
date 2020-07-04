@@ -22,7 +22,7 @@ class FlashCardTaskTests: VaporTestCase {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
 
-        let taskData = FlashCardTask.Create.Data(
+        let taskData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: nil,
             question: "Test",
@@ -32,30 +32,26 @@ class FlashCardTaskTests: VaporTestCase {
             examPaperYear: nil
         )
 
-        do {
-            let flashCardTask = try typingTaskRepository
-                .create(from: taskData, by: user)
-                .wait()
+        let flashCardTask = try typingTaskRepository
+            .create(from: taskData, by: user)
+            .wait()
 
-            let solution = try taskSolutionRepository
-                .solutions(for: flashCardTask.id, for: user)
-                .wait()
+        let solution = try taskSolutionRepository
+            .solutions(for: flashCardTask.id, for: user)
+            .wait()
 
-            XCTAssertNotNil(flashCardTask.createdAt)
-            XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
-            XCTAssertEqual(flashCardTask.question, taskData.question)
-            XCTAssertEqual(solution.first?.solution, taskData.solution)
-            XCTAssertEqual(solution.first?.approvedBy, user.username)
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
+        XCTAssertNotNil(flashCardTask.createdAt)
+        XCTAssertEqual(flashCardTask.subtopicID, subtopic.id)
+        XCTAssertEqual(flashCardTask.question, taskData.question)
+        XCTAssertEqual(solution.first?.solution, taskData.solution)
+        XCTAssertEqual(solution.first?.approvedBy, user.username)
     }
 
     func testCreateAsStudent() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(isAdmin: false, on: app)
 
-        let taskData = FlashCardTask.Create.Data(
+        let taskData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: nil,
             question: "Test",
@@ -92,7 +88,7 @@ class FlashCardTaskTests: VaporTestCase {
             let startingFlash = try FlashCardTask.create(creator: creatorStudent, on: app)
             var startingTask = try TaskDatabaseModel.find(startingFlash.id!, on: database).unwrap(or: Errors.badTest).wait()
 
-            let content = FlashCardTask.Create.Data(
+            let content = TypingTask.Create.Data(
                 subtopicId: startingTask.$subtopic.id,
                 description: nil,
                 question: "Some question 2",
@@ -143,7 +139,7 @@ class FlashCardTaskTests: VaporTestCase {
                 .create(from: create, by: user).wait()
             let sessionRepresentable = try session.representable(on: database).wait()
 
-            let firstSubmit = FlashCardTask.Submit(
+            let firstSubmit = TypingTask.Submit(
                 timeUsed: 20,
                 knowledge: 2,
                 taskIndex: 1,
@@ -152,7 +148,7 @@ class FlashCardTaskTests: VaporTestCase {
             _ = try practiceSessionRepository
                 .submit(firstSubmit, in: sessionRepresentable, by: user).wait()
 
-            let secondSubmit = FlashCardTask.Submit(
+            let secondSubmit = TypingTask.Submit(
                 timeUsed: 20,
                 knowledge: 2,
                 taskIndex: 2,

@@ -1,5 +1,5 @@
 import Vapor
-import KognitaCore
+@testable import KognitaCore
 import PostgresKit
 
 extension Application {
@@ -8,12 +8,8 @@ extension Application {
 
         let app = Application(.testing)
         KognitaCore.config(app: app)
+        DatabaseMigrations.setupTables(app.migrations)
         setupDatabase(for: app)
-
-//        try app.autoRevert().wait()
-//        try app.autoMigrate().wait()
-        // Register the commands (used to reset the database)
-//        services.register(SendVerifyEmailMock(), as: VerifyEmailSendable.self)
         app.logger.logLevel = .debug
         return app
     }

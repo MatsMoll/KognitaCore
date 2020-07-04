@@ -156,7 +156,7 @@ extension TaskDatabaseModel.Migrations {
         typealias Model = TaskDatabaseModel
 
         func build(schema: SchemaBuilder) -> SchemaBuilder {
-            schema.field("creatorId", .uint, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
+            schema.field("creatorID", .uint, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
                 .field("subtopicID", .uint, .required, .references(Subtopic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                 .field("question", .string, .required)
                 .field("description", .string)

@@ -67,7 +67,7 @@ class TaskTests: VaporTestCase {
     func testCreateTaskWithEmptySolution() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
-        let xssData = FlashCardTask.Create.Data(
+        let xssData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: "Test",
             question: "Some question",
@@ -87,7 +87,7 @@ class TaskTests: VaporTestCase {
     func testCreateMultipleLineSolution() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
-        let xssData = FlashCardTask.Create.Data(
+        let xssData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: "Test",
             question: "Some question",
@@ -115,7 +115,7 @@ Dette er flere linjer
     func testCreateTaskWithXSS() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
-        let xssData = FlashCardTask.Create.Data(
+        let xssData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
             question: "Some question",
@@ -139,7 +139,7 @@ Dette er flere linjer
     func testUpdateTaskXSS() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
-        let xssData = FlashCardTask.Create.Data(
+        let xssData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
             question: "Some question",
@@ -165,7 +165,7 @@ Dette er flere linjer
     func testUpdateSolutionXSS() throws {
         let subtopic = try Subtopic.create(on: app)
         let user = try User.create(on: app)
-        let xssData = FlashCardTask.Create.Data(
+        let xssData = TypingTask.Create.Data(
             subtopicId: subtopic.id,
             description: "# XSS test<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>",
             question: "Some question",

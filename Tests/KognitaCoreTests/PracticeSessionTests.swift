@@ -29,13 +29,13 @@ final class PracticeSessionTests: VaporTestCase {
 
             let session = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-            var answer = FlashCardTask.Submit(
+            var answer = TypingTask.Submit(
                 timeUsed: 20,
                 knowledge: 3,
                 taskIndex: 1,
                 answer: ""
             )
-            let updatedAnswer = FlashCardTask.Submit(
+            let updatedAnswer = TypingTask.Submit(
                 timeUsed: 20,
                 knowledge: 4,
                 taskIndex: 2,
@@ -43,7 +43,12 @@ final class PracticeSessionTests: VaporTestCase {
             )
 
             _ = try practiceSessionRepository.submit(answer, in: session, by: user).wait()
-            answer.taskIndex = 2
+            answer = TypingTask.Submit(
+                timeUsed: 20,
+                knowledge: 3,
+                taskIndex: 2,
+                answer: ""
+            )
             _ = try practiceSessionRepository.submit(answer, in: session, by: user).wait()
             _ = try practiceSessionRepository.submit(updatedAnswer, in: session, by: user).wait()
         }
@@ -91,16 +96,26 @@ final class PracticeSessionTests: VaporTestCase {
 
         let session = try PracticeSession.create(in: [subtopic.id], for: user, on: app)
 
-        var answer = FlashCardTask.Submit(
+        var answer = TypingTask.Submit(
             timeUsed: 20,
             knowledge: 3,
             taskIndex: 1,
             answer: ""
         )
         let firstResult     = try practiceSessionRepository.submit(answer, in: session, by: user).wait()
-        answer.taskIndex = 2
+        answer = TypingTask.Submit(
+            timeUsed: 20,
+            knowledge: 3,
+            taskIndex: 2,
+            answer: ""
+        )
         let secondResult    = try practiceSessionRepository.submit(answer, in: session, by: user).wait()
-        answer.taskIndex = 3
+        answer = TypingTask.Submit(
+            timeUsed: 20,
+            knowledge: 3,
+            taskIndex: 3,
+            answer: ""
+        )
         let lastResult      = try practiceSessionRepository.submit(answer, in: session, by: user).wait()
 
         XCTAssertEqual(firstResult.progress, 20)
@@ -157,8 +172,8 @@ final class PracticeSessionTests: VaporTestCase {
 
             let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-            XCTAssertNotNil(firstTask.multipleChoise)
-            XCTAssert(try firstTask.task.requireID() == taskOne.id || firstTask.task.requireID() == taskTwo.id)
+            XCTAssertNotNil(firstTask.isMultipleSelect)
+            XCTAssert(firstTask.taskID == taskOne.id || firstTask.taskID == taskTwo.id)
 
             let firstChoises = try choisesAt(index: 1, for: representable).filter({ $0.isCorrect })
             let submit = MultipleChoiceTask.Submit(
@@ -172,8 +187,8 @@ final class PracticeSessionTests: VaporTestCase {
 
             let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-            XCTAssertNotNil(secondTask.multipleChoise)
-            try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
+            XCTAssertNotNil(secondTask.isMultipleSelect)
+            XCTAssertNotEqual(secondTask.taskID, firstTask.taskID)
 
             let secondChoises = try choisesAt(index: 2, for: representable).first!
             let secondSubmit = try MultipleChoiceTask.Submit(
@@ -217,8 +232,8 @@ final class PracticeSessionTests: VaporTestCase {
 
             let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-            XCTAssertNotNil(firstTask.multipleChoise)
-            XCTAssert(try firstTask.task.requireID() != testTask.requireID())
+            XCTAssertNotNil(firstTask.isMultipleSelect)
+            XCTAssert(try firstTask.taskID != testTask.requireID())
 
             let submit = MultipleChoiceTask.Submit(
                 timeUsed: 20,
@@ -229,8 +244,8 @@ final class PracticeSessionTests: VaporTestCase {
 
             let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-            XCTAssertNotNil(secondTask.multipleChoise)
-            XCTAssert(try secondTask.task.requireID() != testTask.requireID())
+            XCTAssertNotNil(secondTask.isMultipleSelect)
+            XCTAssert(try secondTask.taskID != testTask.requireID())
 
             let secondSubmit = MultipleChoiceTask.Submit(
                 timeUsed: 20,
@@ -240,7 +255,7 @@ final class PracticeSessionTests: VaporTestCase {
             _ = try practiceSessionRepository.submit(secondSubmit, in: representable, by: user).wait()
             let thiredTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-            XCTAssert(try thiredTask.task.requireID() != testTask.requireID())
+            XCTAssert(try thiredTask.taskID != testTask.requireID())
 
         } catch {
             XCTFail(error.localizedDescription)
@@ -290,8 +305,8 @@ final class PracticeSessionTests: VaporTestCase {
 
         let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-        XCTAssertNotNil(firstTask.multipleChoise)
-        XCTAssert(try firstTask.task.requireID() == taskOne.id || firstTask.task.requireID() == taskTwo.id)
+        XCTAssertNotNil(firstTask.isMultipleSelect)
+        XCTAssert(firstTask.taskID == taskOne.id || firstTask.taskID == taskTwo.id)
 
         let submit = MultipleChoiceTask.Submit(
             timeUsed: 20,
@@ -303,8 +318,8 @@ final class PracticeSessionTests: VaporTestCase {
 
         let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
-        XCTAssertNotNil(secondTask.multipleChoise)
-        try XCTAssertNotEqual(secondTask.task.requireID(), firstTask.task.requireID())
+        XCTAssertNotNil(secondTask.isMultipleSelect)
+        try XCTAssertNotEqual(secondTask.taskID, firstTask.taskID)
     }
 
     func testAsignTaskWithTaskResult() throws {

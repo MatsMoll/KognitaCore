@@ -34,10 +34,6 @@ struct VaporFourMigration: Migration {
             }
         }.flatMap {
             database.schema("Response").delete()
-        }.flatMap {
-            SubtopicTopicIDColumn().prepare(on: database)
-        }.flatMap {
-            TopicSubjectIDColumn().prepare(on: database)
         }
     }
 
@@ -72,6 +68,36 @@ struct VaporFourMigration: Migration {
             guard let sql = database as? SQLDatabase else { return database.eventLoop.future() }
 
             return sql.raw("ALTER TABLE \"Topic\" RENAME COLUMN \"subjectID\" TO \"subjectId\";").run()
+        }
+    }
+
+    struct SubjectCreatorIDColumn: Migration {
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future() }
+
+            return sql.raw("ALTER TABLE \"Subject\" RENAME COLUMN \"creatorId\" TO \"creatorID\";").run()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future() }
+
+            return sql.raw("ALTER TABLE \"Subject\" RENAME COLUMN \"creatorID\" TO \"creatorId\";").run()
+        }
+    }
+
+    struct TaskCreatorIDColumn: Migration {
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future() }
+
+            return sql.raw("ALTER TABLE \"Task\" RENAME COLUMN \"creatorId\" TO \"creatorID\";").run()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            guard let sql = database as? SQLDatabase else { return database.eventLoop.future() }
+
+            return sql.raw("ALTER TABLE \"Task\" RENAME COLUMN \"creatorID\" TO \"creatorId\";").run()
         }
     }
 }

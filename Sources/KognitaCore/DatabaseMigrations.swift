@@ -19,6 +19,8 @@ public class DatabaseMigrations {
             app.migrations.add(VaporFourMigration())
             app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
             app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
+            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
+            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
         }
         if app.environment != .testing {
             versionBump(app.migrations)

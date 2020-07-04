@@ -27,7 +27,7 @@ extension Subject {
         public private(set) var name: String
 
         /// The creator of the subject
-        @Parent(key: "creatorId")
+        @Parent(key: "creatorID")
         public var creator: User.DatabaseModel
 
         /// The category describing the subject etc. Tech
@@ -107,7 +107,7 @@ extension Subject.Migrations {
                 .field("description", .string, .required)
                 .field("name", .string, .required)
                 .field("category", .string, .required)
-                .field("creatorId", .uint, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
+                .field("creatorID", .uint, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
                 .defaultTimestamps()
                 .create()
         }

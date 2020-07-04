@@ -107,7 +107,7 @@ extension TaskResult.Migrations {
                 .field("isSetManually", .bool, .required)
                 .field("revisitDate", .datetime)
                 .field("timeUsed", .double)
-                .field("createdAt", .date, .required)
+                .field("createdAt", .datetime, .required)
                 .unique(on: "sessionID", "taskID")
         }
     }

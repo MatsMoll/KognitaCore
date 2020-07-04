@@ -99,8 +99,8 @@ extension Topic.Migrations {
         func build(schema: SchemaBuilder) -> SchemaBuilder {
             schema.field("name", .string, .required)
                 .field("chapter", .int, .required)
-                .field("subjectId", .uint, .references(Subject.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
-                .unique(on: "chapter", "subjectId")
+                .field("subjectID", .uint, .references(Subject.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .unique(on: "chapter", "subjectID")
                 .defaultTimestamps()
         }
     }

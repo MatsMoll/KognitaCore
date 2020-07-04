@@ -9,6 +9,7 @@
 @_exported import FluentKit
 @_exported import XCTVapor
 
+import FluentSQL
 import Vapor
 import XCTest
 import KognitaCoreTestable
@@ -35,7 +36,10 @@ class VaporTestCase: XCTestCase {
     }
 
     func resetDB() {
-        try! app.autoRevert().wait()
+        guard let database = app.databases.database(logger: app.logger, on: app.eventLoopGroup.next()) as? SQLDatabase else { fatalError() }
+        try! database.raw("DROP SCHEMA public CASCADE").run().wait()
+        try! database.raw("CREATE SCHEMA public").run().wait()
+        try! database.raw("GRANT ALL ON SCHEMA public TO public").run().wait()
         try! app.autoMigrate().wait()
     }
 
