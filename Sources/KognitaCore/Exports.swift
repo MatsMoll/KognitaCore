@@ -1,1 +1,1 @@
-@_exported import KognitaContent
+@_exported import KognitaModels

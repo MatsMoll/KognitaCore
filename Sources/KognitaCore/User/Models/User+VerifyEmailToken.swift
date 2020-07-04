@@ -2,7 +2,7 @@ import Vapor
 import FluentKit
 
 public protocol VerifyEmailSendable {
-//    func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) throws -> EventLoopFuture<Void>
+    func sendEmail(with token: User.VerifyEmail.EmailContent) throws -> EventLoopFuture<Void>
 }
 
 extension User.VerifyEmail.Token {

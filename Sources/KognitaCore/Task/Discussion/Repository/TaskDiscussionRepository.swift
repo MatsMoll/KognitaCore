@@ -67,18 +67,18 @@ extension TaskDiscussion {
 
         public func getUserDiscussions(for user: User) throws -> EventLoopFuture<[TaskDiscussion]> {
             TaskDiscussion.DatabaseModel.query(on: database)
-                .with(\.$responses)
-                .with(\.$user)
+                .join(children: \TaskDiscussion.DatabaseModel.$responses)
+                .join(parent: \TaskDiscussion.DatabaseModel.$user)
                 .filter(\TaskDiscussion.DatabaseModel.$user.$id == user.id)
                 .sort(TaskDiscussionResponse.DatabaseModel.self, \TaskDiscussionResponse.DatabaseModel.$createdAt, .descending)
-                .all()
-                .flatMapEachThrowing { discussion in
+                .all(TaskDiscussion.DatabaseModel.self, User.DatabaseModel.self, TaskDiscussionResponse.DatabaseModel.self)
+                .flatMapEachThrowing { (discussion, user, response) in
                     try TaskDiscussion(
                         id: discussion.requireID(),
                         description: discussion.description,
                         createdAt: discussion.createdAt ?? .now,
-                        username: discussion.user.username,
-                        newestResponseCreatedAt: discussion.responses.last?.createdAt ?? .now
+                        username: user.username,
+                        newestResponseCreatedAt: response.createdAt ?? .now
                     )
                 }
                 .map { $0.removingDuplicates() }

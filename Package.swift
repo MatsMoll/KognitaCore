@@ -21,17 +21,17 @@ var dependencies: [Package.Dependency] = [
 switch ProcessInfo.processInfo.environment["BUILD_TYPE"] {
 case "LOCAL":
     dependencies.append(contentsOf: [
-            .package(path: "../KognitaContent"),
+            .package(path: "../KognitaModels"),
         ]
     )
 case "DEV":
     dependencies.append(contentsOf: [
-            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaContent", .branch("develop")),
+            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", .branch("develop")),
         ]
     )
 default:
     dependencies.append(contentsOf: [
-            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaContent", from: "1.0.0"),
+            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", from: "1.0.0"),
         ]
     )
 }
@@ -61,7 +61,7 @@ let package = Package(
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
-                .product(name: "KognitaContent", package: "KognitaContent"),
+                .product(name: "KognitaModels", package: "KognitaModels"),
             ]
         ),
         .target(

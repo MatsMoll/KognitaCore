@@ -39,7 +39,7 @@ public protocol TestSessionRepositoring {
     ///   - user: The user to fetch the result for
     ///   - conn: The database connection
     /// - Returns: The results from a session
-    func results(in test: TestSession.ID, for user: User) -> EventLoopFuture<KognitaContent.TestSession.Results>
+    func results(in test: TestSession.ID, for user: User) -> EventLoopFuture<KognitaModels.TestSession.Results>
 
     /// Returns an overview over a test session
     /// - Parameters:
@@ -368,13 +368,13 @@ extension TestSession {
             .transform(to: ())
         }
 
-        public func results(in sessionID: TestSession.ID, for user: User) -> EventLoopFuture<KognitaContent.TestSession.Results> {
+        public func results(in sessionID: TestSession.ID, for user: User) -> EventLoopFuture<KognitaModels.TestSession.Results> {
             TestSession.TestParameter.resolveWith(sessionID, database: database)
                 .flatMap { session in
                     self.results(in: session, for: user)
             }
         }
-        func results(in session: TestSessionRepresentable, for user: User) -> EventLoopFuture<KognitaContent.TestSession.Results> {
+        func results(in session: TestSessionRepresentable, for user: User) -> EventLoopFuture<KognitaModels.TestSession.Results> {
 
             guard session.userID == user.id else {
                 return database.eventLoop.future(error: Abort(.forbidden))
@@ -398,6 +398,7 @@ extension TestSession {
                     }
 
                     return SubjectTest.Pivot.Task.query(on: self.database)
+                        .withDeleted()
                         .join(parent: \SubjectTest.Pivot.Task.$task)
                         .join(parent: \TaskDatabaseModel.$subtopic)
                         .join(parent: \Subtopic.DatabaseModel.$topic)

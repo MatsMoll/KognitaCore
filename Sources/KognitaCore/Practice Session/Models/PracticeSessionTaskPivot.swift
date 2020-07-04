@@ -37,7 +37,7 @@ extension PracticeSession.Pivot {
         @Field(key: "score")
         var score: Double?
 
-        init(sessionID: PracticeSession.ID, taskID: KognitaContent.Task.ID, index: Int) {
+        init(sessionID: PracticeSession.ID, taskID: KognitaModels.Task.ID, index: Int) {
             self.$session.id = sessionID
             self.$task.id = taskID
             self.index = index
@@ -54,12 +54,12 @@ extension PracticeSession.Pivot {
             return pivot.create(on: database).transform(to: pivot)
         }
 
-        static func create(sessionID: PracticeSession.ID, taskID: KognitaContent.Task.ID, index: Int, on database: Database) -> EventLoopFuture<PracticeSession.Pivot.Task> {
+        static func create(sessionID: PracticeSession.ID, taskID: KognitaModels.Task.ID, index: Int, on database: Database) -> EventLoopFuture<PracticeSession.Pivot.Task> {
             let pivot = PracticeSession.Pivot.Task(sessionID: sessionID, taskID: taskID, index: index)
             return pivot.create(on: database).transform(to: pivot)
         }
 
-        static func create(session: PracticeSessionRepresentable, taskID: KognitaContent.Task.ID, index: Int, on database: Database)
+        static func create(session: PracticeSessionRepresentable, taskID: KognitaModels.Task.ID, index: Int, on database: Database)
             throws -> EventLoopFuture<PracticeSession.Pivot.Task> {
 
             let pivot = try PracticeSession.Pivot.Task(sessionID: session.requireID(), taskID: taskID, index: index)

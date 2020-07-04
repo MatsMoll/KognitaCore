@@ -133,7 +133,7 @@ extension User: SessionAuthenticatable {
 
 public struct SessionUserAuthenticator: SessionAuthenticator {
 
-    public typealias User = KognitaContent.User
+    public typealias User = KognitaModels.User
 
     public func authenticate(sessionID: User.ID, for request: Request) -> EventLoopFuture<Void> {
         request.repositories.userRepository.find(sessionID)

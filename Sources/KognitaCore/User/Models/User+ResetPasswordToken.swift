@@ -68,9 +68,7 @@ extension User.ResetPassword.Token {
             public init() {}
         }
 
-        public struct Response: Content {
-            public let token: String
-        }
+        public typealias Response = User.ResetPassword.Token
     }
 
     public typealias Data = Create.Response

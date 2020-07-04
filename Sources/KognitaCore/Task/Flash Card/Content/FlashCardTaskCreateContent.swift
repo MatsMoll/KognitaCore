@@ -28,7 +28,7 @@ extension FlashCardTask {
             public var examPaperYear: Int?
         }
 
-        public typealias Response = KognitaContent.TypingTask
+        public typealias Response = KognitaModels.TypingTask
     }
 
     public typealias Edit = Create

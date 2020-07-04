@@ -105,17 +105,16 @@ extension TaskResult.DatabaseRepository {
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        sqlDB.select()
-//            .columns(SQLFunction("count", args: SQLLiteral.all))
-//            .column(.count(.all, as: "resultCount"))
-//            .column(\User.DatabaseModel.$id, as: "userID")
-//            .column(.keyPath(\User.DatabaseModel.username, as: "username"))
-//            .column(.function("sum", [.expression(.column(\TaskResult.DatabaseModel.resultScore))]), as: "totalScore")
-//            .from(User.DatabaseModel.self)
-//            .join(\User.DatabaseModel.id, to: \TaskResult.DatabaseModel.userID)
-//            .groupBy(\User.DatabaseModel.id)
-//            .all(decoding: UserResultOverview.self)
+        return sqlDB.select()
+            .column(SQLAlias(SQLFunction("COUNT", args: SQLLiteral.all), as: SQLIdentifier("resultCount")))
+            .column(\User.DatabaseModel.$id, as: "userID")
+            .column(\User.DatabaseModel.$username, as: "username")
+            .sum(\TaskResult.DatabaseModel.$resultScore, as: "totalScore")
+            .from(User.DatabaseModel.schema)
+            .join(from: \User.DatabaseModel.$id, to: \TaskResult.DatabaseModel.$user.$id)
+            .groupBy(\User.DatabaseModel.$id)
+            .orderBy("resultCount")
+            .all(decoding: UserResultOverview.self)
     }
 
     public func getAllResults(for userId: User.ID) -> EventLoopFuture<[TaskResult]> {

@@ -174,6 +174,15 @@ extension Subject {
 
 extension Subject.DatabaseRepository {
 
+    public func tasksWith(subjectID: Subject.ID) -> EventLoopFuture<[GenericTask]> {
+        TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+            .all()
+            .flatMapEachThrowing { try $0.content() }
+    }
+
     public func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject> {
         guard let user = user, user.isAdmin else {
             throw Abort(.forbidden)

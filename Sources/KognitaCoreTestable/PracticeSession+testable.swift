@@ -11,6 +11,8 @@ import FluentKit
 
 public class TestableRepositories: RepositoriesRepresentable {
 
+    public var taskResultRepository: TaskResultRepositoring
+
     public var topicRepository: TopicRepository
 
     public var subjectRepository: SubjectRepositoring
@@ -34,6 +36,7 @@ public class TestableRepositories: RepositoriesRepresentable {
     public var taskDiscussionRepository: TaskDiscussionRepositoring
 
     init(repositories: RepositoriesRepresentable) {
+        self.taskResultRepository = repositories.taskResultRepository
         self.topicRepository = repositories.topicRepository
         self.subjectRepository = repositories.subjectRepository
         self.subjectTestRepository = repositories.subjectTestRepository

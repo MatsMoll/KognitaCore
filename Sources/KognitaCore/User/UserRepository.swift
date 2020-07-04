@@ -35,8 +35,8 @@ public protocol UserRepository: ResetPasswordRepositoring {
 
     func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
 
-    func verify(user: User, with token: User.VerifyEmail.Token) throws -> EventLoopFuture<Void>
-    func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token>
+    func verify(user: User, with token: User.VerifyEmail.Token) -> EventLoopFuture<Void>
+    func verifyToken(for userID: User.ID) -> EventLoopFuture<User.VerifyEmail.Token>
 }
 
 extension User {
@@ -249,31 +249,30 @@ extension User.DatabaseRepository: UserRepository {
             .map { $0 != nil }
     }
 
-    public func verify(user: User, with token: User.VerifyEmail.Token) throws -> EventLoopFuture<Void> {
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//
-//        guard user.isEmailVerified == false else {
-//            return conn.future()
-//        }
-//        return User.DatabaseModel
-//            .find(user.id, on: self.conn)
-//            .unwrap(or: Abort(.badRequest))
-//            .flatMap { user in
-//                try User.VerifyEmail.Token
-//                    .query(on: self.conn)
-//                    .filter(\.token == token.token)
-//                    .filter(\.userID == user.requireID())
-//                    .first()
-//                    .unwrap(or: Abort(.badRequest))
-//                    .flatMap { _ in
-//                        user.isEmailVerified = true
-//                        return user.save(on: self.conn)
-//                            .transform(to: ())
-//                }
-//        }
+    public func verify(user: User, with token: User.VerifyEmail.Token) -> EventLoopFuture<Void> {
+
+        guard user.isEmailVerified == false else {
+            return database.eventLoop.future()
+        }
+
+        return User.DatabaseModel
+            .find(user.id, on: database)
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { databaseUser in
+                User.VerifyEmail.Token.DatabaseModel
+                    .query(on: self.database)
+                    .filter(\.$token == token.token)
+                    .filter(\.$user.$id == user.id)
+                    .first()
+                    .unwrap(or: Abort(.badRequest))
+                    .flatMap { _ in
+                        databaseUser.isEmailVerified = true
+                        return databaseUser.save(on: self.database)
+                }
+        }
     }
 
-    public func verifyToken(for userID: User.ID) throws -> EventLoopFuture<User.VerifyEmail.Token> {
+    public func verifyToken(for userID: User.ID) -> EventLoopFuture<User.VerifyEmail.Token> {
         User.VerifyEmail.Token.DatabaseModel
             .query(on: database)
             .filter(\User.VerifyEmail.Token.DatabaseModel.$user.$id == userID)

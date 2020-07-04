@@ -22,7 +22,7 @@ extension SubjectTest {
 
             init() {}
 
-            init(testID: SubjectTest.ID, taskID: KognitaContent.Task.ID) {
+            init(testID: SubjectTest.ID, taskID: KognitaModels.Task.ID) {
                 self.$test.id = testID
                 self.$task.id = taskID
             }
@@ -60,14 +60,14 @@ extension SubjectTest.Pivot.Task {
     enum Create {
         struct Data {
             let testID: SubjectTest.ID
-            let taskIDs: [KognitaContent.Task.ID]
+            let taskIDs: [KognitaModels.Task.ID]
         }
 
         typealias Response = [SubjectTest.Pivot.Task]
     }
 
     enum Update {
-        typealias Data = [KognitaContent.Task.ID]
+        typealias Data = [KognitaModels.Task.ID]
         typealias Response = Void
     }
 }

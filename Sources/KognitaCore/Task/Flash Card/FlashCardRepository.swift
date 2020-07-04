@@ -21,7 +21,7 @@ extension TypingTask.Create.Data: TaskCreationContentable {
     public var examPaperSemester: TaskExamSemester? { nil }
 }
 
-extension KognitaContent.TypingTask {
+extension KognitaModels.TypingTask {
     init(task: Task) {
         self.init(
             id: task.id,
@@ -55,7 +55,7 @@ extension KognitaContent.TypingTask {
     }
 }
 
-extension KognitaContent.GenericTask {
+extension KognitaModels.GenericTask {
     init(task: TaskDatabaseModel) {
         self.init(
             id: task.id ?? 0,
