@@ -26,12 +26,12 @@ case "LOCAL":
     )
 case "DEV":
     dependencies.append(contentsOf: [
-            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", .branch("develop")),
+            .package(name: "KognitaModels", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", .branch("develop")),
         ]
     )
 default:
     dependencies.append(contentsOf: [
-            .package(name: "KognitaContent", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", from: "1.0.0"),
+            .package(name: "KognitaModels", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", from: "1.0.0"),
         ]
     )
 }
