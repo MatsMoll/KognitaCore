@@ -59,6 +59,18 @@ extension QueryBuilder {
         }
     }
 
+    public func all<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: Optional<JoinedThree>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree?)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), try? $0.joined(JoinedThree.self)) }
+        }
+    }
+
     public func all<Joined, JoinedTwo, JoinedThree, Four>(
         _ joined: Joined.Type,
         _ joinedTwo: JoinedTwo.Type,
@@ -155,12 +167,13 @@ extension String {
 extension Subject {
     public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
 
-        init(database: Database, repositories: RepositoriesRepresentable) {
+        init(database: Database, repositories: RepositoriesRepresentable, taskRepository: TaskRepository) {
             self.database = database
             self.userRepository = repositories.userRepository
             self.topicRepository = repositories.topicRepository
             self.subtopicRepository = repositories.subtopicRepository
             self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
+            self.taskRepository = taskRepository
         }
 
         public let database: Database
@@ -169,6 +182,7 @@ extension Subject {
         private let topicRepository: TopicRepository
         private let subtopicRepository: SubtopicRepositoring
         private let multipleChoiseRepository: MultipleChoiseTaskRepository
+        private let taskRepository: TaskRepository
     }
 }
 
@@ -187,7 +201,7 @@ extension Subject.DatabaseRepository {
         guard let user = user, user.isAdmin else {
             throw Abort(.forbidden)
         }
-        let subject = try Subject.DatabaseModel(content: content, creator: user)
+        let subject = Subject.DatabaseModel(content: content, creator: user)
         return subject.create(on: database)
             .flatMapThrowing {
                 try User.ModeratorPrivilege(userID: user.id, subjectID: subject.requireID())
@@ -411,7 +425,7 @@ extension Subject.DatabaseRepository {
 
     public func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
 
-        try userRepository
+        userRepository
             .isModerator(user: moderator, subjectID: subjectID)
             .ifFalse(throw: Abort(.forbidden))
             .flatMap {
@@ -578,6 +592,29 @@ extension Subject.DatabaseRepository {
                     topics: subject.topics.map { try $0.content() }
                 )
         }
+    }
+
+    public func creatorTasksWith(subjectID: Subject.ID) -> EventLoopFuture<[CreatorTaskContent]> {
+
+        return TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$creator)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self, method: .left)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+            .all(TaskDatabaseModel.self, Topic.DatabaseModel.self, User.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+            .flatMapEachThrowing { (task, topic, creator, multipleChoiceTask) in
+                try CreatorTaskContent(
+                    task: task.content(),
+                    topic: topic.content(),
+                    creator: creator.content(),
+                    isMultipleChoise: multipleChoiceTask != nil
+                )
+        }
+    }
+
+    public func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]> {
+        taskRepository.getTasks(in: subjectID, user: user, query: query, maxAmount: maxAmount, withSoftDeleted: withSoftDeleted)
     }
 }
 

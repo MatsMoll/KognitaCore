@@ -15,7 +15,7 @@ public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
     func create(from content: MultipleChoiceTask.Create.Data, by user: User?) throws -> EventLoopFuture<MultipleChoiceTask.Create.Response>
     func updateModelWith(id: Int, to data: MultipleChoiceTask.Update.Data, by user: User) throws -> EventLoopFuture<MultipleChoiceTask.Update.Response>
     func task(withID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask>
-    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details>
+    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.ModifyContent>
     func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]>
     func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>>
     func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
@@ -31,16 +31,18 @@ extension MultipleChoiceTask {
 
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
-            self.subtopicRepository = repositories.subtopicRepository
-            self.userRepository = repositories.userRepository
+            self.repositories = repositories
             self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, userRepository: repositories.userRepository)
         }
 
         public let database: Database
-
-        private let subtopicRepository: SubtopicRepositoring
-        private let userRepository: UserRepository
+        private let repositories: RepositoriesRepresentable
         private let taskRepository: TaskRepository
+
+        private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
+        private var userRepository: UserRepository { repositories.userRepository }
+        private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
+        private var topicRepository: TopicRepository { repositories.topicRepository }
         private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
@@ -349,58 +351,47 @@ extension MultipleChoiceTask.DatabaseRepository {
             .flatMapEachThrowing { try MultipleChoiceTaskChoice(choice: $0) }
     }
 
-    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.Details> {
+    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.ModifyContent> {
 
-        throw Abort(.notImplemented)
-//        return conn.databaseConnection(to: .psql)
-//            .flatMap { conn in
-//
-//                conn.select()
-//                    .all(table: Task.self)
-//                    .all(table: MultipleChoiceTask.DatabaseModel.self)
-//                    .all(table: TaskSolution.DatabaseModel.self)
-//                    .from(Task.self)
-//                    .join(\Task.id, to: \MultipleChoiceTask.DatabaseModel.id)
-//                    .join(\Task.id, to: \TaskSolution.DatabaseModel.taskID)
-//                    .where(\Task.id, .equal, taskID)
-//                    .first(decoding: Task.self, MultipleChoiceTask.DatabaseModel.self, TaskSolution.DatabaseModel.self)
-//                    .unwrap(or: Abort(.badRequest))
-//                    .flatMap { taskContent in
-//
-//                        MultipleChoiseTaskChoise.query(on: conn)
-//                            .filter(\MultipleChoiseTaskChoise.taskId, .equal, taskID)
-//                            .all()
-//                            .flatMap { choises in
-//
-//                                Subject.DatabaseModel.query(on: conn)
-//                                    .join(\Topic.DatabaseModel.subjectId, to: \Subject.DatabaseModel.id)
-//                                    .join(\Subtopic.DatabaseModel.topicId, to: \Topic.DatabaseModel.id)
-//                                    .filter(\Subtopic.DatabaseModel.id, .equal, taskContent.0.subtopicID)
-//                                    .first()
-//                                    .unwrap(or: Abort(.internalServerError))
-//                                    .flatMap { subject in
-//
-//                                        try self.topicRepository
-//                                            .getTopicResponses(in: subject.content())
-//                                            .map { topics in
-//
-//                                                try MultipleChoiceTask.ModifyContent(
-//                                                    task: Task.ModifyContent(
-//                                                        task: taskContent.0,
-//                                                        solution: taskContent.2.solution
-//                                                    ),
-//                                                    subject: subject.content(),
-//                                                    topics: topics,
-//                                                    multiple: taskContent.1,
-//                                                    choises: choises.map { .init(choise: $0) }
-//                                                )
-//                                        }
-//
-//                                }
-//                        }
-//                }
-//        }
+        TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self)
+            .join(children: \TaskDatabaseModel.$solutions)
+            .filter(\.$id == taskID)
+            .first(TaskDatabaseModel.self, TaskSolution.DatabaseModel.self, MultipleChoiceTask.DatabaseModel.self)
+            .unwrap(or: Abort(.internalServerError))
+            .flatMap { (task, solution, multipleChoice) in
 
+                self.subjectRepository
+                    .overviewContaining(subtopicID: task.$subtopic.id)
+                    .flatMap { subjectOverview in
+
+                        self.topicRepository
+                            .topicsWithSubtopics(subjectID: subjectOverview.id)
+                            .flatMap { topics in
+
+                                self.choisesFor(taskID: taskID)
+                                    .flatMapThrowing { choices in
+
+                                        try MultipleChoiceTask.ModifyContent(
+                                            task: TaskModifyContent(
+                                                task: task.content(),
+                                                solution: solution.solution
+                                            ),
+                                            subject: Subject(
+                                                id: subjectOverview.id,
+                                                name: subjectOverview.name,
+                                                description: subjectOverview.description,
+                                                category: subjectOverview.category
+                                            ),
+                                            isMultipleSelect: multipleChoice.isMultipleSelect,
+                                            choises: choices,
+                                            topics: topics
+                                        )
+                                }
+                        }
+                }
+        }
     }
 
     public func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]> {

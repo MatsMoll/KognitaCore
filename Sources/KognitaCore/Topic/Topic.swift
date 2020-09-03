@@ -44,7 +44,7 @@ extension Topic {
 
         /// The name of the topic
         @Field(key: "name")
-        public private(set) var name: String
+        public var name: String
 
         /// The chapther number in a subject
         @Field(key: "chapter")

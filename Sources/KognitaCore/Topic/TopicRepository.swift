@@ -20,8 +20,9 @@ public protocol TopicRepository: DeleteModelRepository {
     func getTopicResponses(in subject: Subject) throws -> EventLoopFuture<[Topic]>
     func importContent(from content: TopicExportContent, in subject: Subject) throws -> EventLoopFuture<Void>
     func importContent(from content: SubtopicExportContent, in topic: Topic) throws -> EventLoopFuture<Void>
-    func getTopicsWithTaskCount(in subject: Subject) throws -> EventLoopFuture<[Topic.WithTaskCount]>
+    func getTopicsWithTaskCount(withSubjectID subjectID: Subject.ID) throws -> EventLoopFuture<[Topic.WithTaskCount]>
     func topicFor(taskID: Task.ID) -> EventLoopFuture<Topic>
+    func topicsWithSubtopics(subjectID: Subject.ID) -> EventLoopFuture<[Topic.WithSubtopics]>
 }
 
 public struct TimelyTopic: Codable {
@@ -52,6 +53,10 @@ extension Topic {
     public struct WithTaskCount: Content {
         public let topic: Topic
         public let taskCount: Int
+
+        public func userLevelZero() -> UserLevel {
+            .init(topicID: topic.id, correctScore: 0, maxScore: Double(taskCount))
+        }
     }
 }
 
@@ -138,6 +143,21 @@ extension Topic.DatabaseRepository: TopicRepository {
 //            .all()
     }
 
+    public func topicsWithSubtopics(subjectID: Subject.ID) -> EventLoopFuture<[Topic.WithSubtopics]> {
+        Subtopic.DatabaseModel.query(on: database)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+            .sort(Topic.DatabaseModel.self, \Topic.DatabaseModel.$chapter)
+            .sort(\Subtopic.DatabaseModel.$id)
+            .all(with: \Subtopic.DatabaseModel.$topic)
+            .map { subtopics in
+                subtopics.group(by: \Subtopic.DatabaseModel.topic.name)
+            }
+            .flatMapEachThrowing { (topicName, subtopics) in
+                try Topic.WithSubtopics(name: topicName, subtopics: subtopics.map { try $0.content() })
+        }
+    }
+
     public func subtopics(in topic: Topic) throws -> EventLoopFuture<[Subtopic]> {
         return try subtopicRepository
             .getSubtopics(in: topic)
@@ -171,7 +191,7 @@ extension Topic.DatabaseRepository: TopicRepository {
             .flatMapEachThrowing { try $0.content() }
     }
 
-    public func getTopicsWithTaskCount(in subject: Subject) -> EventLoopFuture<[Topic.WithTaskCount]> {
+    public func getTopicsWithTaskCount(withSubjectID subjectID: Subject.ID) -> EventLoopFuture<[Topic.WithTaskCount]> {
 
         guard let sql = database as? SQLDatabase else { return database.eventLoop.future(error: Abort(.internalServerError)) }
         return sql.select()
@@ -181,8 +201,9 @@ extension Topic.DatabaseRepository: TopicRepository {
             .join(parent: \TaskDatabaseModel.$subtopic)
             .join(parent: \Subtopic.DatabaseModel.$topic)
             .groupBy(\Topic.DatabaseModel.$id)
-            .where("subjectID", .equal, subject.id)
+            .where("subjectID", .equal, subjectID)
             .where("isTestable", .equal, false)
+            .where(SQLColumn("deletedAt", table: TaskDatabaseModel.schema), .is, SQLLiteral.null)
             .all(decoding: Topic.self, TopicTaskCount.self)
             .map { topics in
                 topics.map { data in

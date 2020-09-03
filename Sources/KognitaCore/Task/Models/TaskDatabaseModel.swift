@@ -182,7 +182,8 @@ extension TaskDatabaseModel: ContentConvertable {
             isTestable: isTestable,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            editedTaskID: nil
+            editedTaskID: nil,
+            deletedAt: deletedAt
         )
     }
 }

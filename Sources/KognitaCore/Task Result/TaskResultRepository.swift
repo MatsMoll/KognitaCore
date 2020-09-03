@@ -375,6 +375,7 @@ extension TaskResult.DatabaseRepository {
 
     public func getUserLevel(for userId: User.ID, in topics: [Topic.ID]) -> EventLoopFuture<[Topic.UserLevel]> {
 
+        guard topics.isEmpty == false else { return database.eventLoop.future([]) }
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
@@ -383,9 +384,12 @@ extension TaskResult.DatabaseRepository {
             try Query.resultsInTopics(topics, for: userId)
                 .query(for: database)
                 .all(decoding: SubqueryTopicResult.self)
-                .flatMap { results in
+                .flatMap { results -> EventLoopFuture<[UserLevelScore]> in
 
-                    sqlDB.select()
+                    guard results.isEmpty == false else {
+                        return self.database.eventLoop.future([])
+                    }
+                    return sqlDB.select()
                         .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
                         .column(\Topic.DatabaseModel.$id, as: "topicID")
                         .from(TaskResult.DatabaseModel.schema)
@@ -394,24 +398,24 @@ extension TaskResult.DatabaseRepository {
                         .join(parent: \TaskDatabaseModel.$subtopic)
                         .join(parent: \Subtopic.DatabaseModel.$topic)
                         .all(decoding: UserLevelScore.self)
-                        .flatMap { scores in
-                            return scores.group(by: \UserLevelScore.topicID)
-                                .map { topicID, grouped in
-
-                                    TaskDatabaseModel.query(on: self.database)
-                                        .join(parent: \TaskDatabaseModel.$subtopic)
-                                        .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
-                                        .count()
-                                        .map { maxScore in
-                                            Topic.UserLevel(
-                                                topicID: topicID,
-                                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
-                                                maxScore: Double(maxScore)
-                                            )
-                                    }
-                            }.flatten(on: self.database.eventLoop)
-                    }
             }
+        }
+        .flatMap { scores in
+            scores.group(by: \UserLevelScore.topicID)
+                .map { topicID, grouped in
+
+                    TaskDatabaseModel.query(on: self.database)
+                        .join(parent: \TaskDatabaseModel.$subtopic)
+                        .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
+                        .count()
+                        .map { maxScore in
+                            Topic.UserLevel(
+                                topicID: topicID,
+                                correctScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) },
+                                maxScore: Double(maxScore)
+                            )
+                    }
+            }.flatten(on: self.database.eventLoop)
         }
     }
 

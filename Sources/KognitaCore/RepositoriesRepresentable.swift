@@ -37,7 +37,9 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     var password: PasswordHasher
     var database: Database
 
-    public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self)
+    lazy var taskRepository: TaskRepository = TaskDatabaseModel.DatabaseRepository(database: self.database, userRepository: self.userRepository)
+
+    public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository)
 
     public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(database: database, repositories: self)
 

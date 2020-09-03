@@ -15,6 +15,7 @@ protocol TaskRepository {
     func getTaskTypePath(for id: Task.ID) throws -> EventLoopFuture<String>
     func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]>
     func taskFor(id: TaskDatabaseModel.IDValue) -> EventLoopFuture<TaskDatabaseModel>
+    func getTasks(in subjectId: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]>
 }
 
 extension TaskDatabaseModel {
@@ -154,12 +155,7 @@ extension TaskDatabaseModel.DatabaseRepository {
 //        }
 //    }
 
-    public struct CreatorOverviewQuery: Codable {
-        let taskQuestion: String?
-        let topics: [Topic.ID]
-    }
-
-    public func getTasks(in subjectId: Subject.ID, user: User, query: CreatorOverviewQuery? = nil, maxAmount: Int? = nil, withSoftDeleted: Bool = false) throws -> EventLoopFuture<[CreatorTaskContent]> {
+    public func getTasks(in subjectId: Subject.ID, user: User, query: TaskOverviewQuery? = nil, maxAmount: Int? = nil, withSoftDeleted: Bool = false) -> EventLoopFuture<[CreatorTaskContent]> {
 
         userRepository
             .isModerator(user: user, subjectID: subjectId)
@@ -173,7 +169,7 @@ extension TaskDatabaseModel.DatabaseRepository {
                     .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectId)
                     .range(lower: 0, upper: maxAmount)
 
-                if isModerator {
+                if withSoftDeleted {
                     databaseQuery = databaseQuery.withDeleted()
                 }
 
@@ -189,15 +185,13 @@ extension TaskDatabaseModel.DatabaseRepository {
 
                 return databaseQuery
                     .all(TaskDatabaseModel.self, User.DatabaseModel.self, Topic.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
-                    .flatMapThrowing { content in
-                        try content.map { taskContent in
-                            try CreatorTaskContent(
-                                task: taskContent.0.content(),
-                                topic: taskContent.2.content(),
-                                creator: taskContent.1.content(),
-                                isMultipleChoise: taskContent.3 != nil
-                            )
-                        }
+                    .flatMapEachThrowing { (task, user, topic, multipleChoice) in
+                        try CreatorTaskContent(
+                            task: task.content(),
+                            topic: topic.content(),
+                            creator: user.content(),
+                            isMultipleChoise: multipleChoice != nil
+                        )
                 }
         }
     }

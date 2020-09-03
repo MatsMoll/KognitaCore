@@ -34,4 +34,5 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
     func importContent(in subject: Subject, peerWise: [TaskPeerWise], user: User) throws -> EventLoopFuture<Void>
     func tasksWith(subjectID: Subject.ID) -> EventLoopFuture<[GenericTask]>
+    func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]>
 }

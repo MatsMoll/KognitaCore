@@ -100,4 +100,15 @@ struct VaporFourMigration: Migration {
             return sql.raw("ALTER TABLE \"Task\" RENAME COLUMN \"creatorID\" TO \"creatorId\";").run()
         }
     }
+
+    struct SubjectColorClassDeletrion: Migration {
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            return database.schema("Subject").deleteField("colorClass").update()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.eventLoop.future()
+        }
+    }
 }

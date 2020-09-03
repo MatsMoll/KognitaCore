@@ -16,11 +16,12 @@ public class DatabaseMigrations {
             extraDatabase(migrations: app.migrations)
         }
         if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
-            app.migrations.add(VaporFourMigration())
-            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
-            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
-            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
-            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
+//            app.migrations.add(VaporFourMigration())
+//            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
+//            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
+//            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
+            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
+//            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
         }
         if app.environment != .testing {
             versionBump(app.migrations)

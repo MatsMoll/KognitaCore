@@ -179,29 +179,22 @@ extension FlashCardTask.DatabaseRepository {
 
     func delete(model flashCard: FlashCardTask, by user: User?) throws -> EventLoopFuture<Void> {
 
-        guard let user = user else {
-            throw Abort(.unauthorized)
-        }
+        guard let user = user else { throw Abort(.unauthorized) }
+        let id = try flashCard.requireID()
 
-        throw Abort(.notImplemented)
-//        return try userRepository
-//            .isModerator(user: user, taskID: flashCard.requireID())
-//            .map { true }
-//            .catchMap { _ in false }
-//            .flatMap { isModerator in
-//
-//                guard let task = flashCard.task else {
-//                    throw Abort(.internalServerError)
-//                }
-//                return task.get(on: self.conn)
-//                    .flatMap { task in
-//
-//                        guard isModerator || task.creatorID == user.id else {
-//                            throw Abort(.forbidden)
-//                        }
-//                        return task.delete(on: self.conn)
-//                }
-//        }
+        return try userRepository
+            .isModerator(user: user, taskID: flashCard.requireID())
+            .flatMap { isModerator in
+
+                self.taskRepository.taskFor(id: id)
+                    .failableFlatMap { task in
+
+                        guard isModerator || task.$creator.id == user.id else {
+                            throw Abort(.forbidden)
+                        }
+                        return task.delete(on: self.database)
+                }
+        }
     }
 
     public func importTask(from task: TaskBetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
@@ -288,28 +281,38 @@ extension FlashCardTask.DatabaseRepository {
 
     public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent> {
 
-        throw Abort(.notImplemented)
-//        TaskDatabaseModel.query(on: db)
-//            .join(\FlashCardTask.id, to: \TaskDatabaseModel.id)
-//            .join(\TaskSolution.DatabaseModel.taskID, to: \TaskDatabaseModel.id)
-//            .filter(\TaskDatabaseModel.id == taskID)
-//            .alsoDecode(TaskSolution.DatabaseModel.self)
-//            .first()
-//            .unwrap(or: Abort(.internalServerError))
-//            .flatMap { taskInfo in
-//
-//                self.subjectRepository
-//                    .overviewContaining(subtopicID: taskInfo.0.subtopicID)
-//                    .map { subject in
-//
-//                        FlashCardTask.ModifyContent(
-//                            task: TaskDatabaseModel.ModifyContent(
-//                                task: taskInfo.0,
-//                                solution: taskInfo.1.solution
-//                            ),
-//                            subject: subject
-//                        )
-//                }
-//        }
+        TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .join(superclass: FlashCardTask.self, with: TaskDatabaseModel.self)
+            .join(children: \TaskDatabaseModel.$solutions)
+            .filter(\.$id == taskID)
+            .first(TaskDatabaseModel.self, TaskSolution.DatabaseModel.self)
+            .unwrap(or: Abort(.internalServerError))
+            .flatMap { (task, solution) in
+
+                self.subjectRepository
+                    .overviewContaining(subtopicID: task.$subtopic.id)
+                    .flatMap { subjectOverview in
+
+                        self.repositories.topicRepository
+                            .topicsWithSubtopics(subjectID: subjectOverview.id)
+                            .flatMapThrowing { topics in
+
+                                try TypingTask.ModifyContent(
+                                    subject: Subject(
+                                        id: subjectOverview.id,
+                                        name: subjectOverview.name,
+                                        description: subjectOverview.description,
+                                        category: subjectOverview.category
+                                    ),
+                                    topics: topics,
+                                    task: TaskModifyContent(
+                                        task: task.content(),
+                                        solution: solution.solution
+                                    )
+                                )
+                        }
+                }
+        }
     }
 }
