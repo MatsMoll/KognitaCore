@@ -15,10 +15,19 @@ public protocol FlashCardTaskRepository: DeleteModelRepository {
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
     func createAnswer(for task: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer>
     func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
+
+    func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID>
 }
 
 extension TypingTask.Create.Data: TaskCreationContentable {
     public var examPaperSemester: TaskExamSemester? { nil }
+    public var isDraft: Bool { false }
+}
+extension TypingTask.Create.Draft: TaskCreationContentable {
+    public var isTestable: Bool { false }
+    public var isDraft: Bool { true }
+    public var examPaperSemester: TaskExamSemester? { nil }
+    public var examPaperYear: Int? { nil }
 }
 
 extension KognitaModels.TypingTask {
@@ -32,6 +41,7 @@ extension KognitaModels.TypingTask {
             examType: task.examType,
             examYear: task.examYear,
             isTestable: task.isTestable,
+            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
             editedTaskID: task.editedTaskID
@@ -48,6 +58,7 @@ extension KognitaModels.TypingTask {
             examType: nil,
             examYear: task.examPaperYear,
             isTestable: task.isTestable,
+            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
             editedTaskID: nil
@@ -66,6 +77,7 @@ extension KognitaModels.GenericTask {
             examType: nil,
             examYear: task.examPaperYear,
             isTestable: task.isTestable,
+            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
             editedTaskID: nil
@@ -133,21 +145,19 @@ extension FlashCardTask.DatabaseRepository {
     public func updateModelWith(id: Int, to data: TypingTask.Create.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response> {
         FlashCardTask.find(id, on: database)
             .unwrap(or: Abort(.badRequest))
-            .flatMapThrowing { try $0.requireID() }
-            .flatMap(self.taskRepository.taskFor(id: ))
-            .failableFlatMap { task in
-                if user.id == task.$creator.id {
-                    return self.database.eventLoop.future(task)
-                }
-                return self.userRepository
-                    .isModerator(user: user, taskID: id)
-                    .ifFalse(throw: Abort(.forbidden))
-                    .transform(to: task)
-        }.failableFlatMap { task in
-            try task.update(content: data)
-                .save(on: self.database)
-                .map { TypingTask(task: task) }
+            .flatMap { taskID in
+                self.taskRepository.update(
+                    taskID: id,
+                    with: TaskDatabaseModel.Create.Data(
+                        content: data,
+                        subtopicID: data.subtopicId,
+                        solution: data.solution
+                    ),
+                    by: user
+                )
         }
+        .flatMap { self.taskRepository.taskFor(id: id) }
+        .map { TypingTask(task: $0) }
     }
 
 //    private func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<TaskDatabaseModel> {
@@ -284,35 +294,62 @@ extension FlashCardTask.DatabaseRepository {
         TaskDatabaseModel.query(on: database)
             .withDeleted()
             .join(superclass: FlashCardTask.self, with: TaskDatabaseModel.self)
-            .join(children: \TaskDatabaseModel.$solutions)
             .filter(\.$id == taskID)
-            .first(TaskDatabaseModel.self, TaskSolution.DatabaseModel.self)
+            .first(TaskDatabaseModel.self)
             .unwrap(or: Abort(.internalServerError))
-            .flatMap { (task, solution) in
+            .flatMap { (task) in
 
-                self.subjectRepository
-                    .overviewContaining(subtopicID: task.$subtopic.id)
-                    .flatMap { subjectOverview in
+                TaskSolution.DatabaseModel.query(on: self.database)
+                    .filter(\.$task.$id == taskID)
+                    .all()
+                    .flatMap { solutions in
 
-                        self.repositories.topicRepository
-                            .topicsWithSubtopics(subjectID: subjectOverview.id)
-                            .flatMapThrowing { topics in
+                        self.subjectRepository
+                            .overviewContaining(subtopicID: task.$subtopic.id)
+                            .flatMap { subjectOverview in
 
-                                try TypingTask.ModifyContent(
-                                    subject: Subject(
-                                        id: subjectOverview.id,
-                                        name: subjectOverview.name,
-                                        description: subjectOverview.description,
-                                        category: subjectOverview.category
-                                    ),
-                                    topics: topics,
-                                    task: TaskModifyContent(
-                                        task: task.content(),
-                                        solution: solution.solution
-                                    )
-                                )
+                                self.repositories.topicRepository
+                                    .topicsWithSubtopics(subjectID: subjectOverview.id)
+                                    .flatMapThrowing { topics in
+
+                                        try TypingTask.ModifyContent(
+                                            subject: Subject(
+                                                id: subjectOverview.id,
+                                                name: subjectOverview.name,
+                                                description: subjectOverview.description,
+                                                category: subjectOverview.category
+                                            ),
+                                            topics: topics,
+                                            task: TaskModifyContent(
+                                                task: task.content(),
+                                                solutions: solutions.compactMap { try? $0.content() }
+                                            )
+                                        )
+                                }
                         }
                 }
         }
+    }
+
+    public func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID> {
+
+        try self.taskRepository
+            .create(
+                from: TaskDatabaseModel.Create.Data(
+                    content: content,
+                    subtopicID: content.subtopicID,
+                    solution: content.solution ?? ""
+                ),
+                by: user
+        ).failableFlatMap { task in
+            try FlashCardTask(task: task)
+                .create(on: self.database)
+                .flatMap {
+                    // Sets deletedAt in order to not use them while a draft
+                    task.delete(on: self.database)
+                }
+                .flatMapThrowing { try task.requireID() }
+        }
+
     }
 }

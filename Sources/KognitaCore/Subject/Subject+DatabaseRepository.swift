@@ -506,6 +506,7 @@ extension Subject.DatabaseRepository {
             .flatMap { subject in
 
                 var query = TaskDatabaseModel.query(on: self.database)
+                    .withDeleted()
                     .join(FlashCardTask.self, on: \FlashCardTask.$id == \TaskDatabaseModel.$id, method: .inner)
                     .join(parent: \TaskDatabaseModel.$subtopic)
                     .join(parent: \Subtopic.DatabaseModel.$topic)

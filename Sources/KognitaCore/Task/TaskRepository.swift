@@ -12,6 +12,7 @@ import FluentSQL
 protocol TaskRepository {
     func all() throws -> EventLoopFuture<[TaskDatabaseModel]>
     func create(from content: TaskDatabaseModel.Create.Data, by user: User?) throws -> EventLoopFuture<TaskDatabaseModel>
+    func update(taskID: Task.ID, with content: TaskDatabaseModel.Create.Data, by user: User) -> EventLoopFuture<Void>
     func getTaskTypePath(for id: Task.ID) throws -> EventLoopFuture<String>
     func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]>
     func taskFor(id: TaskDatabaseModel.IDValue) -> EventLoopFuture<TaskDatabaseModel>
@@ -76,6 +77,52 @@ extension TaskDatabaseModel.DatabaseRepository {
         .transform(to: task)
     }
 
+    func update(taskID: Task.ID, with data: TaskDatabaseModel.Create.Data, by user: User) -> EventLoopFuture<Void> {
+        taskFor(id: taskID)
+            .flatMap { task in
+                if user.id == task.$creator.id {
+                    return self.database.eventLoop.future(task)
+                }
+                return self.userRepository
+                    .isModerator(user: user, taskID: taskID)
+                    .ifFalse(throw: Abort(.forbidden))
+                    .transform(to: task)
+        }.flatMap { (task: TaskDatabaseModel) -> EventLoopFuture<TaskDatabaseModel> in
+            if task.deletedAt != nil {
+                return task.restore(on: self.database)
+                    .transform(to: task)
+            } else {
+                return self.database.eventLoop.future(task)
+            }
+        }
+        .failableFlatMap { task in
+            try task.update(content: data.content)
+                .save(on: self.database)
+        }
+        .flatMap {
+            TaskSolution.DatabaseModel.query(on: self.database)
+                .filter(\TaskSolution.DatabaseModel.$task.$id == taskID)
+                .all()
+        }
+        .failableFlatMap { (solutions) -> EventLoopFuture<Void> in
+            guard
+                solutions.count == 1,
+                let solutionID = solutions.first?.id
+            else {
+                throw Abort(.badRequest)
+            }
+            return try self.taskSolutionRepository.updateModelWith(
+                id: solutionID,
+                to: TaskSolution.Update.Data.init(
+                    solution: data.solution,
+                    presentUser: nil
+                ),
+                by: user
+            )
+            .transform(to: ())
+        }
+    }
+
     public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
 
         TaskDatabaseModel.query(on: database)
@@ -115,7 +162,11 @@ extension TaskDatabaseModel.DatabaseRepository {
     }
 
     func taskFor(id: TaskDatabaseModel.IDValue) -> EventLoopFuture<TaskDatabaseModel> {
-        TaskDatabaseModel.find(id, on: database).unwrap(or: Abort(.badRequest))
+        TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .filter(\.$id == id)
+            .first()
+            .unwrap(or: Abort(.badRequest))
     }
 
     public func getTasks(in topic: Topic) throws -> EventLoopFuture<[TaskDatabaseModel]> {

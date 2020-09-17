@@ -20,7 +20,9 @@ public class DatabaseMigrations {
 //            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
 //            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
 //            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
-            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
+//            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
+//            app.migrations.add(TaskDatabaseModel.Migrations.IsDraft())
+            app.migrations.add(Topic.Migrations.RemoveUniqueConstraint())
 //            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
         }
         if app.environment != .testing {

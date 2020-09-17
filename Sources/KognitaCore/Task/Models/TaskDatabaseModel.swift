@@ -50,11 +50,11 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
 
     /// Some markdown that contains extra information about the task if needed
     @Field(key: "description")
-    public var description: String?
+    var description: String?
 
     /// The question needed to answer the task
     @Field(key: "question")
-    public var question: String
+    var question: String
 
     /// The id of the user who created the task
     @Parent(key: "creatorID")
@@ -62,27 +62,30 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
 
     /// The semester of the exam
     @Field(key: "examPaperSemester")
-    public var examPaperSemester: ExamSemester?
+    var examPaperSemester: ExamSemester?
 
     /// The year of the exam
     @Field(key: "examPaperYear")
-    public var examPaperYear: Int?
+    var examPaperYear: Int?
 
     /// If the task can be used for testing
     @Field(key: "isTestable")
-    public var isTestable: Bool
+    var isTestable: Bool
+
+    @Field(key: "isDraft")
+    var isDraft: Bool
 
     /// The date the task was created at
     @Timestamp(key: "createdAt", on: .create)
-    public var createdAt: Date?
+    var createdAt: Date?
 
     /// The date the task was updated at
     /// - Note: Usually a task will be marked as isOutdated and create a new `Task` when updated
     @Timestamp(key: "updatedAt", on: .update)
-    public var updatedAt: Date?
+    var updatedAt: Date?
 
     @Timestamp(key: "deletedAt", on: .delete)
-    public var deletedAt: Date?
+    var deletedAt: Date?
 
     @Children(for: \.$task)
     var solutions: [TaskSolution.DatabaseModel]
@@ -98,6 +101,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
         isTestable: Bool = false,
+        isDraft: Bool = false,
         id: IDValue? = nil
     ) {
         self.id             = id
@@ -106,6 +110,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         self.question       = question
         self.$creator.id    = creatorID
         self.isTestable     = isTestable
+        self.isDraft        = isDraft
         self.deletedAt      = nil
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
@@ -126,6 +131,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         self.isTestable     = content.isTestable
         self.$creator.id      = creator.id
         self.examPaperSemester = nil
+        self.isDraft        = content.isDraft
         self.examPaperYear  = content.examPaperYear
         self.deletedAt  = nil
         if description?.isEmpty == true {
@@ -142,6 +148,7 @@ extension TaskDatabaseModel {
         self.question = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable = content.isTestable
         self.examPaperYear = content.examPaperYear
+        self.deletedAt = nil
         return self
     }
 }
@@ -167,6 +174,20 @@ extension TaskDatabaseModel.Migrations {
                 .defaultTimestamps()
         }
     }
+
+    struct IsDraft: Migration {
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(TaskDatabaseModel.schema)
+                .field("isDraft", .bool, .required, .sql(.default(false)))
+                .update()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(TaskDatabaseModel.schema)
+                .deleteField("isDraft")
+                .update()
+        }
+    }
 }
 
 extension TaskDatabaseModel: ContentConvertable {
@@ -180,6 +201,7 @@ extension TaskDatabaseModel: ContentConvertable {
             examType: nil,
             examYear: nil,
             isTestable: isTestable,
+            isDraft: isDraft,
             createdAt: createdAt,
             updatedAt: updatedAt,
             editedTaskID: nil,

@@ -48,7 +48,7 @@ extension Topic {
 
         /// The chapther number in a subject
         @Field(key: "chapter")
-        public private(set) var chapter: Int
+        public var chapter: Int
 
         @Timestamp(key: "createdAt", on: .create)
         public var createdAt: Date?
@@ -102,6 +102,21 @@ extension Topic.Migrations {
                 .field("subjectID", .uint, .references(Subject.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                 .unique(on: "chapter", "subjectID")
                 .defaultTimestamps()
+        }
+    }
+
+    struct RemoveUniqueConstraint: Migration {
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(Topic.DatabaseModel.schema)
+                .deleteUnique(on: "chapter", "subjectId")
+                .update()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(Topic.DatabaseModel.schema)
+                .unique(on: "chapter", "subjectID")
+                .update()
         }
     }
 }

@@ -356,38 +356,43 @@ extension MultipleChoiceTask.DatabaseRepository {
         TaskDatabaseModel.query(on: database)
             .withDeleted()
             .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self)
-            .join(children: \TaskDatabaseModel.$solutions)
             .filter(\.$id == taskID)
-            .first(TaskDatabaseModel.self, TaskSolution.DatabaseModel.self, MultipleChoiceTask.DatabaseModel.self)
+            .first(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel.self)
             .unwrap(or: Abort(.internalServerError))
-            .flatMap { (task, solution, multipleChoice) in
+            .flatMap { (task, multipleChoice) in
 
-                self.subjectRepository
-                    .overviewContaining(subtopicID: task.$subtopic.id)
-                    .flatMap { subjectOverview in
+                TaskSolution.DatabaseModel.query(on: self.database)
+                    .filter(\.$task.$id == taskID)
+                    .all()
+                    .flatMap { solutions in
 
-                        self.topicRepository
-                            .topicsWithSubtopics(subjectID: subjectOverview.id)
-                            .flatMap { topics in
+                        self.subjectRepository
+                            .overviewContaining(subtopicID: task.$subtopic.id)
+                            .flatMap { subjectOverview in
 
-                                self.choisesFor(taskID: taskID)
-                                    .flatMapThrowing { choices in
+                                self.topicRepository
+                                    .topicsWithSubtopics(subjectID: subjectOverview.id)
+                                    .flatMap { topics in
 
-                                        try MultipleChoiceTask.ModifyContent(
-                                            task: TaskModifyContent(
-                                                task: task.content(),
-                                                solution: solution.solution
-                                            ),
-                                            subject: Subject(
-                                                id: subjectOverview.id,
-                                                name: subjectOverview.name,
-                                                description: subjectOverview.description,
-                                                category: subjectOverview.category
-                                            ),
-                                            isMultipleSelect: multipleChoice.isMultipleSelect,
-                                            choises: choices,
-                                            topics: topics
-                                        )
+                                        self.choisesFor(taskID: taskID)
+                                            .flatMapThrowing { choices in
+
+                                                try MultipleChoiceTask.ModifyContent(
+                                                    task: TaskModifyContent(
+                                                        task: task.content(),
+                                                        solutions: solutions.compactMap { try? $0.content() }
+                                                    ),
+                                                    subject: Subject(
+                                                        id: subjectOverview.id,
+                                                        name: subjectOverview.name,
+                                                        description: subjectOverview.description,
+                                                        category: subjectOverview.category
+                                                    ),
+                                                    isMultipleSelect: multipleChoice.isMultipleSelect,
+                                                    choises: choices,
+                                                    topics: topics
+                                                )
+                                        }
                                 }
                         }
                 }

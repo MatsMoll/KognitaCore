@@ -23,6 +23,7 @@ public protocol TopicRepository: DeleteModelRepository {
     func getTopicsWithTaskCount(withSubjectID subjectID: Subject.ID) throws -> EventLoopFuture<[Topic.WithTaskCount]>
     func topicFor(taskID: Task.ID) -> EventLoopFuture<Topic>
     func topicsWithSubtopics(subjectID: Subject.ID) -> EventLoopFuture<[Topic.WithSubtopics]>
+    func save(topics: [Topic], forSubjectID subjectID: Subject.ID, user: User) -> EventLoopFuture<Void>
 }
 
 public struct TimelyTopic: Codable {
@@ -359,6 +360,49 @@ extension Topic.DatabaseRepository: TopicRepository {
         .transform(to: ())
     }
 
+    public func save(topics: [Topic], forSubjectID subjectID: Subject.ID, user: User) -> EventLoopFuture<Void> {
+
+        guard Set(topics.map { $0.chapter }).count == topics.count else {
+            // Duplicate chapters
+            return database.eventLoop.future(error: Abort(.badRequest))
+        }
+        let newTopics = topics.filter { $0.id < 1 }
+        let topicIDs = Set(topics.map { $0.id })
+
+        return userRepository
+            .isModerator(user: user, subjectID: subjectID)
+            .ifFalse(throw: Abort(.forbidden))
+            .flatMap {
+
+                Topic.DatabaseModel.query(on: self.database)
+                    .filter(\Topic.DatabaseModel.$subject.$id == subjectID)
+                    .all()
+                    .flatMap { savedTopics in
+
+                        let deletedTopics = savedTopics
+                            .filter { topicIDs.contains($0.id ?? 0) == false }
+                            .map { $0.delete(on: self.database) }
+
+                        let updatedTopics = savedTopics
+                            .filter { (topic: Topic.DatabaseModel) in topicIDs.contains(topic.id ?? 0) }
+                            .compactMap { (topicToUpdate: Topic.DatabaseModel) -> EventLoopFuture<Void>? in
+                                guard let topic = topics.first(where: { $0.id == topicToUpdate.id }) else {
+                                    return nil
+                                }
+                                topicToUpdate.chapter = topic.chapter
+                                topicToUpdate.name = topic.name
+                                return topicToUpdate.update(on: self.database)
+                        }
+                        let createTopics = newTopics.compactMap { topic in
+                            try? self.create(from: Topic.Create.Data(subjectID: subjectID, name: topic.name, chapter: topic.chapter), by: user)
+                                .transform(to: ())
+                        }
+
+                        return (deletedTopics + updatedTopics + createTopics)
+                            .flatten(on: self.database.eventLoop)
+                }
+        }
+    }
 //    public static func leveledTopics(in subject: Subject, ) throws -> EventLoopFuture<[[Topic]]> {
 //
 //        return try getTopics(in: subject, conn: conn)

@@ -11,6 +11,7 @@ public protocol TaskCreationContentable {
     var description: String? { get }
     var question: String { get }
     var isTestable: Bool { get }
+    var isDraft: Bool { get }
 
     /// The semester of the exam
     var examPaperSemester: TaskExamSemester? { get }
@@ -33,4 +34,5 @@ extension TaskCreationContentable where Self: Validatable {
 
 extension MultipleChoiceTask.Create.Data: TaskCreationContentable {
     public var examPaperSemester: TaskExamSemester? { nil }
+    public var isDraft: Bool { false }
 }
