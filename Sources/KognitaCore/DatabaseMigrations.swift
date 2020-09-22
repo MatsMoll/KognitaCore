@@ -33,8 +33,6 @@ public class DatabaseMigrations {
 
     static func setupTables(_ migrations: Migrations) {
 
-//        migrations.add(migration: TaskDatabaseModel.ExamSemester.self, database: .psql)
-
         migrations.add([
             User.Migrations.Create(),
             User.ResetPassword.Token.Migrations.Create(),

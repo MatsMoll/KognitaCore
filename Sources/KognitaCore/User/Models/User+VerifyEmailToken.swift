@@ -32,7 +32,7 @@ extension User.VerifyEmail.Token {
 
         /// Creates a new `UserToken` for a given user.
         static func create(userID: User.ID) throws -> User.VerifyEmail.Token.DatabaseModel {
-            let string = [UInt8].random(count: 16).base64
+            let string = [UInt8].random(count: 16).base64.replacingOccurrences(of: "+", with: "2")
             // init a new `User.VerifyEmail.Token` from that string.
             return .init(token: string, userID: userID)
         }

@@ -60,3 +60,9 @@ extension MultipleChoiseTaskChoise.Migrations {
 }
 
 extension MultipleChoiseTaskChoise: Content { }
+
+extension MultipleChoiseTaskChoise: ContentConvertable {
+    func content() throws -> MultipleChoiceTaskChoice {
+        try MultipleChoiceTaskChoice(id: requireID(), choice: choice, isCorrect: isCorrect)
+    }
+}
