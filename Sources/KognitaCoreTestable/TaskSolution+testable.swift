@@ -6,30 +6,30 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
 
 extension TaskSolution {
 
     public static func create(creator: User?   = nil,
-                              task: Task?   = nil,
+                              task: TaskDatabaseModel?   = nil,
                               solution: String  = UUID().uuidString,
                               presentUser: Bool    = true,
-                              on conn: PostgreSQLConnection) throws -> TaskSolution {
+                              on app: Application) throws -> TaskSolution {
 
-        let usedCreator = try creator ?? User.create(on: conn)
-        let usedTask = try task ?? Task.create(on: conn)
+        let usedCreator = try creator ?? User.create(on: app)
+        let usedTask = try task ?? TaskDatabaseModel.create(on: app)
 
-        return try create(creatorId: usedCreator.requireID(), solution: solution, presentUser: presentUser, taskID: usedTask.requireID(), on: conn)
+        return try create(creatorId: usedCreator.id, solution: solution, presentUser: presentUser, taskID: usedTask.requireID(), on: app.db)
     }
 
     public static func create(creatorId: User.ID,
                               solution: String,
                               presentUser: Bool,
                               taskID: Task.ID,
-                              on conn: PostgreSQLConnection) throws -> TaskSolution {
+                              on database: Database) throws -> TaskSolution {
 
-        return try TaskSolution(
+        let solution = try TaskSolution.DatabaseModel(
             data: .init(
                 solution: solution,
                 presentUser: presentUser,
@@ -37,6 +37,9 @@ extension TaskSolution {
             ),
             creatorID: creatorId
         )
-            .save(on: conn).wait()
+
+        return try solution.save(on: database)
+            .flatMapThrowing { try solution.content() }
+            .wait()
     }
 }

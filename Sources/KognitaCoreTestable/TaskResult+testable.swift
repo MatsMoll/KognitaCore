@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 import Crypto
 @testable import KognitaCore
 
@@ -20,18 +20,20 @@ extension TaskResult {
     ///   - conn: The database connection
     /// - Throws: If the database query fails
     /// - Returns: A `TaskResult`
-    public static func create(task: Task, sessionID: TaskSession.ID, user: User, score: Double = 1, on conn: PostgreSQLConnection) throws -> TaskResult {
+    public static func create(task: TaskDatabaseModel, sessionID: TaskSession.IDValue, user: User, score: Double = 1, on database: Database) throws -> TaskResult {
         let practiceResult = TaskSessionResult(
             result: "",
             score: score,
             progress: 0
         )
-        let submit = FlashCardTask.Submit(timeUsed: .random(in: 10...60), knowledge: 0, taskIndex: 0, answer: "Dummy answer")
+        let submit = TypingTask.Submit(timeUsed: .random(in: 10...60), knowledge: 0, taskIndex: 0, answer: "Dummy answer")
 
         let submitResult = try TaskSubmitResult(submit: submit, result: practiceResult, taskID: task.requireID())
 
-        return try TaskResult(result: submitResult, userID: user.requireID(), sessionID: sessionID)
-            .save(on: conn)
+        let result = TaskResult.DatabaseModel(result: submitResult, userID: user.id, sessionID: sessionID)
+
+        return try result.save(on: database)
+            .flatMapThrowing { try result.content() }
             .wait()
     }
 }

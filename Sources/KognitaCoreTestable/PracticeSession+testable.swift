@@ -6,8 +6,75 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
+
+public class TestableRepositories: RepositoriesRepresentable {
+
+    public var lectureNoteRepository: LectureNoteRepository
+
+    public var taskResultRepository: TaskResultRepositoring
+
+    public var topicRepository: TopicRepository
+
+    public var subjectRepository: SubjectRepositoring
+
+    public var subjectTestRepository: SubjectTestRepositoring
+
+    public var userRepository: UserRepository
+
+    public var subtopicRepository: SubtopicRepositoring
+
+    public var testSessionRepository: TestSessionRepositoring
+
+    public var practiceSessionRepository: PracticeSessionRepository
+
+    public var multipleChoiceTaskRepository: MultipleChoiseTaskRepository
+
+    public var typingTaskRepository: FlashCardTaskRepository
+
+    public var taskSolutionRepository: TaskSolutionRepositoring
+
+    public var taskDiscussionRepository: TaskDiscussionRepositoring
+
+    init(repositories: RepositoriesRepresentable) {
+        self.lectureNoteRepository = repositories.lectureNoteRepository
+        self.taskResultRepository = repositories.taskResultRepository
+        self.topicRepository = repositories.topicRepository
+        self.subjectRepository = repositories.subjectRepository
+        self.subjectTestRepository = repositories.subjectTestRepository
+        self.userRepository = repositories.userRepository
+        self.subtopicRepository = repositories.subtopicRepository
+        self.testSessionRepository = repositories.testSessionRepository
+        self.practiceSessionRepository = repositories.practiceSessionRepository
+        self.multipleChoiceTaskRepository = repositories.multipleChoiceTaskRepository
+        self.typingTaskRepository = repositories.typingTaskRepository
+        self.taskSolutionRepository = repositories.taskSolutionRepository
+        self.taskDiscussionRepository = repositories.taskDiscussionRepository
+    }
+
+    private static var shared: TestableRepositories!
+
+    public static func testable(with app: Application) -> TestableRepositories {
+        testable(database: app.db, password: app.password)
+    }
+
+    public static func testable(database: Database, password: PasswordHasher) -> TestableRepositories {
+        if shared == nil {
+            shared = TestableRepositories(repositories: DatabaseRepositories(database: database, password: password))
+        }
+        return shared
+    }
+
+    public static func reset() {
+        shared = nil
+    }
+
+    public static func modifyRepositories(_ modifier: @escaping (inout TestableRepositories) -> Void) {
+        guard var shared = shared else { fatalError() }
+        modifier(&shared)
+    }
+}
 
 extension PracticeSession {
 
@@ -19,16 +86,21 @@ extension PracticeSession {
     ///   - conn: The database connection
     /// - Throws: If the database query failes
     /// - Returns: A `TaskSession.PracticeParameter` representing a session
-    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on conn: PostgreSQLConnection) throws -> TaskSession.PracticeParameter {
+    public static func create(in subtopicIDs: Set<Subtopic.ID>, for user: User, numberOfTaskGoal: Int = 5, on app: Application) throws -> PracticeSessionRepresentable {
 
-        return try PracticeSession
-            .create(user, subtopics: subtopicIDs, numberOfTaskGoal: numberOfTaskGoal, on: conn)
+        return try TestableRepositories.testable(with: app)
+            .practiceSessionRepository
+            .create(
+                from: Create.Data(
+                    numberOfTaskGoal: numberOfTaskGoal,
+                    subtopicsIDs: subtopicIDs,
+                    topicIDs: nil
+                ),
+                by: user
+            )
             .flatMap { session in
-                try TaskSession.find(session.requireID(), on: conn)
-                    .unwrap(or: Abort(.internalServerError))
-                    .map { taskSession in
-                        TaskSession.PracticeParameter(session: taskSession, practiceSession: session)
-                }
-        }.wait()
+                PracticeParameter.resolveWith(session.id, database: app.db)
+            }
+            .wait()
     }
 }

@@ -5,60 +5,84 @@
 //  Created by Mats Mollestad on 12/04/2019.
 //
 
-import FluentPostgreSQL
+import Vapor
+import FluentKit
 
 public class DatabaseMigrations {
 
-    public static func migrationConfig(enviroment: Environment) -> MigrationConfig {
-        var migrations = MigrationConfig()
-        setupTables(&migrations)
-        extraDatabase(migrations: &migrations)
-        versionBump(&migrations, enviroment: enviroment)
-        return migrations
+    public static func migrationConfig(_ app: Application) {
+        if Environment.get("CLEAN_SETUP_MIGRATIONS")?.lowercased() == "true" {
+            setupTables(app.migrations)
+            extraDatabase(migrations: app.migrations)
+        }
+        if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
+//            app.migrations.add(VaporFourMigration())
+//            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
+//            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
+//            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
+//            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
+//            app.migrations.add(TaskDatabaseModel.Migrations.IsDraft())
+//            app.migrations.add(Topic.Migrations.RemoveUniqueConstraint())
+//            app.migrations.add(LectureNote.Migrations.NoteSession())
+//            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
+        }
+        if app.environment != .testing {
+            versionBump(app.migrations)
+        }
     }
 
-    static func setupTables(_ migrations: inout MigrationConfig) {
+    static func setupTables(_ migrations: Migrations) {
 
-        migrations.add(migration: Task.ExamSemester.self, database: .psql)
-        migrations.add(migration: Subject.ColorClass.self, database: .psql)
+//        migrations.add(migration: TaskDatabaseModel.ExamSemester.self, database: .psql)
 
-        migrations.add(model: User.self, database: .psql)
-        migrations.add(model: User.Login.Token.self, database: .psql)
-        migrations.add(model: User.ResetPassword.Token.self, database: .psql)
-        migrations.add(model: User.VerifyEmail.Token.self, database: .psql)
-        migrations.add(model: Subject.self, database: .psql)
-        migrations.add(model: User.ModeratorPrivilege.self, database: .psql)
-        migrations.add(model: User.ActiveSubject.self, database: .psql)
-        migrations.add(model: Topic.self, database: .psql)
-        migrations.add(model: Subtopic.self, database: .psql)
-        migrations.add(model: Task.self, database: .psql)
-        migrations.add(model: TaskDiscussion.self, database: .psql)
-        migrations.add(model: TaskDiscussion.Pivot.Response.self, database: .psql)
-        migrations.add(model: TaskSolution.self, database: .psql)
-        migrations.add(model: TaskSolution.Pivot.Vote.self, database: .psql)
-        migrations.add(model: MultipleChoiseTask.self, database: .psql)
-        migrations.add(model: MultipleChoiseTaskChoise.self, database: .psql)
-        migrations.add(model: TaskSession.self, database: .psql)
-        migrations.add(model: PracticeSession.self, database: .psql)
-        migrations.add(model: PracticeSession.Pivot.Task.self, database: .psql)
-        migrations.add(model: PracticeSession.Pivot.Subtopic.self, database: .psql)
-        migrations.add(model: FlashCardTask.self, database: .psql)
-        migrations.add(model: TaskResult.self, database: .psql)
-        migrations.add(model: TaskAnswer.self, database: .psql)
-        migrations.add(model: MultipleChoiseTaskAnswer.self, database: .psql)
-        migrations.add(model: FlashCardAnswer.self, database: .psql)
-        migrations.add(model: TestSession.self, database: .psql)
-        migrations.add(model: SubjectTest.self, database: .psql)
-        migrations.add(model: SubjectTest.Pivot.Task.self, database: .psql)
-        migrations.add(model: TaskSessionAnswer.self, database: .psql)
+        migrations.add([
+            User.Migrations.Create(),
+            User.ResetPassword.Token.Migrations.Create(),
+            User.Login.Token.Migrations.Create(),
+            User.VerifyEmail.Token.Migrations.Create(),
+
+            Subject.Migrations.Create(),
+            Topic.Migrations.Create(),
+            Subtopic.Migrations.Create(),
+
+            User.ActiveSubject.Migrations.Create(),
+            User.ModeratorPrivilege.Migrations.Create(),
+
+            TaskDatabaseModel.Migrations.Create(),
+            FlashCardTask.Migrations.Create(),
+            MultipleChoiceTask.Migrations.Create(),
+            MultipleChoiseTaskChoise.Migrations.Create(),
+
+            TaskDiscussion.Migrations.Create(),
+            TaskDiscussionResponse.Migrations.Create(),
+
+            TaskAnswer.Migrations.Create(),
+            FlashCardAnswer.Migrations.Create(),
+            MultipleChoiseTaskAnswer.Migrations.Create(),
+            LectureNote.Migrations.Create(),
+
+            TaskSolution.Migrations.Create(),
+            TaskSolution.Pivot.Vote.Migrations.Create(),
+
+            TaskSession.Migrations.Create(),
+            PracticeSession.Migrations.Create(),
+            PracticeSession.Pivot.Task.Migrations.Create(),
+            PracticeSession.Pivot.Subtopic.Migrations.Create(),
+
+            SubjectTest.Migrations.Create(),
+            SubjectTest.Pivot.Task.Migrations.Create(),
+            TestSession.Migrations.Create(),
+
+            TaskResult.Migrations.Create(),
+            TaskSessionAnswer.Migrations.Create()
+        ])
     }
 
-    static func extraDatabase(migrations: inout MigrationConfig) {
-        migrations.add(migration: User.UnknownUserMigration.self, database: .psql)
+    static func extraDatabase(migrations: Migrations) {
+//        migrations.add(migration: User.UnknownUserMigration.self, database: .psql)
     }
 
-    static func versionBump(_ migrations: inout MigrationConfig, enviroment: Environment) {
-        guard enviroment != .testing else { return }
-        migrations.add(migration: User.ViewedNotificationAtMigration.self, database: .psql)
+    static func versionBump(_ migrations: Migrations) {
+//        migrations.add(migration: User.ViewedNotificationAtMigration.self, database: .psql)
     }
 }

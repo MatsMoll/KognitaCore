@@ -1,73 +1,62 @@
 import Vapor
-import FluentPostgreSQL
-import Crypto
+import FluentKit
 
 public protocol VerifyEmailSendable {
-    func sendEmail(with token: User.VerifyEmail.EmailContent, on container: Container) throws -> EventLoopFuture<Void>
+    func sendEmail(with token: User.VerifyEmail.EmailContent) throws -> EventLoopFuture<Void>
 }
 
-extension User {
-    public enum VerifyEmail {
-        public final class Token: PostgreSQLModel {
+extension User.VerifyEmail.Token {
+    public final class DatabaseModel: Model {
 
-            public typealias Database = PostgreSQLDatabase
+        public static var entity: String = "User.VerifyEmail.Token"
+        public static var schema: String = "User.VerifyEmail.Token"
 
-            public static var entity: String = "User.VerifyEmail.Token"
-            public static var name: String = "User.VerifyEmail.Token"
+        /// UserToken's unique identifier.
+        @DBID(custom: "id")
+        public var id: Int?
 
-            /// UserToken's unique identifier.
-            public var id: Int?
+        /// Unique token string.
+        @Field(key: "token")
+        public var token: String
 
-            /// Unique token string.
-            public var token: String
+        /// Reference to user that owns this token.
+        @Parent(key: "userID")
+        var user: User.DatabaseModel
 
-            /// Reference to user that owns this token.
-            public var userID: User.ID
-
-            init(token: String, userID: User.ID) {
-                self.token = token
-                self.userID = userID
-            }
-
-            /// Creates a new `UserToken` for a given user.
-            static func create(userID: User.ID) throws -> User.VerifyEmail.Token {
-                let string = try CryptoRandom().generateData(count: 16).base64URLEncodedString(options: .init())
-                // init a new `User.VerifyEmail.Token` from that string.
-                return .init(token: string, userID: userID)
-            }
+        init(token: String, userID: User.ID) {
+            self.token = token
+            self.$user.id = userID
         }
 
-        public struct EmailContent {
-            public let token: String
-            public let userID: User.ID
-            public let email: String
-        }
+        public init() { }
 
-        public struct Request: Content {
-            public let token: String
+        /// Creates a new `UserToken` for a given user.
+        static func create(userID: User.ID) throws -> User.VerifyEmail.Token.DatabaseModel {
+            let string = [UInt8].random(count: 16).base64
+            // init a new `User.VerifyEmail.Token` from that string.
+            return .init(token: string, userID: userID)
         }
     }
 }
 
 extension User.VerifyEmail.Token {
+    enum Migrations {}
+}
 
-    public func content(with email: String) -> User.VerifyEmail.EmailContent {
-        .init(token: token, userID: userID, email: email)
+extension User.VerifyEmail.Token.Migrations {
+    struct Create: KognitaModelMigration {
+        typealias Model = User.VerifyEmail.Token.DatabaseModel
+
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.field("token", .string, .required)
+                .field("userID", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+        }
     }
 }
 
-/// Allows `UserToken` to be used as a Fluent migration.
-extension User.VerifyEmail.Token: Migration {
-    /// See `Migration`.
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(User.VerifyEmail.Token.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension User.VerifyEmail.Token.DatabaseModel {
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(User.VerifyEmail.Token.self, on: connection)
+    public func content(with email: String) -> User.VerifyEmail.EmailContent {
+        .init(token: token, userID: $user.id, email: email)
     }
 }

@@ -5,54 +5,54 @@
 //  Created by Mats Mollestad on 22/12/2019.
 //
 
-import FluentPostgreSQL
+import FluentKit
 
-public protocol RetriveAllModelsRepository {
-    associatedtype ResponseModel
-    associatedtype Model
+//public protocol RetriveAllModelsRepository {
+//    associatedtype ResponseModel
+//    associatedtype Model
+//
+//    func all() throws -> EventLoopFuture<[ResponseModel]>
+//}
+//
+//extension RetriveAllModelsRepository where ResponseModel == Model, Model: PostgreSQLModel, Self: DatabaseConnectableRepository {
+//
+//    public func all() throws -> EventLoopFuture<[ResponseModel]> {
+//        Model.query(on: conn)
+//            .all()
+//    }
+//
+//    func all(where filter: FilterOperator<PostgreSQLDatabase, Model>) -> EventLoopFuture<[Model]> {
+//        return Model.query(on: conn)
+//            .filter(filter)
+//            .all()
+//    }
+//}
 
-    static func all(on conn: DatabaseConnectable) throws -> EventLoopFuture<[ResponseModel]>
-}
+extension DatabaseConnectableRepository {
 
-extension RetriveAllModelsRepository where ResponseModel == Model, Model: PostgreSQLModel {
-
-    public static func all(on conn: DatabaseConnectable) throws -> EventLoopFuture<[ResponseModel]> {
-        Model.query(on: conn)
+    func all<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type) -> EventLoopFuture<[DatabaseModel.ResponseModel]> where DatabaseModel: Model {
+        DatabaseModel.query(on: database)
             .all()
-    }
-
-    static public func all(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> EventLoopFuture<[Model]> {
-        return Model.query(on: conn)
-            .filter(filter)
-            .all()
+            .flatMapEachThrowing { try $0.content() }
     }
 }
 
-public protocol RetriveModelRepository {
-    associatedtype Model
-}
+//public protocol RetriveModelRepository {
+//    associatedtype Model: Identifiable
+//    func find(_ id: Int, or error: Error) -> EventLoopFuture<Model>
+//    func find(_ id: Int) -> EventLoopFuture<Model?>
+//}
 
-extension RetriveModelRepository where Model: PostgreSQLModel {
+extension DatabaseConnectableRepository {
 
-    public static func find(_ id: Model.ID, or error: Error, on conn: DatabaseConnectable) -> EventLoopFuture<Model> {
-        return Model.find(id, on: conn)
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int) -> EventLoopFuture<DatabaseModel.ResponseModel?> where DatabaseModel: Model, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(id, on: database)
+            .flatMapThrowing { try $0?.content() }
+    }
+
+    func findDatabaseModel<DatabaseModel: ContentConvertable>(_ modelType: DatabaseModel.Type, withID id: Int, or error: Error) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: Model, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(id, on: database)
             .unwrap(or: error)
-    }
-
-    public static func find(_ id: Model.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Model?> {
-        return Model.find(id, on: conn)
-    }
-
-    public static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, on conn: DatabaseConnectable) -> EventLoopFuture<Model?> {
-        return Model.query(on: conn)
-            .filter(filter)
-            .first()
-    }
-
-    public static func first(where filter: FilterOperator<PostgreSQLDatabase, Model>, or error: Error, on conn: DatabaseConnectable) -> EventLoopFuture<Model> {
-        return Model.query(on: conn)
-            .filter(filter)
-            .first()
-            .unwrap(or: error)
+            .content()
     }
 }

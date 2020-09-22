@@ -6,97 +6,144 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 /// One solution to a `Task`
-public final class TaskSolution: KognitaPersistenceModel, Validatable {
+extension TaskSolution {
+    final class DatabaseModel: KognitaPersistenceModel {
 
-    public var id: Int?
+        public static var tableName: String = "TaskSolution"
 
-    public var createdAt: Date?
+        @DBID(custom: "id")
+        public var id: Int?
 
-    public var updatedAt: Date?
+        @Timestamp(key: "createdAt", on: .create)
+        public var createdAt: Date?
 
-    public var solution: String
+        @Timestamp(key: "updatedAt", on: .update)
+        public var updatedAt: Date?
 
-    public var creatorID: User.ID
+        @Field(key: "solution")
+        public var solution: String
 
-    public var isApproved: Bool
+        @Parent(key: "creatorID")
+        public var creator: User.DatabaseModel
 
-    public var approvedBy: User.ID?
+        @Field(key: "isApproved")
+        public var isApproved: Bool
 
-    public var taskID: Task.ID
+        @OptionalParent(key: "approvedBy")
+        public var approvedBy: User.DatabaseModel?
 
-    public var presentUser: Bool
+        @Parent(key: "taskID")
+        public var task: TaskDatabaseModel
 
-    init(data: Create.Data, creatorID: User.ID) throws {
-        self.solution = try data.solution.cleanXSS(whitelist: .basicWithImages())
-        self.presentUser = data.presentUser
-        self.taskID = data.taskID
-        self.creatorID = creatorID
-        self.isApproved = false
-        self.approvedBy = nil
-        try validate()
-    }
+        @Field(key: "presentUser")
+        public var presentUser: Bool
 
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(TaskSolution.self, on: conn) { builder in
-            try addProperties(to: builder)
+        init() {}
 
-            builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.creatorID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-            builder.reference(from: \.approvedBy, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-        }.flatMap {
-            PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
-                builder.deleteField(for: \.creatorID)
-                builder.field(for: \.creatorID, type: .int, .default(1))
+        init(data: Create.Data, creatorID: User.ID) throws {
+            self.solution = try data.solution.cleanXSS(whitelist: .basicWithImages())
+            self.presentUser = data.presentUser
+            self.$task.id = data.taskID
+            self.$creator.id = creatorID
+            self.isApproved = false
+            self.$approvedBy.id = nil
+//            try validate()
+        }
+
+        public func update(with data: TaskSolution.Update.Data) throws {
+            if let solution = data.solution {
+                self.solution = try solution.cleanXSS(whitelist: .basicWithImages())
             }
+            if let presentUser = data.presentUser {
+                self.presentUser = presentUser
+            }
+//            try validate()
         }
-    }
 
-    public func update(with data: TaskSolution.Update.Data) throws {
-        if let solution = data.solution {
-            self.solution = try solution.cleanXSS(whitelist: .basicWithImages())
-        }
-        if let presentUser = data.presentUser {
-            self.presentUser = presentUser
-        }
-        try validate()
-    }
-
-    public func approve(by user: User) throws -> TaskSolution {
-        guard approvedBy == nil else {
+        public func approve(by user: User) -> TaskSolution.DatabaseModel {
+            guard approvedBy == nil else {
+                return self
+            }
+            $approvedBy.id = user.id
+            isApproved = true
             return self
         }
-        approvedBy = try user.requireID()
-        isApproved = true
-        return self
-    }
 
-    public static func validations() throws -> Validations<TaskSolution> {
-        var validator = Validations(TaskSolution.self)
-        try validator.add(\.solution, .count(3...))
-        try validator.add(\.creatorID, .range(1...))
-        try validator.add(\.taskID, .range(1...))
-        return validator
+//        public static func validations() throws -> Validations<TaskSolution.DatabaseModel> {
+//            var validator = Validations(TaskSolution.DatabaseModel.self)
+//            try validator.add(\.solution, .count(3...))
+//            try validator.add(\.creatorID, .range(1...))
+//            try validator.add(\.taskID, .range(1...))
+//            return validator
+//        }
     }
 }
 
 extension TaskSolution {
-    enum Migration {
-        struct TaskIDDeleteReferance: PostgreSQLMigration {
+    enum Migrations {}
+}
 
-            static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                PostgreSQLDatabase.update(TaskSolution.self, on: conn) { builder in
+extension TaskSolution.Migrations {
+    struct Create: KognitaModelMigration {
 
-                    builder.deleteReference(from: \.taskID, to: \Task.id)
-                    builder.reference(from: \.taskID, to: \Task.id, onUpdate: .cascade, onDelete: .cascade)
-                }
-            }
+        typealias Model = TaskSolution.DatabaseModel
 
-            static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-                conn.future()
-            }
+        func build(schema: SchemaBuilder) -> SchemaBuilder {
+            schema.defaultTimestamps()
+                .field("solution", .string, .required)
+                .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("creatorID", .uint, .required, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
+                .field("approvedBy", .uint, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
+                .field("presentUser", .bool, .required)
+                .field("isApproved", .bool, .required)
         }
+    }
+}
+
+extension TaskSolution.DatabaseModel: ContentConvertable {
+    func content() throws -> TaskSolution {
+        try .init(
+            id: requireID(),
+            taskID: $task.id,
+            createdAt: createdAt ?? .now,
+            solution: solution,
+            creatorID: $creator.id,
+            approvedBy: $approvedBy.id ?? 0
+        )
+    }
+}
+
+protocol KognitaModelMigration: Migration {
+    associatedtype Model: FluentKit.Model
+
+    var subclassSchema: String? { get }
+
+    func build(schema: SchemaBuilder) -> SchemaBuilder
+}
+
+extension KognitaModelMigration {
+
+    var subclassSchema: String? { nil }
+
+    func prepare(on database: Database) -> EventLoopFuture<Void> {
+
+        if let subclassSchema = subclassSchema {
+            return build(schema:
+                database.schema(Model.schema)
+                    .field("id", .uint, .identifier(auto: true), .references(subclassSchema, .id, onDelete: .cascade, onUpdate: .cascade))
+            ).create()
+        } else {
+            return build(schema:
+                database.schema(Model.schema)
+                    .field("id", .uint, .identifier(auto: true))
+            ).create()
+        }
+    }
+
+    func revert(on database: Database) -> EventLoopFuture<Void> {
+        database.schema(Model.schema).delete()
     }
 }

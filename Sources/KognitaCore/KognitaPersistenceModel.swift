@@ -6,7 +6,7 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import Fluent
 
 //extension KognitaRepositoryDeletable {
 //    static public func delete(_ model: Model, by user: User?, on conn: DatabaseConnectable) throws -> Future<Void> {
@@ -44,7 +44,9 @@ public protocol KognitaModelUpdatable: KognitaCRUDModel {
 //}
 //
 /// A protocol that defines a Model to be used in Kognita
-public protocol KognitaPersistenceModel: PostgreSQLModel, Migration {
+public protocol KognitaPersistenceModel: Model {
+
+    static var tableName: String { get }
 
     /// Creation at data
     var createdAt: Date? { get set }
@@ -52,29 +54,10 @@ public protocol KognitaPersistenceModel: PostgreSQLModel, Migration {
     /// Updated at data
     var updatedAt: Date? { get set }
 
-    /// Adds constraints to the database table
-    ///
-    /// - Parameter builder: The builder that builds the table
-    static func addTableConstraints(to builder: SchemaCreator<Self>)
 }
 
 extension KognitaPersistenceModel {
-
-    public static var createdAtKey: WritableKeyPath<Self, Date?>? { return \Self.createdAt }
-    public static var updatedAtKey: WritableKeyPath<Self, Date?>? { return \Self.updatedAt }
-
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(Self.self, on: conn) { builder in
-            try addProperties(to: builder)
-            Self.addTableConstraints(to: builder)
-        }
-    }
-
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(Self.self, on: connection)
-    }
-
-    public static func addTableConstraints(to builder: SchemaCreator<Self>) {}
+    public static var schema: String { tableName }
 }
 //
 //public typealias KognitaCRUDRepository = KognitaRepositoryDeletable & KognitaRepositoryEditable
@@ -91,4 +74,9 @@ public protocol SoftDeleatableModel: KognitaPersistenceModel {
 
 extension SoftDeleatableModel {
     public static var deletedAtKey: WritableKeyPath<Self, Date?>? { return \Self.deletedAt }
+}
+
+public protocol ContentConvertable {
+    associatedtype ResponseModel
+    func content() throws -> ResponseModel
 }

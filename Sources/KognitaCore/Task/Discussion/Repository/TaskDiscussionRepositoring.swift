@@ -1,20 +1,12 @@
 import Vapor
 
-public protocol TaskDiscussionRepositoring: CreateModelRepository,
-    UpdateModelRepository
-    where
-    Model           == TaskDiscussion,
-    CreateData      == TaskDiscussion.Create.Data,
-    CreateResponse  == TaskDiscussion.Create.Response,
-    UpdateData      == TaskDiscussion.Update.Data,
-    UpdateResponse  == TaskDiscussion.Update.Response {
-    static func respond(with response: TaskDiscussion.Pivot.Response.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
+public protocol TaskDiscussionRepositoring {
 
-    static func responses(to discussionID: TaskDiscussion.ID, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Pivot.Response.Details]>
-
-    static func getDiscussions(in taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]>
-
-    static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]>
-
-    static func setRecentlyVisited(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Bool>
+    func create(from content: TaskDiscussion.Create.Data, by user: User?) throws -> EventLoopFuture<TaskDiscussion.Create.Response>
+    func updateModelWith(id: Int, to data: TaskDiscussion.Update.Data, by user: User) throws -> EventLoopFuture<TaskDiscussion.Update.Response>
+    func respond(with response: TaskDiscussionResponse.Create.Data, by user: User) throws -> EventLoopFuture<Void>
+    func responses(to discussionID: TaskDiscussion.ID, for user: User) throws -> EventLoopFuture<[TaskDiscussionResponse]>
+    func getDiscussions(in taskID: Task.ID) throws -> EventLoopFuture<[TaskDiscussion]>
+    func getUserDiscussions(for user: User) throws -> EventLoopFuture<[TaskDiscussion]>
+    func setRecentlyVisited(for user: User) throws -> EventLoopFuture<Bool>
 }

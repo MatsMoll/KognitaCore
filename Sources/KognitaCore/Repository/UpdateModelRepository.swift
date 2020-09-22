@@ -5,24 +5,53 @@
 //  Created by Mats Mollestad on 22/12/2019.
 //
 
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
-public protocol UpdateModelRepository {
-    associatedtype UpdateData
-    associatedtype UpdateResponse
-    associatedtype Model
+//public protocol UpdateModelRepository {
+//    associatedtype UpdateData
+//    associatedtype UpdateResponse
+//    associatedtype ID
+//
+//    func updateModelWith(id: ID, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
+//    func updateModelWith(id: Int, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
+//}
 
-    static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse>
+public protocol DatabaseConnectableRepository {
+    var database: Database { get }
 }
 
-extension UpdateModelRepository
-    where
-    Model: KognitaModelUpdatable,
-    Model.EditData == UpdateData,
-    UpdateResponse == Model {
-    public static func update(model: Model, to data: UpdateData, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<UpdateResponse> {
-        try model.updateValues(with: data)
-        return model.save(on: conn)
+extension DatabaseConnectableRepository {
+    func updateDatabase<DatabaseModel: KognitaModelUpdatable>(_ type: DatabaseModel.Type, modelID: Int, to data: DatabaseModel.EditData) -> EventLoopFuture<DatabaseModel.ResponseModel> where DatabaseModel: ContentConvertable, DatabaseModel.IDValue == Int {
+        DatabaseModel.find(modelID, on: database)
+            .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { databaseModel -> DatabaseModel in
+                try databaseModel.updateValues(with: data)
+                return databaseModel
+            }.flatMap { databaseModel in
+                databaseModel.save(on: self.database)
+                    .transform(to: databaseModel)
+            }
+            .flatMapThrowing { try $0.content() }
+    }
+}
+
+extension EventLoopFuture {
+    public func failableFlatMap<Result>(event: @escaping (Value) throws -> EventLoopFuture<Result>) -> EventLoopFuture<Result> {
+        flatMap { value in
+            do {
+                return try event(value)
+            } catch {
+                return self.eventLoop.future(error: error)
+            }
+        }
+    }
+}
+
+func failable<Value>(eventLoop: EventLoop, event: () throws -> EventLoopFuture<Value>) -> EventLoopFuture<Value> {
+    do {
+        return try event()
+    } catch {
+        return eventLoop.makeFailedFuture(error)
     }
 }
