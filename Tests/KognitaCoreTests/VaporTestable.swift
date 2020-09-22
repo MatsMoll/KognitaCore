@@ -25,10 +25,6 @@ class VaporTestCase: XCTestCase {
     var app: Application!
     var database: Database { app.db }
 
-//    func setup() -> Application {
-//        self.app = Application.testable()
-//    }
-
     override func setUp() {
         super.setUp()
         app = try! Application.testable()
