@@ -295,7 +295,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                                     if let multiple = multiple {
                                         multipleTasks[id] = MultipleChoiceTask.BetaFormat(
                                             task: betaTask,
-                                            choises: choices.filter { $0.$task.id == id },
+                                            choises: choices.filter { $0.$task.id == id }.compactMap { try? $0.content() },
                                             isMultipleSelect: multiple.isMultipleSelect
                                         )
                                     } else {
@@ -335,7 +335,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
         let subtopic = Subtopic.DatabaseModel(
             name: content.subtopic.name,
-            topicID: content.subtopic.topicID
+            topicID: topic.id
         )
 
         return subtopic.create(on: database)
@@ -494,7 +494,7 @@ extension MultipleChoiceTask {
 
         let task: TaskBetaFormat
 
-        let choises: [MultipleChoiseTaskChoise]
+        let choises: [MultipleChoiceTaskChoice]
 
         let isMultipleSelect: Bool
     }
