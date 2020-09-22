@@ -1,60 +1,98 @@
 import Vapor
-import FluentPostgreSQL
+import Fluent
+import FluentSQL
+
+extension QueryBuilder {
+    func join<From, To>(parent: KeyPath<From, ParentProperty<From, To>>) -> Self {
+        join(To.self, on: parent.appending(path: \.$id) == \To._$id)
+    }
+
+    func join<From, To>(parent: KeyPath<From, OptionalParentProperty<From, To>>) -> Self {
+        join(To.self, on: parent.appending(path: \.$id) == \To._$id, method: .left)
+    }
+
+    func join<From, To>(superclass: To.Type, with: From.Type, method: DatabaseQuery.Join.Method = .inner) -> Self where From: FluentKit.Model, To: FluentKit.Model, To.IDValue == From.IDValue {
+        join(To.self, on: \From._$id == \To._$id, method: method)
+    }
+
+    func join<From, To>(from: From.Type, to toType: To.Type, method: DatabaseQuery.Join.Method = .inner) -> Self where From: FluentKit.Model, To: FluentKit.Model, To.IDValue == From.IDValue {
+        join(To.self, on: \From._$id == \To._$id, method: method)
+    }
+
+    func join<From, To>(children: KeyPath<From, ChildrenProperty<From, To>>) -> Self {
+        switch From()[keyPath: children].parentKey {
+        case .optional(let parent): return join(To.self, on: \From._$id == parent.appending(path: \.$id))
+        case .required(let parent): return join(To.self, on: \From._$id == parent.appending(path: \.$id))
+        }
+    }
+
+    func join<From, To, Through>(siblings: KeyPath<From, SiblingsProperty<From, To, Through>>) -> Self where From: FluentKit.Model, To: FluentKit.Model, Through: FluentKit.Model {
+        let siblings = From()[keyPath: siblings]
+        return join(Through.self, on: siblings.from.appending(path: \.$id) == \From._$id)
+            .join(To.self, on: siblings.to.appending(path: \.$id) == \To._$id)
+    }
+}
+
+extension SQLSelectBuilder {
+    func join<From, To>(parent: KeyPath<From, ParentProperty<From, To>>) -> Self {
+        join(To.schema, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: parent.appending(path: \.$id)].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()._$id.key.description)\"")
+    }
+}
 
 extension TaskDiscussion {
-    public class DatabaseRepository: TaskDiscussionRepositoring {
+    public struct DatabaseRepository: TaskDiscussionRepositoring, DatabaseConnectableRepository {
 
-        public static func getDiscussions(in taskID: Task.ID, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
-            TaskDiscussion.query(on: conn)
-                .filter(\TaskDiscussion.taskID == taskID)
-                .join(\User.id, to: \TaskDiscussion.userID)
-                .alsoDecode(User.self)
-                .all()
-                .map { discussions in
+        public init(database: Database) {
+            self.database = database
+        }
 
-                    return discussions.map { (discussion, user) in
+        public let database: Database
 
-                        TaskDiscussion.Details(
-                            id: discussion.id ?? 0,
-                            description: discussion.description,
-                            createdAt: discussion.createdAt,
-                            username: user.username,
-                            newestResponseCreatedAt: .now
-                        )
-                    }
+        public func getDiscussions(in taskID: Task.ID) throws -> EventLoopFuture<[TaskDiscussion]> {
+
+            return TaskDiscussion.DatabaseModel.query(on: database)
+                .filter(\.$task.$id == taskID)
+                .join(parent: \TaskDiscussion.DatabaseModel.$user)
+                .all(TaskDiscussion.DatabaseModel.self, User.DatabaseModel.self)
+                .mapEach { (discussion, user) in
+                    TaskDiscussion(
+                        id: discussion.id ?? 0,
+                        description: discussion.description,
+                        createdAt: discussion.createdAt,
+                        username: user.username,
+                        newestResponseCreatedAt: .now
+                    )
             }
         }
 
-        public static func getUserDiscussions(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Details]> {
-            return conn.databaseConnection(to: .psql)
-                .flatMap { psqlConn in
-                    try psqlConn.select()
-                        .all(table: TaskDiscussion.self)
-                        .column(\User.username)
-                        .column(\TaskDiscussion.Pivot.Response.createdAt, as: "newestResponseCreatedAt")
-                        .from(TaskDiscussion.self)
-                        .join(\TaskDiscussion.id, to: \TaskDiscussion.Pivot.Response.discussionID)
-                        .join(\TaskDiscussion.userID, to: \User.id)
-                        .where(\TaskDiscussion.userID == user.requireID())
-                        .orderBy(\TaskDiscussion.Pivot.Response.createdAt, .descending)
-                        .all(decoding: TaskDiscussion.Details.self)
-                        .map {  discussions in
-
-                            discussions.removingDuplicates()
-
-                    }
-
-            }
+        public func getUserDiscussions(for user: User) throws -> EventLoopFuture<[TaskDiscussion]> {
+            TaskDiscussion.DatabaseModel.query(on: database)
+                .join(children: \TaskDiscussion.DatabaseModel.$responses)
+                .join(parent: \TaskDiscussion.DatabaseModel.$user)
+                .filter(\TaskDiscussion.DatabaseModel.$user.$id == user.id)
+                .sort(TaskDiscussionResponse.DatabaseModel.self, \TaskDiscussionResponse.DatabaseModel.$createdAt, .descending)
+                .all(TaskDiscussion.DatabaseModel.self, User.DatabaseModel.self, TaskDiscussionResponse.DatabaseModel.self)
+                .flatMapEachThrowing { (discussion, user, response) in
+                    try TaskDiscussion(
+                        id: discussion.requireID(),
+                        description: discussion.description,
+                        createdAt: discussion.createdAt ?? .now,
+                        username: user.username,
+                        newestResponseCreatedAt: response.createdAt ?? .now
+                    )
+                }
+                .map { $0.removingDuplicates() }
         }
 
-        public static func setRecentlyVisited(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Bool> {
+        public func setRecentlyVisited(for user: User) throws -> EventLoopFuture<Bool> {
 
-            var query = try TaskDiscussion.Pivot.Response.query(on: conn)
-                .filter(\.userID == user.requireID())
+            var query = TaskDiscussionResponse.DatabaseModel.query(on: database)
+                .filter(\.$user.$id == user.id)
 
-            if let recentlyVisited = user.viewedNotificationsAt {
-                query = query.filter(\.createdAt > recentlyVisited)
-            }
+            // FIXME: - Add variable
+//            if let recentlyVisited = user.viewedNotificationsAt {
+//                query = query.filter(\.createdAt > recentlyVisited)
+//            }
 
             return query.count()
                 .map { numberOfResponses in
@@ -62,73 +100,79 @@ extension TaskDiscussion {
             }
         }
 
-        public static func getLastResponse(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Pivot.Response?> {
+        func getLastResponse(for user: User) throws -> EventLoopFuture<TaskDiscussionResponse.DatabaseModel?> {
 
-            try TaskDiscussion.Pivot.Response.query(on: conn)
-                .filter(\.userID == user.requireID())
-                .sort(\.createdAt, .descending)
+            TaskDiscussionResponse.DatabaseModel.query(on: database)
+                .filter(\.$user.$id == user.id)
+                .sort(\.$createdAt, .descending)
                 .first()
         }
 
-        public static func create(from content: TaskDiscussion.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Create.Response> {
-
+        public func create(from content: TaskDiscussion.Create.Data, by user: User?) throws -> EventLoopFuture<NoData> {
+            guard content.description.removeCharacters(from: .whitespaces).count > 3 else {
+                return database.eventLoop.future(error: Abort(.badRequest))
+            }
             guard let user = user else {
                 throw Abort(.unauthorized)
             }
 
-            return try TaskDiscussion(data: content, userID: user.requireID())
-                .create(on: conn)
-                .transform(to: .init())
+            return TaskDiscussion.DatabaseModel(data: content, userID: user.id)
+                .create(on: database)
+                .transform(to: NoData())
         }
 
-        public static func update(model: TaskDiscussion, to data: TaskDiscussion.Update.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<TaskDiscussion.Update.Response> {
+        public func updateModelWith(id: Int, to data: TaskDiscussion.Update.Data, by user: User) throws -> EventLoopFuture<NoData> {
+            TaskDiscussion.DatabaseModel.find(id, on: database)
+                .unwrap(or: Abort(.badRequest))
+                .flatMapThrowing { model -> TaskDiscussion.DatabaseModel in
+                    guard user.id == model.user.id else {
+                        throw Abort(.forbidden)
+                    }
+                    model.update(with: data)
+                    return model
+                }
+                .flatMap {
+                    $0.save(on: self.database)
+                }
+                .transform(to: NoData())
+        }
 
-            guard user.id == model.userID else {
-                throw Abort(.forbidden)
+        public func respond(with response: TaskDiscussionResponse.Create.Data, by user: User) throws -> EventLoopFuture<Void> {
+            guard response.response.removeCharacters(from: .whitespaces).count > 3 else {
+                return database.eventLoop.future(error: Abort(.badRequest))
             }
-            try model.update(with: data)
-            return model.save(on: conn)
-                .transform(to: .init())
-        }
-
-        public static func respond(with response: TaskDiscussion.Pivot.Response.Create.Data, by user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-
-            return try TaskDiscussion.Pivot.Response(data: response, userID: user.requireID())
-                .create(on: conn)
+            return try TaskDiscussionResponse.DatabaseModel(data: response, userID: user.id)
+                .create(on: database)
                 .transform(to: ())
         }
 
-        public static func responses(to discussionID: TaskDiscussion.ID, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskDiscussion.Pivot.Response.Details]> {
+        public func responses(to discussionID: TaskDiscussion.ID, for user: User) throws -> EventLoopFuture<[TaskDiscussionResponse]> {
 
-            let oldViewedDate = user.viewedNotificationsAt
+            let oldViewedDate: Date? = nil
 //            user.viewedNotificationsAt = Date()
 
-            return user.save(on: conn).flatMap { _ in
-                TaskDiscussion.Pivot.Response.query(on: conn)
-                    .filter(\TaskDiscussion.Pivot.Response.discussionID == discussionID)
-                    .join(\User.id, to: \TaskDiscussion.Pivot.Response.userID)
-                    .sort(\TaskDiscussion.Pivot.Response.createdAt, .ascending)
-                    .alsoDecode(User.self)
+//            return user.save(on: conn).flatMap { _ in
+                return TaskDiscussionResponse.DatabaseModel.query(on: self.database)
+                    .filter(\TaskDiscussionResponse.DatabaseModel.$discussion.$id == discussionID)
+                    .with(\.$user)
+                    .sort(\TaskDiscussionResponse.DatabaseModel.$createdAt, .ascending)
                     .all()
-                    .map { responses in
-                        responses.map { response, user in
-                            var isNew = true
-                            if
-                                let oldDate = oldViewedDate,
-                                let responseDate = response.createdAt
-                            {
-                                isNew = responseDate > oldDate
-                            }
-
-                            return TaskDiscussion.Pivot.Response.Details(
-                                response: response.response,
-                                createdAt: response.createdAt,
-                                username: user.username,
-                                isNew: isNew
-                            )
+                    .mapEach { response in
+                        var isNew = true
+                        if
+                            let oldDate = oldViewedDate,
+                            let responseDate = response.createdAt
+                        {
+                            isNew = responseDate > oldDate
                         }
-                }
-            }
+                        return TaskDiscussionResponse(
+                            response: response.response,
+                            createdAt: response.createdAt,
+                            username: response.user.username,
+                            isNew: isNew
+                        )
+                    }
+//            }
         }
     }
 }

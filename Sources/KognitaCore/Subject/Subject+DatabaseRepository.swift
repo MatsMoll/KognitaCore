@@ -4,10 +4,148 @@
 //
 //  Created by Mats Mollestad on 23/12/2019.
 //
+// swiftlint:disable large_tuple
 
 import Vapor
-import FluentPostgreSQL
 import FluentSQL
+import Fluent
+
+extension EventLoopFuture where Value: Model {
+    func create(on database: Database) -> EventLoopFuture<Void> {
+        flatMap { $0.create(on: database) }
+    }
+
+    func update(on database: Database) -> EventLoopFuture<Void> {
+        flatMap { $0.update(on: database) }
+    }
+
+    func delete(on database: Database) -> EventLoopFuture<Void> {
+        flatMap { $0.delete(on: database) }
+    }
+}
+
+extension QueryBuilder {
+    public func all<Joined>(
+        _ joined: Joined.Type
+    ) -> EventLoopFuture<[Joined]>
+        where
+            Joined: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try $0.joined(Joined.self) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo)]>
+        where Joined: Schema, JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: JoinedThree.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), $0.joined(JoinedThree.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: Optional<JoinedThree>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree?)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), try? $0.joined(JoinedThree.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo, JoinedThree, Four>(
+        _ joined: Joined.Type,
+        _ joinedTwo: JoinedTwo.Type,
+        _ joinedThree: JoinedThree.Type,
+        _ four: Optional<Four>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo, JoinedThree, Four?)]>
+        where Joined: Schema, JoinedTwo: Schema, JoinedThree: Schema, Four: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { try ($0.joined(Joined.self), $0.joined(JoinedTwo.self), $0.joined(JoinedThree.self), try? $0.joined(Four.self)) }
+        }
+    }
+
+    public func all<Joined, JoinedTwo>(
+        _ joined: Joined.Type,
+        _ joinedTwo: Optional<JoinedTwo>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo?)]>
+        where Joined: Schema, JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { (try $0.joined(Joined.self), try? $0.joined(JoinedTwo.self)) }
+        }
+    }
+
+    public func first<Joined>(
+        _ joined: Joined.Type
+    ) -> EventLoopFuture<Joined?>
+        where
+            Joined: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            try $0?.joined(Joined.self)
+        }
+    }
+
+    public func first<Joined, JoinedTwo>(
+        _ joined: Joined.Type, _ joinedTwo: JoinedTwo.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self), let joinedTwo = try $0?.joined(JoinedTwo.self) else { return nil }
+            return (joined, joinedTwo)
+        }
+    }
+
+    public func first<Joined, JoinedTwo, JoinedThree>(
+        _ joined: Joined.Type, _ joinedTwo: JoinedTwo.Type, _ joinedThree: JoinedThree.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo, JoinedThree)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema,
+        JoinedThree: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self), let joinedTwo = try $0?.joined(JoinedTwo.self), let joinedThree = try $0?.joined(JoinedThree.self) else { return nil }
+            return (joined, joinedTwo, joinedThree)
+        }
+    }
+
+    public func first<Joined, JoinedTwo>(
+        _ joined: Joined.Type, _ joinedTwo: Optional<JoinedTwo>.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo?)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self) else { return nil }
+            return (joined, try? $0?.joined(JoinedTwo.self))
+        }
+    }
+}
 
 extension String {
 
@@ -27,81 +165,128 @@ extension String {
 }
 
 extension Subject {
-    public final class DatabaseRepository: SubjectRepositoring {}
+    public struct DatabaseRepository: SubjectRepositoring, DatabaseConnectableRepository {
+
+        init(database: Database, repositories: RepositoriesRepresentable, taskRepository: TaskRepository) {
+            self.database = database
+            self.userRepository = repositories.userRepository
+            self.topicRepository = repositories.topicRepository
+            self.subtopicRepository = repositories.subtopicRepository
+            self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
+            self.taskRepository = taskRepository
+        }
+
+        public let database: Database
+
+        private let userRepository: UserRepository
+        private let topicRepository: TopicRepository
+        private let subtopicRepository: SubtopicRepositoring
+        private let multipleChoiseRepository: MultipleChoiseTaskRepository
+        private let taskRepository: TaskRepository
+    }
 }
 
 extension Subject.DatabaseRepository {
 
-    public static func create(from content: Subject.Create.Data, by user: User?, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject> {
+    public func tasksWith(subjectID: Subject.ID) -> EventLoopFuture<[GenericTask]> {
+        TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+            .all()
+            .flatMapEachThrowing { try $0.content() }
+    }
+
+    public func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject> {
         guard let user = user, user.isAdmin else {
             throw Abort(.forbidden)
         }
-        return try Subject(content: content, creator: user)
-            .create(on: conn)
-            .flatMap { subject in
-
-                try User.ModeratorPrivilege(userID: user.requireID(), subjectID: subject.requireID())
-                    .create(on: conn)
-                    .transform(to: subject)
-        }
+        let subject = Subject.DatabaseModel(content: content, creator: user)
+        return subject.create(on: database)
+            .flatMapThrowing {
+                try User.ModeratorPrivilege(userID: user.id, subjectID: subject.requireID())
+            }
+            .create(on: database)
+            .flatMapThrowing { try subject.content() }
     }
+
+    public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
+        deleteDatabase(Subject.DatabaseModel.self, modelID: id)
+    }
+
+    public func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject> {
+        updateDatabase(Subject.DatabaseModel.self, modelID: id, to: data)
+    }
+
+    public func all() throws -> EventLoopFuture<[Subject]> { all(Subject.DatabaseModel.self) }
+    public func find(_ id: Int) -> EventLoopFuture<Subject?> { findDatabaseModel(Subject.DatabaseModel.self, withID: id) }
+    public func find(_ id: Int, or error: Error) -> EventLoopFuture<Subject> { findDatabaseModel(Subject.DatabaseModel.self, withID: id, or: error) }
 
     /// Fetches the subject for a given topic
     /// - Parameters:
     ///   - topicID: The topic id
     ///   - conn: The database connection
     /// - Returns: A future `Subject`
-    public static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        Topic.query(on: conn)
-            .filter(\.id == topicID)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .decode(Subject.self)
-            .first()
+    public func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject> {
+        Topic.DatabaseModel.query(on: database)
+            .filter(\.$id == topicID)
+            .join(parent: \Topic.DatabaseModel.$subject)
+            .first(Subject.DatabaseModel.self)
             .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { try $0.content() }
     }
 
-    public static func subject(for session: PracticeSessionRepresentable, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        PracticeSession.query(on: conn)
-            .join(\PracticeSession.Pivot.Subtopic.sessionID, to: \PracticeSession.id)
-            .join(\Subtopic.id, to: \PracticeSession.Pivot.Subtopic.subtopicID)
-            .join(\Topic.id, to: \Subtopic.topicId)
-            .join(\Subject.id, to: \Topic.subjectId)
-            .filter(\PracticeSession.id == session.id)
-            .decode(Subject.self)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
-    }
-
-    public static func getSubjectWith(id: Subject.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        return Subject
-            .find(id, on: conn)
-            .unwrap(or: Abort(.badRequest))
-    }
-
-    public static func getSubject(in topic: Topic, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        return topic.subject.get(on: conn)
-    }
-
-    public static func importContent(_ content: SubjectExportContent, on conn: DatabaseConnectable) -> EventLoopFuture<Subject> {
-        content.subject.id = nil
-        content.subject.creatorId = 1
-        return conn.transaction(on: .psql) { conn in
-            content.subject.create(on: conn).flatMap { subject in
-                try content.topics.map { try Topic.DatabaseRepository.importContent(from: $0, in: subject, on: conn) }
-                    .flatten(on: conn)
-                    .transform(to: subject)
-            }
+    public func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject> {
+        failable(eventLoop: database.eventLoop) {
+            try PracticeSession.DatabaseModel.query(on: database)
+                .join(siblings: \PracticeSession.DatabaseModel.$subtopics)
+                .join(parent: \Subtopic.DatabaseModel.$topic)
+                .join(parent: \Topic.DatabaseModel.$subject)
+                .filter(\PracticeSession.DatabaseModel.$id == session.requireID())
+                .first(Subject.DatabaseModel.self)
+                .unwrap(or: Abort(.internalServerError))
+                .flatMapThrowing { try $0.content() }
         }
     }
 
-    public static func importContent(in subject: Subject, peerWise: [Task.PeerWise], user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func getSubjectWith(id: Subject.ID) -> EventLoopFuture<Subject> {
+        return Subject.DatabaseModel
+            .find(id, on: database)
+            .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { try $0.content() }
+    }
+
+    public func getSubject(in topic: Topic) -> EventLoopFuture<Subject> {
+        Subject.DatabaseModel.query(on: database)
+            .filter(\Subject.DatabaseModel.$id == topic.subjectID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { try $0.content() }
+    }
+
+    public func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject> {
+        let subject = Subject.DatabaseModel(
+            name: content.subject.name,
+            category: content.subject.category,
+            description: content.subject.description,
+            creatorId: 1
+        )
+        return subject.create(on: database)
+            .failableFlatMap {
+                try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
+                    .flatten(on: self.database.eventLoop)
+                    .flatMapThrowing { try subject.content() }
+        }
+    }
+
+    public func importContent(in subject: Subject, peerWise: [TaskPeerWise], user: User) throws -> EventLoopFuture<Void> {
 
         let knownTopic = peerWise.filter({ $0.topicName != "" })
 
-        return try Topic.query(on: conn)
-            .filter(\.subjectId == subject.requireID())
+        return Topic.DatabaseModel.query(on: database)
+            .filter(\Topic.DatabaseModel.$subject.$id == subject.id)
             .count()
-            .flatMap { numberOfExistingTopics in
+            .failableFlatMap { numberOfExistingTopics in
 
                 var numberOfTopics = numberOfExistingTopics
 
@@ -111,26 +296,25 @@ extension Subject.DatabaseRepository {
 
                         numberOfTopics += 1
 
-                        return try Topic.DatabaseRepository.create(
+                        return try self.topicRepository.create(
                             from: Topic.Create.Data(
-                                subjectId: subject.requireID(),
+                                subjectID: subject.id,
                                 name: topicName,
                                 chapter: numberOfTopics
                             ),
-                            by: user,
-                            on: conn
+                            by: user
                         )
-                            .flatMap { topic in
-                                try Subtopic.DatabaseRepository
-                                    .getSubtopics(in: topic, with: conn)
-                                    .flatMap { subtopics in
+                            .failableFlatMap { topic in
+                                try self.subtopicRepository
+                                    .getSubtopics(in: topic)
+                                    .failableFlatMap { subtopics in
 
                                         guard let subtopic = subtopics.first else { throw Abort(.internalServerError) }
 
                                         return try tasks.map { task in
-                                            try MultipleChoiseTask.DatabaseRepository.create(
-                                                from: MultipleChoiseTask.Create.Data(
-                                                    subtopicId: subtopic.requireID(),
+                                            try self.multipleChoiseRepository.create(
+                                                from: MultipleChoiceTask.Create.Data(
+                                                    subtopicId: subtopic.id,
                                                     description: nil,
                                                     question: task.question,
                                                     solution: task.solution,
@@ -140,225 +324,165 @@ extension Subject.DatabaseRepository {
                                                     isTestable: false,
                                                     choises: task.choises
                                                 ),
-                                                by: user,
-                                                on: conn
+                                                by: user
                                             )
                                                 .transform(to: ())
                                         }
-                                        .flatten(on: conn)
+                                        .flatten(on: self.database.eventLoop)
                                 }
                         }
                 }
-                .flatten(on: conn)
+                .flatten(on: self.database.eventLoop)
                 .transform(to: ())
         }
     }
 
-    public static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]> {
+    public func allActive(for user: User) throws -> EventLoopFuture<[Subject]> {
 
-        return try Subject.query(on: conn)
-            .join(\User.ActiveSubject.subjectID, to: \Subject.id, method: .left)
-            .filter(\User.ActiveSubject.userID == user.requireID())
-            .decode(Subject.self)
+        return Subject.DatabaseModel.query(on: database)
+            .join(children: \Subject.DatabaseModel.$activeSubjects)
+            .filter(User.ActiveSubject.self, \User.ActiveSubject.$user.$id == user.id)
             .all()
+            .flatMapEachThrowing { try $0.content() }
     }
 
     struct SubjectID: Decodable {
         let subjectId: Subject.ID
     }
 
-    static func subjectIDFor(taskIDs: [Task.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(taskIDs: [Int]) -> EventLoopFuture<Subject.ID> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { conn in
-
-                conn.select()
-                    .column(\Topic.subjectId)
-                    .from(Task.self)
-                    .join(\Task.subtopicID, to: \Subtopic.id)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .where(\Task.id, .in, taskIDs)
-                    .groupBy(\Topic.subjectId)
-                    .all(decoding: SubjectID.self)
-                    .map { subjectIDs in
-                        guard
-                            subjectIDs.count == 1,
-                            let id = subjectIDs.first?.subjectId
-                        else {
-                            throw Abort(.badRequest)
-                        }
-                        return id
+        return TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(\TaskDatabaseModel.$id ~~ taskIDs)
+            .unique()
+            .all(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id)
+            .flatMapThrowing { subjectIDs in
+                guard
+                    subjectIDs.count == 1,
+                    let id = subjectIDs.first
+                else {
+                    throw Abort(.badRequest)
                 }
+                return id
         }
     }
 
-    static func subjectIDFor(topicIDs: [Topic.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(topicIDs: [Topic.ID]) -> EventLoopFuture<Subject.ID> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { conn in
-
-                conn.select()
-                    .column(\Topic.subjectId)
-                    .from(Topic.self)
-                    .where(\Topic.id, .in, topicIDs)
-                    .groupBy(\Topic.subjectId)
-                    .all(decoding: SubjectID.self)
-                    .map { subjectIDs in
-                        guard
-                            subjectIDs.count == 1,
-                            let id = subjectIDs.first?.subjectId
-                        else {
-                            throw Abort(.badRequest)
-                        }
-                        return id
+        return Topic.DatabaseModel.query(on: database)
+            .filter(\Topic.DatabaseModel.$id ~~ topicIDs)
+            .unique()
+            .all(\.$subject.$id)
+            .flatMapThrowing { subjectIDs in
+                guard
+                    subjectIDs.count == 1,
+                    let id = subjectIDs.first
+                else {
+                    throw Abort(.badRequest)
                 }
+                return id
         }
     }
 
-    static func subjectIDFor(subtopicIDs: [Subtopic.ID], on conn: DatabaseConnectable) -> EventLoopFuture<Subject.ID> {
+    public func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { conn in
-
-                conn.select()
-                    .column(\Topic.subjectId)
-                    .from(Subtopic.self)
-                    .join(\Subtopic.topicId, to: \Topic.id)
-                    .where(\Subtopic.id, .in, subtopicIDs)
-                    .groupBy(\Topic.subjectId)
-                    .all(decoding: SubjectID.self)
-                    .map { subjectIDs in
-                        guard
-                            subjectIDs.count == 1,
-                            let id = subjectIDs.first?.subjectId
-                        else {
-                            throw Abort(.badRequest)
-                        }
-                        return id
+        return Subtopic.DatabaseModel.query(on: database)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(\Subtopic.DatabaseModel.$id ~~ subtopicIDs)
+            .unique()
+            .all(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id)
+            .flatMapThrowing { subjectIDs in
+                guard
+                    subjectIDs.count == 1,
+                    let id = subjectIDs.first
+                else {
+                    throw Abort(.badRequest)
                 }
+                return id
         }
     }
 
-    public static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void> {
 
-        try User.ActiveSubject.query(on: conn)
-            .filter(\User.ActiveSubject.subjectID == subject.requireID())
-            .filter(\User.ActiveSubject.userID == user.requireID())
+        User.ActiveSubject.query(on: database)
+            .filter(\User.ActiveSubject.$subject.$id == subject.id)
+            .filter(\User.ActiveSubject.$user.$id == user.id)
             .first()
             .unwrap(or: Abort(.badRequest))
-            .delete(on: conn)
-            .transform(to: ())
+            .delete(on: database)
     }
 
-    public static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
-        try User.ActiveSubject(
-            userID: user.requireID(),
-            subjectID: subject.requireID(),
+    public func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void> {
+        User.ActiveSubject(
+            userID: user.id,
+            subjectID: subject.id,
             canPractice: canPractice
         )
-            .create(on: conn)
-            .transform(to: ())
+            .create(on: database)
     }
 
-    public static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
 
-        try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+        userRepository
+            .isModerator(user: moderator, subjectID: subjectID)
+            .ifFalse(throw: Abort(.forbidden))
             .flatMap {
                 User.ModeratorPrivilege(
                     userID: userID,
                     subjectID: subjectID
                 )
-                    .create(on: conn)
-                    .transform(to: ())
+                    .create(on: self.database)
         }
     }
 
-    public static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void> {
+    public func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
         guard moderator.id != userID else {
             throw Abort(.badRequest)
         }
-        return try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
+        return try userRepository
+            .isModerator(user: moderator, subjectID: subjectID)
+            .ifFalse(throw: Abort(.forbidden))
             .flatMap {
 
-                User.ModeratorPrivilege.query(on: conn)
-                    .filter(\.userID == userID)
-                    .filter(\.subjectID == subjectID)
+                User.ModeratorPrivilege.query(on: self.database)
+                    .filter(\.$user.$id == userID)
+                    .filter(\.$subject.$id == subjectID)
                     .first()
                     .unwrap(or: Abort(.badRequest))
                     .flatMap { privilege in
-
-                        privilege.delete(on: conn)
+                        privilege.delete(on: self.database)
                 }
         }
     }
 
-    public static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?> {
+    public func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?> {
 
-        try User.ActiveSubject.query(on: conn)
-            .filter(\.userID == user.requireID())
-            .filter(\.subjectID == subject.requireID())
+        User.ActiveSubject.query(on: database)
+            .filter(\.$user.$id == user.id)
+            .filter(\.$subject.$id == subject.id)
             .first()
-    }
-
-    /// Should be in `TaskSolutionRepositoring`
-    public static func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[TaskSolution.Unverified]> {
-
-        return try User.DatabaseRepository
-            .isModerator(user: moderator, subjectID: subjectID, on: conn)
-            .flatMap {
-
-                Task.query(on: conn)
-                    .join(\TaskSolution.taskID, to: \Task.id)
-                    .join(\Subtopic.id, to: \Task.subtopicID)
-                    .join(\Topic.id, to: \Subtopic.topicId)
-                    .filter(\Topic.subjectId == subjectID)
-                    .filter(\TaskSolution.approvedBy == nil)
-                    .range(0..<10)
-                    .alsoDecode(TaskSolution.self)
-                    .all()
-                    .flatMap { tasks in
-
-                        MultipleChoiseTaskChoise.query(on: conn)
-                            .filter(\MultipleChoiseTaskChoise.taskId ~~ tasks.map { $0.1.taskID })
-                            .all()
-                            .map { (choises: [MultipleChoiseTaskChoise]) in
-
-                                let groupedChoises = choises.group(by: \.taskId)
-
-                                return tasks.map { task, solution in
-                                    TaskSolution.Unverified(
-                                        task: task,
-                                        solution: solution,
-                                        choises: groupedChoises[solution.taskID] ?? []
-                                    )
-                                }
-                        }
-                }
-        }
-        .catchMap { _ in [] }
     }
 
     struct ActiveSubjectQuery: Codable {
         let canPractice: Bool
     }
 
-    public static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]> {
+    public func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]> {
 
-        return Subject.query(on: conn)
+        return Subject.DatabaseModel.query(on: database)
             .all()
             .flatMap { subjects in
 
-                try User.ActiveSubject.query(on: conn)
-                    .filter(\.userID == user.requireID())
+                User.ActiveSubject.query(on: self.database)
+                    .filter(\.$user.$id == user.id)
                     .all()
                     .map { activeSubjects in
-
                         subjects.map { subject in
                             Subject.ListOverview(
                                 subject: subject,
-                                isActive: activeSubjects.contains(where: { $0.subjectID == subject.id })
+                                active: activeSubjects
                             )
                         }
                 }
@@ -375,121 +499,181 @@ extension Subject.DatabaseRepository {
         let subtopicID: Subtopic.ID
     }
 
-    public static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium> {
+    public func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, for userID: User.ID) throws -> EventLoopFuture<Subject.Compendium> {
 
-        return conn.databaseConnection(to: .psql)
-            .flatMap { conn in
+        return Subject.DatabaseModel.find(subjectID, on: database)
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { subject in
 
-                Subject.find(subjectID, on: conn)
-                    .unwrap(or: Abort(.badRequest))
-                    .flatMap { subject in
+                var query = TaskDatabaseModel.query(on: self.database)
+                    .join(FlashCardTask.self, on: \FlashCardTask.$id == \TaskDatabaseModel.$id, method: .inner)
+                    .join(parent: \TaskDatabaseModel.$subtopic)
+                    .join(parent: \Subtopic.DatabaseModel.$topic)
+                    .filter(\TaskDatabaseModel.$description == nil)
+                    .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
 
-                        var query = conn.select()
-                            .column(\Task.question)
-                            .column(\TaskSolution.solution)
-                            .column(\Topic.name, as: "topicName")
-                            .column(\Topic.id, as: "topicID")
-                            .column(\Topic.chapter, as: "topicChapter")
-                            .column(\Subtopic.name, as: "subtopicName")
-                            .column(\Subtopic.id, as: "subtopicID")
-                            .from(Task.self)
-                            .join(\Task.subtopicID, to: \Subtopic.id)
-                            .join(\Subtopic.topicId, to: \Topic.id)
-                            .join(\Task.id, to: \FlashCardTask.id) // Only flash card tasks
-                            .join(\Task.id, to: \TaskSolution.taskID)
-                            .where(\Task.description == nil)
-                            .where(\Task.deletedAt == nil)
-                            .where(\Topic.subjectId == subjectID)
+                var noteQuery = TaskDatabaseModel.query(on: self.database)
+                    .withDeleted()
+                    .join(superclass: LectureNote.DatabaseModel.self, with: TaskDatabaseModel.self)
+                    .join(parent: \TaskDatabaseModel.$subtopic)
+                    .join(parent: \Subtopic.DatabaseModel.$topic)
+                    .filter(\TaskDatabaseModel.$description == nil)
+                    .filter(\TaskDatabaseModel.$creator.$id == userID)
+                    .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
 
-                        if let subtopicIDs = filter.subtopicIDs {
-                            query = query.where(\Subtopic.id, .in, Array(subtopicIDs))
-                        }
+                if let subtopicIDs = filter.subtopicIDs {
+                    query = query.filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id ~~ subtopicIDs)
+                    noteQuery = noteQuery.filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id ~~ subtopicIDs)
+                }
 
-                        return query
-                            .all(decoding: CompendiumData.self)
-                            .map { data in
+                return query.all(with: \TaskDatabaseModel.$subtopic, \Subtopic.DatabaseModel.$topic)
+                    .flatMap { (data: [TaskDatabaseModel]) -> EventLoopFuture<[TaskDatabaseModel]> in
+                        noteQuery.all(with: \TaskDatabaseModel.$subtopic, \Subtopic.DatabaseModel.$topic)
+                            .map { notes in data + notes }
+                }.flatMap { data in
+                    TaskSolution.DatabaseModel.query(on: self.database)
+                        .filter(\.$task.$id ~~ data.compactMap { $0.id })
+                        .all()
+                        .map { solutions in
 
-                                Subject.Compendium(
-                                    subjectID: subjectID,
-                                    subjectName: subject.name,
-                                    topics: data.group(by: \.topicID)
-                                        .map { _, topicData in
+                            Subject.Compendium(
+                                subjectID: subjectID,
+                                subjectName: subject.name,
+                                topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
+                                    .map { _, topicData in
 
-                                            Subject.Compendium.TopicData(
-                                                name: topicData.first!.topicName,
-                                                chapter: topicData.first!.topicChapter,
-                                                subtopics: topicData.group(by: \.subtopicID)
-                                                    .map { subtopicID, questions in
+                                        Subject.Compendium.TopicData(
+                                            name: topicData.first!.subtopic.topic.name,
+                                            chapter: topicData.first!.subtopic.topic.chapter,
+                                            subtopics: topicData.group(by: \.$subtopic.id)
+                                                .map { subtopicID, questions in
 
-                                                        Subject.Compendium.SubtopicData(
-                                                            subjectID: subjectID,
-                                                            subtopicID: subtopicID,
-                                                            name: questions.first!.subtopicName,
-                                                            questions: questions.map { question in
+                                                    Subject.Compendium.SubtopicData(
+                                                        subjectID: subjectID,
+                                                        subtopicID: subtopicID,
+                                                        name: questions.first!.subtopic.name,
+                                                        questions: questions.map { question in
 
-                                                                Subject.Compendium.QuestionData(
-                                                                    question: question.question,
-                                                                    solution: question.solution
-                                                                )
-                                                            }
-                                                        )
-                                                }
-                                            )
-                                    }
-                                    .sorted(by: { $0.chapter < $1.chapter })
-                                )
-                        }
+                                                            Subject.Compendium.QuestionData(
+                                                                question: question.question,
+                                                                solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
+                                                            )
+                                                        }
+                                                    )
+                                            }
+                                        )
+                                }
+                                .sorted(by: { $0.chapter < $1.chapter })
+                            )
+                    }
                 }
         }
     }
-}
 
-extension Subject {
-    public struct Compendium: Content {
-
-        public struct QuestionData: Codable {
-            public let question: String
-            public let solution: String
+    public func overviewFor(id: Subject.ID) -> EventLoopFuture<Subject.Overview> {
+        Subject.DatabaseModel.query(on: database)
+            .filter(\.$id == id)
+            .with(\.$topics)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { subject in
+                try Subject.Overview(
+                    id: subject.requireID(),
+                    name: subject.name,
+                    description: subject.description,
+                    category: subject.description,
+                    topics: subject.topics.map { try $0.content() }
+                )
         }
+    }
 
-        public struct SubtopicData: Codable {
-            public let subjectID: Subject.ID
-            public let subtopicID: Subtopic.ID
-            public let name: String
-            public let questions: [QuestionData]
+    public func overviewContaining(subtopicID: Subtopic.ID) -> EventLoopFuture<Subject.Overview> {
+        Subject.DatabaseModel.query(on: database)
+            .join(children: \Subject.DatabaseModel.$topics)
+            .join(children: \Topic.DatabaseModel.$subtopics)
+            .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id == subtopicID)
+            .with(\.$topics)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMapThrowing { subject in
+                try Subject.Overview(
+                    id: subject.requireID(),
+                    name: subject.name,
+                    description: subject.description,
+                    category: subject.description,
+                    topics: subject.topics.map { try $0.content() }
+                )
         }
+    }
 
-        public struct TopicData: Codable {
-            public let name: String
-            public let chapter: Int
-            public let subtopics: [SubtopicData]
+    public func creatorTasksWith(subjectID: Subject.ID) -> EventLoopFuture<[CreatorTaskContent]> {
+
+        return TaskDatabaseModel.query(on: database)
+            .join(parent: \TaskDatabaseModel.$creator)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self, method: .left)
+            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+            .all(TaskDatabaseModel.self, Topic.DatabaseModel.self, User.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+            .flatMapEachThrowing { (task, topic, creator, multipleChoiceTask) in
+                try CreatorTaskContent(
+                    task: task.content(),
+                    topic: topic.content(),
+                    creator: creator.content(),
+                    isMultipleChoise: multipleChoiceTask != nil
+                )
         }
+    }
 
-        public let subjectID: Subject.ID
-        public let subjectName: String
-        public let topics: [TopicData]
+    public func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]> {
+        taskRepository.getTasks(in: subjectID, user: user, query: query, maxAmount: maxAmount, withSoftDeleted: withSoftDeleted)
     }
 }
 
-extension TaskSolution {
+extension Subject.ListOverview {
+    init(subject: Subject.DatabaseModel, isActive: Bool) {
+        self.init(
+            id: subject.id ?? 0,
+            name: subject.name,
+            description: subject.description,
+            category: subject.category,
+            isActive: isActive
+        )
+    }
+}
 
-    public struct Unverified: Codable {
+extension TaskSolution.Unverified {
 
-        public let taskID: Task.ID
-        public let solutionID: TaskSolution.ID
-        public let description: String?
-        public let question: String
-        public let solution: String
+    init(task: TaskDatabaseModel, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) throws {
+        self.init(
+            taskID: try task.requireID(),
+            solutionID: solution.id,
+            description: task.description,
+            question: task.question,
+            solution: solution.solution,
+            choises: try choises.map { try .init(choice: $0) }
+        )
+    }
+}
 
-        public let choises: [MultipleChoiseTaskChoise.Data]
+extension MultipleChoiceTaskChoice {
+    init(choice: MultipleChoiseTaskChoise) throws {
+        try self.init(
+            id: choice.requireID(),
+            choice: choice.choice,
+            isCorrect: choice.isCorrect
+        )
+    }
+}
 
-        init(task: Task, solution: TaskSolution, choises: [MultipleChoiseTaskChoise]) {
-            self.taskID = task.id ?? 0
-            self.solutionID = solution.id ?? 0
-            self.description = task.description
-            self.question = task.question
-            self.solution = solution.solution
-            self.choises = choises.map { .init(choise: $0) }
-        }
+extension Subject.ListOverview {
+    init(subject: Subject.DatabaseModel, active: [User.ActiveSubject]) {
+        self.init(
+            id: subject.id ?? 0,
+            name: subject.name,
+            description: subject.description,
+            category: subject.category,
+            isActive: active.contains(where: { $0.$subject.id == subject.id })
+        )
     }
 }

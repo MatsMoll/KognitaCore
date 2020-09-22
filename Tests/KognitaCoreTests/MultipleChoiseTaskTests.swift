@@ -7,17 +7,22 @@
 
 import Vapor
 import XCTest
-import FluentPostgreSQL
+import FluentKit
 @testable import KognitaCore
+import KognitaCoreTestable
 
 class MultipleChoiseTaskTests: VaporTestCase {
 
-    func testCreateAsAdmin() throws {
-        let subtopic = try Subtopic.create(on: conn)
-        let user = try User.create(on: conn)
+    lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: app).multipleChoiceTaskRepository }()
+    lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
+    lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: app).practiceSessionRepository }()
 
-        let taskData = try MultipleChoiseTask.Create.Data(
-            subtopicId: subtopic.requireID(),
+    func testCreateAsAdmin() throws {
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(on: app)
+
+        let taskData = MultipleChoiceTask.Create.Data(
+            subtopicId: subtopic.id,
             description: "",
             question: "Some question",
             solution: "Some solution",
@@ -26,38 +31,34 @@ class MultipleChoiseTaskTests: VaporTestCase {
             examPaperYear: nil,
             isTestable: true,
             choises: [
-                .init(choise: "not", isCorrect: false),
-                .init(choise: "yes", isCorrect: true)
+                .init(choice: "not", isCorrect: false),
+                .init(choice: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTask.DatabaseRepository
-            .create(from: taskData, by: user, on: conn)
+        let multiple = try multipleChoiceRepository
+            .create(from: taskData, by: user)
             .wait()
 
-        let content = try multiple
-            .content(on: conn)
-            .wait()
-
-        let solution = try TaskSolution.DatabaseRepository
-            .solutions(for: multiple.requireID(), for: user, on: conn)
+        let solution = try taskSolutionRepository
+            .solutions(for: multiple.id, for: user)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
-        XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(content.task.subtopicID, subtopic.id)
-        XCTAssertEqual(content.task.description, nil)
-        XCTAssertEqual(content.task.question, taskData.question)
+        XCTAssertEqual(multiple.isMultipleSelect, taskData.isMultipleSelect)
+        XCTAssertEqual(multiple.subtopicID, taskData.subtopicId)
+        XCTAssertEqual(multiple.description, nil)
+        XCTAssertEqual(multiple.question, taskData.question)
         XCTAssertEqual(solution.first?.solution, taskData.solution)
         XCTAssertEqual(solution.first?.approvedBy, user.username)
-        XCTAssertEqual(content.choises.count, taskData.choises.count)
+        XCTAssertEqual(multiple.choises.count, taskData.choises.count)
     }
 
     func testCreateAsStudent() throws {
-        let subtopic = try Subtopic.create(on: conn)
-        let user = try User.create(isAdmin: false, on: conn)
+        let subtopic = try Subtopic.create(on: app)
+        let user = try User.create(isAdmin: false, on: app)
 
-        let taskData = try MultipleChoiseTask.Create.Data(
-            subtopicId: subtopic.requireID(),
+        let taskData = MultipleChoiceTask.Create.Data(
+            subtopicId: subtopic.id,
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -66,38 +67,33 @@ class MultipleChoiseTaskTests: VaporTestCase {
             examPaperYear: nil,
             isTestable: true,
             choises: [
-                .init(choise: "not", isCorrect: false),
-                .init(choise: "yes", isCorrect: true)
+                .init(choice: "not", isCorrect: false),
+                .init(choice: "yes", isCorrect: true)
             ]
         )
-        let multiple = try MultipleChoiseTask.DatabaseRepository
-            .create(from: taskData, by: user, on: conn)
+        let multiple = try multipleChoiceRepository
+            .create(from: taskData, by: user)
             .wait()
 
-        let content = try multiple
-            .content(on: conn)
-            .wait()
-
-        let solution = try TaskSolution.DatabaseRepository
-            .solutions(for: multiple.requireID(), for: user, on: conn)
+        let solution = try taskSolutionRepository
+            .solutions(for: multiple.id, for: user)
             .wait()
 
         XCTAssertNotNil(multiple.createdAt)
-        XCTAssertEqual(multiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(content.task.subtopicID, subtopic.id)
-        XCTAssertEqual(content.task.question, taskData.question)
+        XCTAssertEqual(multiple.isMultipleSelect, taskData.isMultipleSelect)
+        XCTAssertEqual(multiple.subtopicID, subtopic.id)
+        XCTAssertEqual(multiple.question, taskData.question)
         XCTAssertEqual(solution.first?.solution, taskData.solution)
         XCTAssertNil(solution.first?.approvedBy)
-        XCTAssertEqual(content.choises.count, taskData.choises.count)
+        XCTAssertEqual(multiple.choises.count, taskData.choises.count)
     }
 
     func testEdit() throws {
-        let startingMultiple = try MultipleChoiseTask.create(on: conn)
-        var startingTask = try startingMultiple.task!.get(on: conn).wait()
-        let user = try User.create(on: conn)
+        let startingMultiple = try MultipleChoiceTask.create(on: app)
+        let user = try User.create(on: app)
 
-        let content = MultipleChoiseTask.Create.Data(
-            subtopicId: startingTask.subtopicID,
+        let content = MultipleChoiceTask.Create.Data(
+            subtopicId: startingMultiple.subtopicID,
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -106,33 +102,32 @@ class MultipleChoiseTaskTests: VaporTestCase {
             examPaperYear: nil,
             isTestable: true,
             choises: [
-                .init(choise: "not", isCorrect: false),
-                .init(choise: "yes", isCorrect: true)
+                .init(choice: "not", isCorrect: false),
+                .init(choice: "yes", isCorrect: true)
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: user, on: conn).wait()
-        let editedTask = try editedMultiple.task!.get(on: conn).wait()
-        startingTask = try Task.query(on: conn, withSoftDeleted: true)
-            .filter(\.id == startingTask.id)
+        let editedMultiple = try multipleChoiceRepository
+            .updateModelWith(id: startingMultiple.id, to: content, by: user).wait()
+
+        let startingTask = try TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .filter(\.$id == startingMultiple.id)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .wait() // refershing
 
         XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
     }
 
     func testEditAsStudent() throws {
-        let creatorStudent = try User.create(isAdmin: false, on: conn)
-        let otherStudent = try User.create(isAdmin: false, on: conn)
+        let creatorStudent = try User.create(isAdmin: false, on: app)
+        let otherStudent = try User.create(isAdmin: false, on: app)
 
-        let startingMultiple = try MultipleChoiseTask.create(creator: creatorStudent, on: conn)
-        var startingTask = try startingMultiple.task!.get(on: conn).wait()
+        let startingMultiple = try MultipleChoiceTask.create(creator: creatorStudent, on: app)
 
-        let content = MultipleChoiseTask.Create.Data(
-            subtopicId: startingTask.subtopicID,
+        let content = MultipleChoiceTask.Create.Data(
+            subtopicId: startingMultiple.subtopicID,
             description: nil,
             question: "Some question",
             solution: "Some solution",
@@ -141,113 +136,135 @@ class MultipleChoiseTaskTests: VaporTestCase {
             examPaperYear: nil,
             isTestable: true,
             choises: [
-                .init(choise: "not", isCorrect: false),
-                .init(choise: "yes", isCorrect: true)
+                .init(choice: "not", isCorrect: false),
+                .init(choice: "yes", isCorrect: true)
             ]
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: creatorStudent, on: conn).wait()
-        let editedTask = try editedMultiple.task!.get(on: conn).wait()
-        startingTask = try Task.query(on: conn, withSoftDeleted: true)
-            .filter(\.id == startingTask.id)
+        let editedMultiple = try multipleChoiceRepository
+            .updateModelWith(id: startingMultiple.id, to: content, by: creatorStudent).wait()
+
+        let startingTask = try TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .filter(\.$id == startingMultiple.id)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .wait() // refershing
 
         XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
 
         throwsError(of: Abort.self) {
-            _ = try MultipleChoiseTask.DatabaseRepository
-                .update(model: editedMultiple, to: content, by: otherStudent, on: conn).wait()
+            _ = try multipleChoiceRepository
+                .updateModelWith(id: editedMultiple.id, to: content, by: otherStudent).wait()
         }
     }
 
     func testEditEqualChoisesError() throws {
-        _ = try MultipleChoiseTask.create(on: conn)
-        let startingMultiple = try MultipleChoiseTask.create(on: conn)
-        var startingTask = try startingMultiple.task!.get(on: conn).wait()
-        let startingChoises = try startingMultiple.choises.query(on: conn).all().wait()
-        let user = try User.create(on: conn)
+        _ = try MultipleChoiceTask.create(on: app)
+        let startingMultiple = try MultipleChoiceTask.create(on: app)
 
-        let content = MultipleChoiseTask.Create.Data(
-            subtopicId: startingTask.subtopicID,
-            description: startingTask.description,
-            question: startingTask.question,
+        let user = try User.create(on: app)
+
+        let content = MultipleChoiceTask.Create.Data(
+            subtopicId: startingMultiple.subtopicID,
+            description: startingMultiple.description,
+            question: startingMultiple.question,
             solution: "Something",
             isMultipleSelect: startingMultiple.isMultipleSelect,
-            examPaperSemester: startingTask.examPaperSemester,
-            examPaperYear: startingTask.examPaperYear,
-            isTestable: startingTask.isTestable,
-            choises: startingChoises.map { .init(choise: $0.choise, isCorrect: $0.isCorrect) }
+            examPaperSemester: nil,
+            examPaperYear: startingMultiple.examYear,
+            isTestable: startingMultiple.isTestable,
+            choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
         )
 
-        let editedMultiple = try MultipleChoiseTask.DatabaseRepository
-            .update(model: startingMultiple, to: content, by: user, on: conn)
+        let editedMultiple = try multipleChoiceRepository
+            .updateModelWith(id: startingMultiple.id, to: content, by: user)
             .wait()
-        let editedTask = try editedMultiple.task!.get(on: conn).wait()
-        startingTask = try Task.query(on: conn, withSoftDeleted: true)
-            .filter(\.id == startingTask.id)
+
+        let startingTask = try TaskDatabaseModel.query(on: database)
+            .withDeleted()
+            .filter(\.$id == startingMultiple.id)
             .first()
             .unwrap(or: Abort(.internalServerError))
             .wait() // refershing
 
         XCTAssertEqual(editedMultiple.isMultipleSelect, content.isMultipleSelect)
-        XCTAssertEqual(editedTask.id, startingTask.editedTaskID)
+    }
+
+    func testNonCorrectAnswers() throws {
+        _ = try MultipleChoiceTask.create(on: app)
+        let startingMultiple = try MultipleChoiceTask.create(on: app)
+
+        let user = try User.create(on: app)
+
+        let content = MultipleChoiceTask.Create.Data(
+            subtopicId: startingMultiple.subtopicID,
+            description: startingMultiple.description,
+            question: startingMultiple.question,
+            solution: "Something",
+            isMultipleSelect: startingMultiple.isMultipleSelect,
+            examPaperSemester: nil,
+            examPaperYear: startingMultiple.examYear,
+            isTestable: startingMultiple.isTestable,
+            choises: (0...3).map { _ in MultipleChoiceTaskChoice.Create.Data(choice: "Test", isCorrect: false) }
+        )
+
+        XCTAssertThrowsError(
+            try multipleChoiceRepository
+                .updateModelWith(id: startingMultiple.id, to: content, by: user)
+                .wait()
+        )
     }
 
     func testAnswerIsSavedOnSubmit() throws {
 
-        let user = try User.create(on: conn)
+        let user = try User.create(on: app)
 
-        let subtopic = try Subtopic.create(on: conn)
+        let subtopic = try Subtopic.create(on: app)
 
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
-        _ = try MultipleChoiseTask.create(subtopic: subtopic, on: conn)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
+        _ = try MultipleChoiceTask.create(subtopic: subtopic, on: app)
 
-        let create = try PracticeSession.Create.Data(
+        let create = PracticeSession.Create.Data(
             numberOfTaskGoal: 2,
-            subtopicsIDs: [
-                subtopic.requireID()
-            ],
+            subtopicsIDs: [subtopic.id],
             topicIDs: nil
         )
 
-        let session = try PracticeSession.DatabaseRepository
-            .create(from: create, by: user, on: conn).wait()
-        let representable = try session.representable(on: conn).wait()
+        let session = try practiceSessionRepository
+            .create(from: create, by: user).wait()
+        let representable = try session.representable(on: database).wait()
 
-        let firstTask = try session.currentTask(on: conn).wait()
-        let firstChoises = try firstTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == true).all().wait()
+        let firstTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
+        let firstChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.taskID).wait()
 
-        let firstSubmit = MultipleChoiseTask.Submit(
+        let firstSubmit = MultipleChoiceTask.Submit(
             timeUsed: 20,
             choises: firstChoises.compactMap { $0.id },
             taskIndex: 1
         )
-        _ = try PracticeSession.DatabaseRepository
-            .submit(firstSubmit, in: representable, by: user, on: conn).wait()
+        _ = try practiceSessionRepository
+            .submit(firstSubmit, in: representable, by: user).wait()
 
-        let secondTask = try session.currentTask(on: conn).wait()
-        let secondChoises = try secondTask.multipleChoise!.choises.query(on: conn).filter(\.isCorrect == false).all().wait()
+        let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
+        let secondChoises = try multipleChoiceRepository.choisesFor(taskID: firstTask.taskID).wait()
 
-        let secondSubmit = MultipleChoiseTask.Submit(
+        let secondSubmit = MultipleChoiceTask.Submit(
             timeUsed: 20,
             choises: secondChoises.compactMap { $0.id },
             taskIndex: 2
         )
 
-        _ = try PracticeSession.DatabaseRepository
-            .submit(secondSubmit, in: representable, by: user, on: conn).wait()
+        _ = try practiceSessionRepository
+            .submit(secondSubmit, in: representable, by: user).wait()
 
-        let sessionAnswers = try TaskSessionAnswer.query(on: conn).all().wait()
+        let sessionAnswers = try TaskSessionAnswer.query(on: database).all().wait()
 
-        let answers = try MultipleChoiseTaskAnswer.query(on: conn).all().wait()
+        let answers = try MultipleChoiseTaskAnswer.query(on: database).all().wait()
         XCTAssertEqual(answers.count, secondChoises.count + firstChoises.count)
-        XCTAssert(sessionAnswers.allSatisfy { $0.sessionID == session.id })
-        XCTAssert(answers.contains { $0.choiseID == firstChoises.first?.id })
-        XCTAssert(answers.contains { answer in secondChoises.contains { answer.choiseID == $0.id }})
+        XCTAssert(sessionAnswers.allSatisfy { $0.$session.id == session.id })
+        XCTAssert(answers.contains { $0.$choice.id == firstChoises.first?.id })
+        XCTAssert(answers.contains { answer in secondChoises.contains { answer.$choice.id == $0.id }})
     }
 
     static var allTests = [

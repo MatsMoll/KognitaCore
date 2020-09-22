@@ -1,42 +1,39 @@
-import Authentication
 import Crypto
-import FluentPostgreSQL
 import Vapor
+import FluentKit
 
 /// An ephermal authentication token that identifies a registered user.
-extension User {
-    public enum Login {}
-}
-extension User.Login {
-    public final class Token: PostgreSQLModel {
 
-        public typealias Database = PostgreSQLDatabase
+extension User.Login.Token {
+    final class DatabaseModel: Model {
 
-        public static var entity: String = "User.Login.Token"
-        public static var name: String = "User.Login.Token"
+        public static var schema: String = "User.Login.Token"
 
         /// Creates a new `UserToken` for a given user.
-        static func create(userID: User.ID) throws -> User.Login.Token {
+        static func create(userID: User.ID) throws -> User.Login.Token.DatabaseModel {
             // generate a random 128-bit, base64-encoded string.
-            let string = try CryptoRandom().generateData(count: 16).base64EncodedString()
+            let string = [UInt8].random(count: 32).base64
             // init a new `UserToken` from that string.
             return .init(string: string, userID: userID)
         }
 
-        /// See `Model`.
-        public static var deletedAtKey: TimestampKey? { return \.expiresAt }
+        /// See `Model`
 
         /// UserToken's unique identifier.
+        @DBID(custom: "id")
         public var id: Int?
 
         /// Unique token string.
+        @Field(key: "string")
         public var string: String
 
         /// Reference to user that owns this token.
-        public var userID: User.ID
+        @Parent(key: "userID")
+        public var user: User.DatabaseModel
 
         /// Expiration date. Token will no longer be valid after this point.
-        public var expiresAt: Date?
+        @Field(key: "expiresAt")
+        public var expiresAt: Date
 
         /// Creates a new `UserToken`.
         init(id: Int? = nil, string: String, userID: User.ID) {
@@ -44,57 +41,57 @@ extension User.Login {
             self.string = string
             // set token to expire after 5 hours
             self.expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
-            self.userID = userID
+            self.$user.id = userID
         }
-    }
-}
 
-extension User.Login.Token {
-    /// Fluent relation to the user that owns this token.
-    var user: Parent<User.Login.Token, User> {
-        return parent(\.userID)
+        init() {}
     }
 }
 
 /// Allows this model to be used as a TokenAuthenticatable's token.
-extension User.Login.Token: Token {
+extension User.Login.Token.DatabaseModel {
     /// See `Token`.
-    public typealias UserType = User
-
-    /// See `Token`.
-    public static var tokenKey: WritableKeyPath<User.Login.Token, String> {
-        return \.string
-    }
-
-    /// See `Token`.
-    public static var userIDKey: WritableKeyPath<User.Login.Token, User.ID> {
-        return \.userID
-    }
+    var isValid: Bool { expiresAt.timeIntervalSinceNow > 0 }
+    static var valueKey: KeyPath<User.Login.Token.DatabaseModel, Field<String>> = \.$string
+    static var userKey: KeyPath<User.Login.Token.DatabaseModel, Parent<User.DatabaseModel>> = \.$user
 }
 
-/// Allows `UserToken` to be used as a Fluent migration.
-extension User.Login.Token: Migration {
-    /// See `Migration`.
-    public static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.create(User.Login.Token.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension User.Login.Token {
+    enum Migrations {}
+}
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .setDefault)
-        }.flatMap {
-            PostgreSQLDatabase.update(User.Login.Token.self, on: conn) { builder in
-                builder.deleteField(for: \.userID)
-                builder.field(for: \.userID, type: .int, .default(1))
-            }
+extension User.Login.Token.Migrations {
+    struct Create: Migration {
+
+        let schema = User.Login.Token.DatabaseModel.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("userID", .uint, .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade), .sql(.default(1)))
+                .field("expiresAt", .datetime, .required)
+                .field("string", .string, .required)
+                .create()
         }
-    }
 
-    public static func revert(on connection: PostgreSQLConnection) -> Future<Void> {
-        return PostgreSQLDatabase.delete(User.Login.Token.self, on: connection)
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
     }
 }
 
 /// Allows `UserToken` to be encoded to and decoded from HTTP messages.
 extension User.Login.Token: Content { }
+extension User.Login.Token.DatabaseModel: ContentConvertable {
+    func content() throws -> User.Login.Token {
+        try .init(
+            id: requireID(),
+            string: string,
+            userID: $user.id,
+            expiresAt: expiresAt
+        )
+    }
+}
 
 /// Allows `UserToken` to be used as a dynamic parameter in route definitions.
-extension User.Login.Token: ModelParameterRepresentable { }
+//extension User.Login.Token: ModelParameterRepresentable { }

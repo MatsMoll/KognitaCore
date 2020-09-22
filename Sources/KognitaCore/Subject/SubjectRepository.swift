@@ -6,46 +6,33 @@
 //
 
 import Vapor
-import FluentPostgreSQL
 
 public struct SubjectCompendiumFilter: Codable {
     let subtopicIDs: Set<Subtopic.ID>?
 }
 
-public protocol SubjectRepositoring: CreateModelRepository,
-    UpdateModelRepository,
-    DeleteModelRepository,
-    RetriveAllModelsRepository
-    where
-    Model           == Subject,
-    CreateData      == Subject.Create.Data,
-    CreateResponse  == Subject.Create.Response,
-    UpdateData      == Subject.Edit.Data,
-    UpdateResponse  == Subject.Edit.Response,
-    ResponseModel   == Subject {
-    static func subjectFor(topicID: Topic.ID, on conn: DatabaseConnectable) -> EventLoopFuture<Subject>
-    static func allSubjects(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject.ListOverview]>
-    static func allActive(for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<[Subject]>
-    static func active(subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<User.ActiveSubject?>
-    static func mark(active subject: Subject, canPractice: Bool, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func mark(inactive subject: Subject, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<Void>
-    static func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, on conn: DatabaseConnectable) throws -> EventLoopFuture<Subject.Compendium>
-}
-
-extension Subject {
-
-    public enum Create {
-        public struct Data: Content {
-            let name: String
-            let colorClass: Subject.ColorClass = .primary
-            let description: String
-            let category: String
-        }
-
-        public typealias Response = Subject
-    }
-
-    public typealias Edit = Create
+public protocol SubjectRepositoring: DeleteModelRepository {
+    func all() throws -> EventLoopFuture<[Subject]>
+    func find(_ id: Subject.ID, or error: Error) -> EventLoopFuture<Subject>
+    func overviewFor(id: Subject.ID) -> EventLoopFuture<Subject.Overview>
+    func overviewContaining(subtopicID: Subtopic.ID) -> EventLoopFuture<Subject.Overview>
+    func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject.Create.Response>
+    func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject.Update.Response>
+    func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>
+    func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]>
+    func allActive(for user: User) throws -> EventLoopFuture<[Subject]>
+    func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?>
+    func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void>
+    func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void>
+    func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
+    func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
+    func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, for userID: User.ID) throws -> EventLoopFuture<Subject.Compendium>
+    func subjectIDFor(taskIDs: [Task.ID]) -> EventLoopFuture<Subject.ID>
+    func subjectIDFor(topicIDs: [Topic.ID]) -> EventLoopFuture<Subject.ID>
+    func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>
+    func subject(for session: PracticeSessionRepresentable) -> EventLoopFuture<Subject>
+    func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject>
+    func importContent(in subject: Subject, peerWise: [TaskPeerWise], user: User) throws -> EventLoopFuture<Void>
+    func tasksWith(subjectID: Subject.ID) -> EventLoopFuture<[GenericTask]>
+    func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]>
 }

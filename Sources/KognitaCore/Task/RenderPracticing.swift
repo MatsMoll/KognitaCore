@@ -8,22 +8,22 @@
 import Vapor
 
 /// A protocol for a task tha can be practiced on
-public protocol RenderTaskPracticing {
-
-    /// The id of the task
-    var id: Int? { get }
-
-    /// Render a task in practice mode
-    ///
-    /// - Parameters:
-    ///     - req:      The http request
-    ///     - session:  The session object the task is rendered for
-    ///     - user:     The user to render the task for
-    ///
-    /// - Returns:
-    ///     A renderd `View` of the task
-    func render(session: PracticeSession, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<HTTPResponse>
-}
+//public protocol RenderTaskPracticing {
+//
+//    /// The id of the task
+//    var id: Int? { get }
+//
+//    /// Render a task in practice mode
+//    ///
+//    /// - Parameters:
+//    ///     - req:      The http request
+//    ///     - session:  The session object the task is rendered for
+//    ///     - user:     The user to render the task for
+//    ///
+//    /// - Returns:
+//    ///     A renderd `View` of the task
+//    func render(session: PracticeSession, for user: User, on conn: DatabaseConnectable) throws -> EventLoopFuture<HTTPResponse>
+//}
 
 public final class TaskSessionResult<T: Content>: Content, TaskSubmitResultable {
 

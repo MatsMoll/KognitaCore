@@ -6,37 +6,50 @@
 //
 
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 /// A submitted answer form a `FlashCardTask`
-public final class FlashCardAnswer: PostgreSQLModel, Codable {
+final class FlashCardAnswer: Model {
 
-    public typealias Database = PostgreSQLDatabase
+    static var schema: String = "FlashCardAnswer"
 
+    @DBID(custom: "id", generatedBy: .user)
     public var id: Int?
 
-    public var taskID: FlashCardTask.ID
+    @Parent(key: "taskID")
+    public var task: FlashCardTask
 
+    @Field(key: "answer")
     public var answer: String
 
-    init(answerID: TaskAnswer.ID, taskID: FlashCardTask.ID, answer: String) {
+    init(answerID: TaskAnswer.IDValue, taskID: FlashCardTask.IDValue, answer: String) {
         self.id = answerID
-        self.taskID = taskID
+        self.$task.id = taskID
         self.answer = answer
     }
+
+    init() {}
 }
 
-extension FlashCardAnswer: Migration {
-    public static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.create(FlashCardAnswer.self, on: conn) { builder in
-            try addProperties(to: builder)
+extension FlashCardAnswer {
+    enum Migrations {}
+}
 
-            builder.reference(from: \.id, to: \TaskAnswer.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.taskID, to: \FlashCardTask.id, onUpdate: .cascade, onDelete: .cascade)
+extension FlashCardAnswer.Migrations {
+    struct Create: Migration {
+
+        let schema = FlashCardAnswer.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true), .references(TaskAnswer.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .field("answer", .string, .required)
+                .create()
         }
-    }
 
-    public static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        return PostgreSQLDatabase.delete(FlashCardAnswer.self, on: connection)
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
     }
 }

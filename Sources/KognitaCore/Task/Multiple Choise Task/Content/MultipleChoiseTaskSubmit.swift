@@ -7,7 +7,7 @@
 
 import Vapor
 
-extension MultipleChoiseTask {
+extension MultipleChoiceTask {
 
     /// The content needed to submit a answer to a `MultipleChoiseTask`
     public struct Submit: Content, TaskSubmitable {
@@ -16,16 +16,9 @@ extension MultipleChoiseTask {
         public let timeUsed: TimeInterval?
 
         /// The choise id's
-        public let choises: [MultipleChoiseTaskChoise.ID]
+        public let choises: [MultipleChoiceTaskChoice.ID]
 
         // FIXME: Remove and replace by url parameter
         public internal(set) var taskIndex: Int
-    }
-}
-
-extension MultipleChoiseTaskChoise {
-    public struct Result: Content {
-        public let id: MultipleChoiseTaskChoise.ID
-        public let isCorrect: Bool
     }
 }

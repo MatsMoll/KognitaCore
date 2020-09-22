@@ -5,72 +5,84 @@
 //  Created by Mats Mollestad on 26/08/2019.
 //
 
-import FluentPostgreSQL
+import Fluent
 import Vapor
 
-public final class Subtopic: KognitaCRUDModel, KognitaModelUpdatable {
+extension Subtopic {
+    final class DatabaseModel: KognitaCRUDModel, KognitaModelUpdatable {
 
-    public var id: Int?
+        public static var tableName: String = "Subtopic"
 
-    public var name: String
+        @DBID(custom: "id")
+        public var id: Int?
 
-    public var topicId: Topic.ID
+        @Field(key: "name")
+        public var name: String
 
-    public var createdAt: Date?
+        @Parent(key: "topicID")
+        public var topic: Topic.DatabaseModel
 
-    public var updatedAt: Date?
+        @Timestamp(key: "createdAt", on: .create)
+        public var createdAt: Date?
 
-    init(name: String, topicId: Topic.ID) {
-        self.name = name
-        self.topicId = topicId
+        @Timestamp(key: "updatedAt", on: .update)
+        public var updatedAt: Date?
+
+        @Children(for: \.$subtopic)
+        var tasks: [TaskDatabaseModel]
+
+        init() {}
+
+        init(name: String, topicID: Topic.ID) {
+            self.name = name
+            self.$topic.id = topicID
+        }
+
+        init(content: Create.Data) {
+            self.name = content.name
+            self.$topic.id = content.topicId
+        }
+
+        public func updateValues(with content: Create.Data) {
+            self.name = content.name
+            self.$topic.id = content.topicId
+        }
     }
+}
 
-    init(content: Create.Data) {
-        self.name = content.name
-        self.topicId = content.topicId
+extension Subtopic {
+    enum Migrations {}
+}
+
+extension Subtopic.Migrations {
+    struct Create: Migration {
+
+        let schema = Subtopic.DatabaseModel.schema
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema)
+                .field("id", .uint, .identifier(auto: true))
+                .field("name", .string, .required)
+                .field("topicID", .uint, .required, .references(Topic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .defaultTimestamps()
+                .create()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(schema).delete()
+        }
     }
+}
 
-    public func updateValues(with content: Create.Data) {
-        self.name = content.name
-        self.topicId = content.topicId
-    }
-
-    public static func addTableConstraints(to builder: SchemaCreator<Subtopic>) {
-        builder.reference(from: \.topicId, to: \Topic.id, onUpdate: .cascade, onDelete: .cascade)
+extension Subtopic.DatabaseModel: ContentConvertable {
+    func content() throws -> Subtopic {
+        try .init(
+            id: requireID(),
+            name: name,
+            topicID: $topic.id
+        )
     }
 }
 
 extension Subtopic: Content { }
-extension Subtopic: ModelParameterRepresentable { }
-
-extension Subtopic {
-
-    public enum Create {
-
-        public struct Data: Content {
-
-            public let name: String
-
-            public var topicId: Topic.ID
-        }
-
-        public typealias Response = Subtopic
-    }
-
-    public typealias Edit = Create
-}
-
-extension Subtopic {
-    public struct Overview: Content {
-
-        public let id: Int
-        public let name: String
-        public let topicID: Topic.ID
-
-        init(subtopic: Subtopic) {
-            self.id = subtopic.id ?? 0
-            self.name = subtopic.name
-            self.topicID = subtopic.topicId
-        }
-    }
-}
+//extension Subtopic: ModelParameterRepresentable { }

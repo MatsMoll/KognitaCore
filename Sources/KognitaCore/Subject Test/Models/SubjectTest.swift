@@ -1,101 +1,139 @@
-import FluentPostgreSQL
 import FluentSQL
 import Vapor
 
-/// A practice session object
-public final class SubjectTest: KognitaPersistenceModel {
+extension SubjectTest {
+    /// A practice session object
+    final class DatabaseModel: KognitaPersistenceModel, KognitaModelUpdatable {
 
-    /// The session id
-    public var id: Int?
+        public static var tableName: String = "SubjectTest"
 
-    /// The date when the session was started
-    public var createdAt: Date?
+        /// The session id
+        @DBID(custom: "id")
+        public var id: Int?
 
-    public var updatedAt: Date?
+        /// The date when the session was started
+        @Timestamp(key: "createdAt", on: .create)
+        public var createdAt: Date?
 
-    /// The id of the subject to test
-    public var subjectID: Subject.ID
+        @Timestamp(key: "updatedAt", on: .update)
+        public var updatedAt: Date?
 
-    /// The duratino of the test
-    public var duration: TimeInterval
+        /// The id of the subject to test
+        @Parent(key: "subjectID")
+        public var subject: Subject.DatabaseModel
 
-    /// The time the test is open for entering
-    public var openedAt: Date?
+        /// The duratino of the test
+        @Field(key: "duration")
+        public var duration: TimeInterval
 
-    /// The date the test ended
-    public var endedAt: Date?
+        /// The time the test is open for entering
+        @Field(key: "openedAt")
+        public var openedAt: Date?
 
-    /// The date the test is suppose to be held at
-    public var scheduledAt: Date
+        /// The date the test ended
+        @Field(key: "endedAt")
+        public var endedAt: Date?
 
-    /// The password that is needed in order to enter
-    public var password: String
+        /// The date the test is suppose to be held at
+        @Field(key: "scheduledAt")
+        public var scheduledAt: Date
 
-    /// A title describing the test
-    public var title: String
+        /// The password that is needed in order to enter
+        @Field(key: "password")
+        public var password: String
 
-    /// A bool represening if is in team based learning mode
-    public var isTeamBasedLearning: Bool
+        /// A title describing the test
+        @Field(key: "title")
+        public var title: String
 
-    public var isOpen: Bool {
-        guard
-            let openedAt = openedAt,
-            let endsAt = endedAt
-        else {
-            return false
+        /// A bool represening if is in team based learning mode
+        @Field(key: "isTeamBasedLearning")
+        public var isTeamBasedLearning: Bool
+
+        public var isOpen: Bool {
+            guard
+                let openedAt = openedAt,
+                let endsAt = endedAt
+            else {
+                return false
+            }
+            return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
         }
-        return openedAt.timeIntervalSinceNow < 0 && endsAt.timeIntervalSinceNow > 0
-    }
 
-    init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID, isTeamBasedLearning: Bool) {
-        self.scheduledAt            = scheduledAt
-        self.duration               = duration
-        self.password               = password
-        self.title                  = title
-        self.subjectID              = subjectID
-        self.isTeamBasedLearning    = isTeamBasedLearning
-    }
+        init() { }
 
-    convenience init(data: SubjectTest.Create.Data) {
-        self.init(
-            scheduledAt: data.scheduledAt,
-            duration: data.duration,
-            password: data.password,
-            title: data.title,
-            subjectID: data.subjectID,
-            isTeamBasedLearning: data.isTeamBasedLearning
-        )
-    }
+        init(scheduledAt: Date, duration: TimeInterval, password: String, title: String, subjectID: Subject.ID, isTeamBasedLearning: Bool) {
+            self.scheduledAt            = scheduledAt
+            self.duration               = duration
+            self.password               = password
+            self.title                  = title
+            self.$subject.id            = subjectID
+            self.isTeamBasedLearning    = isTeamBasedLearning
+            self.openedAt               = nil
+            self.endedAt                = nil
+            self.updatedAt              = nil
+            self.createdAt              = nil
+        }
 
-    public func update(with data: Update.Data) -> SubjectTest {
-        self.scheduledAt    = data.scheduledAt
-        self.duration       = data.duration
-        self.password       = data.password
-        self.title          = data.title
-        self.isTeamBasedLearning = data.isTeamBasedLearning
-        return self
-    }
+        convenience init(data: SubjectTest.Create.Data) {
+            self.init(
+                scheduledAt: data.scheduledAt,
+                duration: data.duration,
+                password: data.password,
+                title: data.title,
+                subjectID: data.subjectID,
+                isTeamBasedLearning: data.isTeamBasedLearning
+            )
+        }
 
-    public func open(on conn: DatabaseConnectable) -> EventLoopFuture<SubjectTest> {
-        let openDate = Date()
-        self.openedAt = openDate
-        self.endedAt = openDate.addingTimeInterval(duration)
-        return self.save(on: conn)
-    }
+        func updateValues(with data: Update.Data) throws {
+            self.scheduledAt    = data.scheduledAt
+            self.duration       = data.duration
+            self.password       = data.password
+            self.title          = data.title
+            self.isTeamBasedLearning = data.isTeamBasedLearning
+        }
 
-    public func response(with subject: Subject) throws -> SubjectTest.OverviewResponse {
-        try SubjectTest.OverviewResponse(
-            test: self,
-            subjectName: subject.name,
-            subjectID: subject.requireID(),
-            hasSubmitted: false,
-            testSessionID: nil
+        public func open(on database: Database) -> EventLoopFuture<SubjectTest.DatabaseModel> {
+            let openDate = Date()
+            self.openedAt = openDate
+            self.endedAt = openDate.addingTimeInterval(duration)
+            return self.save(on: database)
+                .transform(to: self)
+        }
+
+        public func response(with subject: Subject) throws -> SubjectTest.UserOverview {
+            try SubjectTest.UserOverview(
+                test: self.content(),
+                subjectName: subject.name,
+                subjectID: subject.id,
+                hasSubmitted: false,
+                testSessionID: nil
+            )
+        }
+    }
+}
+
+extension SubjectTest.DatabaseModel: ContentConvertable {
+    func content() throws -> SubjectTest {
+        try .init(
+            id: requireID(),
+            createdAt: createdAt ?? .now,
+            subjectID: $subject.id,
+            duration: duration,
+            openedAt: openedAt,
+            endedAt: endedAt,
+            scheduledAt: scheduledAt,
+            password: password,
+            title: title,
+            isTeamBasedLearning: isTeamBasedLearning,
+            taskIDs: []
         )
     }
 }
 
 extension SubjectTest: Content {}
-extension SubjectTest: ModelParameterRepresentable {}
+//extension SubjectTest: ModelParameterRepresentable {}
 
 extension Date {
     public static var now: Date { Date() }

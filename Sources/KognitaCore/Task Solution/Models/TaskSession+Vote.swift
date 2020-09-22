@@ -1,39 +1,57 @@
 import Vapor
-import FluentPostgreSQL
+import FluentKit
 
 extension TaskSolution {
-    public enum Pivot {
-        final class Vote: PostgreSQLModel {
+    enum Pivot {
+        final class Vote: Model {
 
-            public static var entity: String = "TaskSolution.Pivot.Vote"
-            public static var name: String = "TaskSolution.Pivot.Vote"
+            public static var schema: String = "TaskSolution.Pivot.Vote"
 
+            @DBID(custom: "id")
             var id: Int?
 
-            let userID: User.ID
-            let solutionID: TaskSolution.ID
+            @Parent(key: "userID")
+            var user: User.DatabaseModel
+
+            @Parent(key: "solutionID")
+            var solution: TaskSolution.DatabaseModel
 
             init(userID: User.ID, solutionID: TaskSolution.ID) {
-                self.userID = userID
-                self.solutionID = solutionID
+                self.$user.id = userID
+                self.$solution.id = solutionID
             }
+
+            init() {}
         }
     }
 }
 
-extension TaskSolution.Pivot.Vote: PostgreSQLMigration {
+//extension TaskSolution.Pivot.Vote: PostgreSQLMigration {
+//
+//    static func prepare(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//        PostgreSQLDatabase.create(TaskSolution.Pivot.Vote.self, on: connection) { (builder) in
+//            try addProperties(to: builder)
+//
+//            builder.reference(from: \.userID, to: \User.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+//            builder.reference(from: \.solutionID, to: \TaskSolution.DatabaseModel.id, onUpdate: .cascade, onDelete: .cascade)
+//            builder.unique(on: \.solutionID, \.userID)
+//        }
+//    }
+//
+//    static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
+//        PostgreSQLDatabase.delete(TaskSolution.Pivot.Vote.self, on: connection)
+//    }
+//}
 
-    static func prepare(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.create(TaskSolution.Pivot.Vote.self, on: connection) { (builder) in
-            try addProperties(to: builder)
+extension TaskSolution.Pivot.Vote {
+    enum Migrations {
+        struct Create: KognitaModelMigration {
+            typealias Model = TaskSolution.Pivot.Vote
 
-            builder.reference(from: \.userID, to: \User.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.reference(from: \.solutionID, to: \TaskSolution.id, onUpdate: .cascade, onDelete: .cascade)
-            builder.unique(on: \.solutionID, \.userID)
+            func build(schema: SchemaBuilder) -> SchemaBuilder {
+                schema.field("userID", .uint, .required, .references(User.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                    .field("solutionID", .uint, .required, .references(TaskSolution.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+            }
         }
-    }
-
-    static func revert(on connection: PostgreSQLConnection) -> EventLoopFuture<Void> {
-        PostgreSQLDatabase.delete(TaskSolution.Pivot.Vote.self, on: connection)
     }
 }
