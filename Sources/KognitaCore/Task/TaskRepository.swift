@@ -13,8 +13,8 @@ protocol TaskRepository {
     func all() throws -> EventLoopFuture<[TaskDatabaseModel]>
     func create(from content: TaskDatabaseModel.Create.Data, by user: User?) throws -> EventLoopFuture<TaskDatabaseModel>
     func update(taskID: Task.ID, with content: TaskDatabaseModel.Create.Data, by user: User) -> EventLoopFuture<Void>
+    func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
     func getTaskTypePath(for id: Task.ID) throws -> EventLoopFuture<String>
-    func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]>
     func taskFor(id: TaskDatabaseModel.IDValue) -> EventLoopFuture<TaskDatabaseModel>
     func getTasks(in subjectId: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]>
 }
@@ -38,9 +38,10 @@ extension TaskDatabaseModel {
 
         public let database: Database
 
+        internal let taskResultRepository: TaskResultRepositoring
         internal var userRepository: UserRepository
         private var taskSolutionRepository: TaskSolutionRepositoring { TaskSolution.DatabaseRepository(database: database, userRepository: userRepository) }
-        private var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: database, userRepository: userRepository) }
+        private var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: taskResultRepository, userRepository: userRepository) }
     }
 }
 
@@ -73,6 +74,18 @@ extension TaskDatabaseModel.DatabaseRepository {
                 ),
                     by: user
                 )
+                .transform(to: ())
+        }
+        .failableFlatMap {
+            try self.taskResultRepository.createResult(
+                from: TaskSubmitResultRepresentableWrapper(
+                    taskID: task.requireID(),
+                    score: 0.5,
+                    timeUsed: nil
+                ),
+                userID: user.id,
+                with: nil
+            )
         }
         .transform(to: task)
     }
@@ -123,29 +136,49 @@ extension TaskDatabaseModel.DatabaseRepository {
         }
     }
 
-    public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
+    func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void> {
 
         TaskDatabaseModel.query(on: database)
-            .join(parent: \TaskDatabaseModel.$subtopic)
-            .join(parent: \TaskDatabaseModel.$creator)
-            .join(parent: \Subtopic.DatabaseModel.$topic)
-            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
-            .all(with: \.$creator, \.$subtopic, \Subtopic.DatabaseModel.$topic)
-            .flatMapEach(on: database.eventLoop) { (task: TaskDatabaseModel) in
-                failable(eventLoop: self.database.eventLoop) {
-                    try self.taskRepository
-                        .getTaskTypePath(for: task.requireID())
-                        .flatMapThrowing { path in
-                            try TaskContent(
-//                                task: task,
-                                topic: task.subtopic.topic.content(),
-                                subject: subject,
-                                creator: task.creator.content(),
-                                taskTypePath: path
-                            )
+            .withDeleted()
+            .filter(\.$id == taskID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { task in
+                if task.$creator.id == user.id {
+                    return task.delete(force: true, on: self.database)
+                } else {
+                    return self.userRepository.isModerator(user: user, taskID: taskID)
+                        .ifFalse(throw: Abort(.unauthorized))
+                        .flatMap {
+                            task.delete(force: true, on: self.database)
                     }
                 }
         }
+    }
+
+//    public func getTasks(in subject: Subject) throws -> EventLoopFuture<[TaskContent]> {
+//
+//        TaskDatabaseModel.query(on: database)
+//            .join(parent: \TaskDatabaseModel.$subtopic)
+//            .join(parent: \TaskDatabaseModel.$creator)
+//            .join(parent: \Subtopic.DatabaseModel.$topic)
+//            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subject.id)
+//            .all(with: \.$creator, \.$subtopic, \Subtopic.DatabaseModel.$topic)
+//            .flatMapEach(on: database.eventLoop) { (task: TaskDatabaseModel) in
+//                failable(eventLoop: self.database.eventLoop) {
+//                    try self.taskRepository
+//                        .getTaskTypePath(for: task.requireID())
+//                        .flatMapThrowing { path in
+//                            try TaskContent(
+////                                task: task,
+//                                topic: task.subtopic.topic.content(),
+//                                subject: subject,
+//                                creator: task.creator.content(),
+//                                taskTypePath: path
+//                            )
+//                    }
+//                }
+//        }
 //            .flatMap { tasks in
 //                try tasks.map { content in
 //                    try self.taskRepository.getTaskTypePath(for: content.0.1.requireID()).map { path in
@@ -159,7 +192,7 @@ extension TaskDatabaseModel.DatabaseRepository {
 //                    }
 //                }.flatten(on: self.conn)
 //        }
-    }
+//    }
 
     func taskFor(id: TaskDatabaseModel.IDValue) -> EventLoopFuture<TaskDatabaseModel> {
         TaskDatabaseModel.query(on: database)
@@ -220,10 +253,6 @@ extension TaskDatabaseModel.DatabaseRepository {
                     .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectId)
                     .range(lower: 0, upper: maxAmount)
 
-                if withSoftDeleted {
-                    databaseQuery = databaseQuery.withDeleted()
-                }
-
                 if let topics = query?.topics, topics.isEmpty == false {
                     databaseQuery = databaseQuery.filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$id ~~ topics)
                 }
@@ -234,8 +263,20 @@ extension TaskDatabaseModel.DatabaseRepository {
                     databaseQuery = databaseQuery.filter(\TaskDatabaseModel.$isTestable == false)
                 }
 
+                var noteQuery = databaseQuery.copy()
+                    .filter(\TaskDatabaseModel.$deletedAt != nil)
+                    .withDeleted()
+
+                if withSoftDeleted == false {
+                    noteQuery = noteQuery.filter(\.$creator.$id == user.id)
+                }
+
                 return databaseQuery
                     .all(TaskDatabaseModel.self, User.DatabaseModel.self, Topic.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+                    .flatMap { tasks in
+                        noteQuery.all(TaskDatabaseModel.self, User.DatabaseModel.self, Topic.DatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+                            .map { notes in tasks + notes }
+                    }
                     .flatMapEachThrowing { (task, user, topic, multipleChoice) in
                         try CreatorTaskContent(
                             task: task.content(),

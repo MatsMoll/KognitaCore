@@ -26,7 +26,7 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     func mark(inactive subject: Subject, for user: User) throws -> EventLoopFuture<Void>
     func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
     func revokeModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void>
-    func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter) throws -> EventLoopFuture<Subject.Compendium>
+    func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, for userID: User.ID) throws -> EventLoopFuture<Subject.Compendium>
     func subjectIDFor(taskIDs: [Task.ID]) -> EventLoopFuture<Subject.ID>
     func subjectIDFor(topicIDs: [Topic.ID]) -> EventLoopFuture<Subject.ID>
     func subjectIDFor(subtopicIDs: [Subtopic.ID]) -> EventLoopFuture<Subject.ID>

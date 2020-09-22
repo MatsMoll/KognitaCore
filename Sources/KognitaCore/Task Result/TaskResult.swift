@@ -102,7 +102,7 @@ extension TaskResult.Migrations {
         func build(schema: SchemaBuilder) -> SchemaBuilder {
             schema.field("taskID", .uint, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                 .field("userID", .uint, .required, .sql(.default(1)), .references(User.DatabaseModel.schema, .id, onDelete: .setDefault, onUpdate: .cascade))
-                .field("sessionID", .uint, .required, .references(TaskSession.schema, .id, onDelete: .setNull, onUpdate: .cascade))
+                .field("sessionID", .uint, .references(TaskSession.schema, .id, onDelete: .setNull, onUpdate: .cascade))
                 .field("resultScore", .double, .required)
                 .field("isSetManually", .bool, .required)
                 .field("revisitDate", .datetime)

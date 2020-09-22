@@ -367,7 +367,7 @@ extension TaskResult.DatabaseRepository {
         }
     }
 
-    public func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: Sessions.ID) -> EventLoopFuture<TaskResult> {
+    public func createResult(from result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: Sessions.ID?) -> EventLoopFuture<TaskResult> {
         let result = TaskResult.DatabaseModel(result: result, userID: userID, sessionID: sessionID)
         return result.save(on: database)
             .flatMapThrowing { try result.content() }
@@ -498,6 +498,12 @@ extension TaskResult.DatabaseRepository {
 
 public protocol TaskSubmitResultRepresentable: TaskSubmitResultable, TaskSubmitable {
     var taskID: Task.ID { get }
+}
+
+struct TaskSubmitResultRepresentableWrapper: TaskSubmitResultRepresentable {
+    let taskID: Int
+    let score: Double
+    let timeUsed: TimeInterval?
 }
 
 struct TaskSubmitResult: TaskSubmitResultRepresentable {

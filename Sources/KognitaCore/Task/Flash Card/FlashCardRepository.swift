@@ -15,15 +15,14 @@ public protocol FlashCardTaskRepository: DeleteModelRepository {
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
     func createAnswer(for task: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer>
     func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
-
-    func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID>
+    func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
 }
 
 extension TypingTask.Create.Data: TaskCreationContentable {
     public var examPaperSemester: TaskExamSemester? { nil }
     public var isDraft: Bool { false }
 }
-extension TypingTask.Create.Draft: TaskCreationContentable {
+extension LectureNote.Create.Data: TaskCreationContentable {
     public var isTestable: Bool { false }
     public var isDraft: Bool { true }
     public var examPaperSemester: TaskExamSemester? { nil }
@@ -41,9 +40,9 @@ extension KognitaModels.TypingTask {
             examType: task.examType,
             examYear: task.examYear,
             isTestable: task.isTestable,
-            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
+            deletedAt: task.deletedAt,
             editedTaskID: task.editedTaskID
         )
     }
@@ -58,9 +57,9 @@ extension KognitaModels.TypingTask {
             examType: nil,
             examYear: task.examPaperYear,
             isTestable: task.isTestable,
-            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
+            deletedAt: task.deletedAt,
             editedTaskID: nil
         )
     }
@@ -77,10 +76,10 @@ extension KognitaModels.GenericTask {
             examType: nil,
             examYear: task.examPaperYear,
             isTestable: task.isTestable,
-            isDraft: task.isDraft,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
-            editedTaskID: nil
+            editedTaskID: nil,
+            deletedAt: task.deletedAt
         )
     }
 }
@@ -91,7 +90,7 @@ extension FlashCardTask {
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
             self.repositories = repositories
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, userRepository: repositories.userRepository)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: repositories.taskResultRepository, userRepository: repositories.userRepository)
         }
 
         public let database: Database
@@ -331,25 +330,29 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID> {
-
-        try self.taskRepository
-            .create(
-                from: TaskDatabaseModel.Create.Data(
-                    content: content,
-                    subtopicID: content.subtopicID,
-                    solution: content.solution ?? ""
-                ),
-                by: user
-        ).failableFlatMap { task in
-            try FlashCardTask(task: task)
-                .create(on: self.database)
-                .flatMap {
-                    // Sets deletedAt in order to not use them while a draft
-                    task.delete(on: self.database)
-                }
-                .flatMapThrowing { try task.requireID() }
-        }
-
+    public func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void> {
+        taskRepository.forceDelete(taskID: taskID, by: user)
     }
+
+//    public func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID> {
+//
+//        try self.taskRepository
+//            .create(
+//                from: TaskDatabaseModel.Create.Data(
+//                    content: content,
+//                    subtopicID: content.subtopicID,
+//                    solution: content.solution ?? ""
+//                ),
+//                by: user
+//        ).failableFlatMap { task in
+//            try FlashCardTask(task: task)
+//                .create(on: self.database)
+//                .flatMap {
+//                    // Sets deletedAt in order to not use them while a draft
+//                    task.delete(on: self.database)
+//                }
+//                .flatMapThrowing { try task.requireID() }
+//        }
+//
+//    }
 }

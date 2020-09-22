@@ -499,62 +499,73 @@ extension Subject.DatabaseRepository {
         let subtopicID: Subtopic.ID
     }
 
-    public func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter) throws -> EventLoopFuture<Subject.Compendium> {
+    public func compendium(for subjectID: Subject.ID, filter: SubjectCompendiumFilter, for userID: User.ID) throws -> EventLoopFuture<Subject.Compendium> {
 
         return Subject.DatabaseModel.find(subjectID, on: database)
             .unwrap(or: Abort(.badRequest))
             .flatMap { subject in
 
                 var query = TaskDatabaseModel.query(on: self.database)
-                    .withDeleted()
                     .join(FlashCardTask.self, on: \FlashCardTask.$id == \TaskDatabaseModel.$id, method: .inner)
                     .join(parent: \TaskDatabaseModel.$subtopic)
                     .join(parent: \Subtopic.DatabaseModel.$topic)
                     .filter(\TaskDatabaseModel.$description == nil)
                     .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
 
+                var noteQuery = TaskDatabaseModel.query(on: self.database)
+                    .withDeleted()
+                    .join(superclass: LectureNote.DatabaseModel.self, with: TaskDatabaseModel.self)
+                    .join(parent: \TaskDatabaseModel.$subtopic)
+                    .join(parent: \Subtopic.DatabaseModel.$topic)
+                    .filter(\TaskDatabaseModel.$description == nil)
+                    .filter(\TaskDatabaseModel.$creator.$id == userID)
+                    .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+
                 if let subtopicIDs = filter.subtopicIDs {
                     query = query.filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id ~~ subtopicIDs)
+                    noteQuery = noteQuery.filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$id ~~ subtopicIDs)
                 }
 
                 return query.all(with: \TaskDatabaseModel.$subtopic, \Subtopic.DatabaseModel.$topic)
-                    .flatMap { data in
+                    .flatMap { (data: [TaskDatabaseModel]) -> EventLoopFuture<[TaskDatabaseModel]> in
+                        noteQuery.all(with: \TaskDatabaseModel.$subtopic, \Subtopic.DatabaseModel.$topic)
+                            .map { notes in data + notes }
+                }.flatMap { data in
+                    TaskSolution.DatabaseModel.query(on: self.database)
+                        .filter(\.$task.$id ~~ data.compactMap { $0.id })
+                        .all()
+                        .map { solutions in
 
-                        TaskSolution.DatabaseModel.query(on: self.database)
-                            .filter(\.$task.$id ~~ data.compactMap { $0.id })
-                            .all()
-                            .map { solutions in
+                            Subject.Compendium(
+                                subjectID: subjectID,
+                                subjectName: subject.name,
+                                topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
+                                    .map { _, topicData in
 
-                                Subject.Compendium(
-                                    subjectID: subjectID,
-                                    subjectName: subject.name,
-                                    topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
-                                        .map { _, topicData in
+                                        Subject.Compendium.TopicData(
+                                            name: topicData.first!.subtopic.topic.name,
+                                            chapter: topicData.first!.subtopic.topic.chapter,
+                                            subtopics: topicData.group(by: \.$subtopic.id)
+                                                .map { subtopicID, questions in
 
-                                            Subject.Compendium.TopicData(
-                                                name: topicData.first!.subtopic.topic.name,
-                                                chapter: topicData.first!.subtopic.topic.chapter,
-                                                subtopics: topicData.group(by: \.$subtopic.id)
-                                                    .map { subtopicID, questions in
+                                                    Subject.Compendium.SubtopicData(
+                                                        subjectID: subjectID,
+                                                        subtopicID: subtopicID,
+                                                        name: questions.first!.subtopic.name,
+                                                        questions: questions.map { question in
 
-                                                        Subject.Compendium.SubtopicData(
-                                                            subjectID: subjectID,
-                                                            subtopicID: subtopicID,
-                                                            name: questions.first!.subtopic.name,
-                                                            questions: questions.map { question in
-
-                                                                Subject.Compendium.QuestionData(
-                                                                    question: question.question,
-                                                                    solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
-                                                                )
-                                                            }
-                                                        )
-                                                }
-                                            )
-                                    }
-                                    .sorted(by: { $0.chapter < $1.chapter })
-                                )
-                        }
+                                                            Subject.Compendium.QuestionData(
+                                                                question: question.question,
+                                                                solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
+                                                            )
+                                                        }
+                                                    )
+                                            }
+                                        )
+                                }
+                                .sorted(by: { $0.chapter < $1.chapter })
+                            )
+                    }
                 }
         }
     }

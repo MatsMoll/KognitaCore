@@ -72,9 +72,6 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     @Field(key: "isTestable")
     var isTestable: Bool
 
-    @Field(key: "isDraft")
-    var isDraft: Bool
-
     /// The date the task was created at
     @Timestamp(key: "createdAt", on: .create)
     var createdAt: Date?
@@ -101,7 +98,6 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         examPaperSemester: ExamSemester? = nil,
         examPaperYear: Int? = nil,
         isTestable: Bool = false,
-        isDraft: Bool = false,
         id: IDValue? = nil
     ) {
         self.id             = id
@@ -110,7 +106,6 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         self.question       = question
         self.$creator.id    = creatorID
         self.isTestable     = isTestable
-        self.isDraft        = isDraft
         self.deletedAt      = nil
         if examPaperSemester != nil, examPaperYear != nil {
             self.examPaperYear  = examPaperYear
@@ -131,7 +126,6 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         self.isTestable     = content.isTestable
         self.$creator.id      = creator.id
         self.examPaperSemester = nil
-        self.isDraft        = content.isDraft
         self.examPaperYear  = content.examPaperYear
         self.deletedAt  = nil
         if description?.isEmpty == true {
@@ -201,7 +195,6 @@ extension TaskDatabaseModel: ContentConvertable {
             examType: nil,
             examYear: nil,
             isTestable: isTestable,
-            isDraft: isDraft,
             createdAt: createdAt,
             updatedAt: updatedAt,
             editedTaskID: nil,

@@ -84,6 +84,7 @@ extension MultipleChoiceTask {
             isTestable: task.isTestable,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
+            deletedAt: task.deletedAt,
             editedTaskID: nil,
             isMultipleSelect: isMultipleSelect,
             choises: choises.map { MultipleChoiceTaskChoice(id: $0.id ?? 0, choice: $0.choice, isCorrect: $0.isCorrect) }

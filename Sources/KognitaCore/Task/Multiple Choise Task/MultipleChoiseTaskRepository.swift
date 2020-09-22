@@ -24,6 +24,7 @@ public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
     func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]>
     func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], agenst correctChoises: [MultipleChoiceTaskChoice]) throws -> TaskSessionResult<[MultipleChoiceTaskChoice.Result]>
     func multipleChoiseAnswers(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice.Answered]>
+    func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
 }
 
 extension MultipleChoiceTask {
@@ -32,7 +33,7 @@ extension MultipleChoiceTask {
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
             self.repositories = repositories
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, userRepository: repositories.userRepository)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: repositories.taskResultRepository, userRepository: repositories.userRepository)
         }
 
         public let database: Database
@@ -405,5 +406,9 @@ extension MultipleChoiceTask.DatabaseRepository {
             .filter(\MultipleChoiseTaskChoise.$task.$id == taskID)
             .all()
             .flatMapEachThrowing { try MultipleChoiceTaskChoice(choice: $0) }
+    }
+
+    public func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void> {
+        taskRepository.forceDelete(taskID: taskID, by: user)
     }
 }

@@ -14,6 +14,7 @@ public protocol RepositoriesRepresentable {
     var taskSolutionRepository: TaskSolutionRepositoring { get }
     var taskDiscussionRepository: TaskDiscussionRepositoring { get }
     var taskResultRepository: TaskResultRepositoring { get }
+    var lectureNoteRepository: LectureNoteRepository { get }
 }
 
 struct DatabaseRepositoriesProvider: LifecycleHandler {
@@ -37,7 +38,7 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     var password: PasswordHasher
     var database: Database
 
-    lazy var taskRepository: TaskRepository = TaskDatabaseModel.DatabaseRepository(database: self.database, userRepository: self.userRepository)
+    lazy var taskRepository: TaskRepository = TaskDatabaseModel.DatabaseRepository(database: self.database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository)
 
     public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository)
 
@@ -62,6 +63,8 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     public lazy var taskDiscussionRepository: TaskDiscussionRepositoring = TaskDiscussion.DatabaseRepository(database: database)
 
     public lazy var taskResultRepository: TaskResultRepositoring = TaskResult.DatabaseRepository(database: database)
+
+    public lazy var lectureNoteRepository: LectureNoteRepository = LectureNote.DatabaseRepository(database: database, repositories: self)
 }
 
 struct RepositoriesFactory {

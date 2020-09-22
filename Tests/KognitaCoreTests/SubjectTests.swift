@@ -12,10 +12,11 @@ import KognitaCoreTestable
 
 class SubjectTests: VaporTestCase {
 
+    lazy var taskResultRepository: TaskResultRepositoring = { TestableRepositories.testable(with: app).taskResultRepository }()
     lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: app).topicRepository }()
     lazy var subjectRepository: SubjectRepositoring = { TestableRepositories.testable(with: app).subjectRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
-    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: database, userRepository: self.userRepository) }()
+    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository) }()
     lazy var userRepository: UserRepository = { TestableRepositories.testable(with: app).userRepository }()
 
     func testExportAndImport() throws {
@@ -196,6 +197,7 @@ class SubjectTests: VaporTestCase {
 
     func testCompendium() {
         failableTest {
+            let user = try User.create(on: app)
             let subject = try Subject.create(on: app)
             let topic = try Topic.create(subject: subject, on: app)
             let firstSubtopic = try Subtopic.create(topic: topic, on: app)
@@ -206,9 +208,9 @@ class SubjectTests: VaporTestCase {
             _ = try FlashCardTask.create(subtopic: secondSubtopic, on: app)
             _ = try FlashCardTask.create(subtopic: secondSubtopic, on: app)
 
-            let compendium = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: nil)).wait()
-            let noContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [3])).wait()
-            let filteredContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [firstSubtopic.id])).wait()
+            let compendium = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: nil), for: user.id).wait()
+            let noContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [3]), for: user.id).wait()
+            let filteredContent = try subjectRepository.compendium(for: subject.id, filter: SubjectCompendiumFilter(subtopicIDs: [firstSubtopic.id]), for: user.id).wait()
 
             XCTAssertEqual(compendium.topics.count, 1)
             XCTAssertEqual(noContent.topics.count, 0)

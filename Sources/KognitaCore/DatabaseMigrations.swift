@@ -22,7 +22,8 @@ public class DatabaseMigrations {
 //            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
 //            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
 //            app.migrations.add(TaskDatabaseModel.Migrations.IsDraft())
-            app.migrations.add(Topic.Migrations.RemoveUniqueConstraint())
+//            app.migrations.add(Topic.Migrations.RemoveUniqueConstraint())
+//            app.migrations.add(LectureNote.Migrations.NoteSession())
 //            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
         }
         if app.environment != .testing {
@@ -58,6 +59,7 @@ public class DatabaseMigrations {
             TaskAnswer.Migrations.Create(),
             FlashCardAnswer.Migrations.Create(),
             MultipleChoiseTaskAnswer.Migrations.Create(),
+            LectureNote.Migrations.Create(),
 
             TaskSolution.Migrations.Create(),
             TaskSolution.Pivot.Vote.Migrations.Create(),

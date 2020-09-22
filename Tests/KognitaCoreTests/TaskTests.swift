@@ -12,15 +12,18 @@ import KognitaCoreTestable
 
 class TaskTests: VaporTestCase {
 
+    lazy var taskResultRepository: TaskResultRepositoring = { TestableRepositories.testable(with: app).taskResultRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
-    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database, userRepository: TestableRepositories.testable(with: app).userRepository) }()
+    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: self.taskResultRepository, userRepository: TestableRepositories.testable(with: app).userRepository) }()
     lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
 
     func testTasksInSubject() throws {
 
+        let user = try User.create(on: app)
         let subject = try Subject.create(name: "test", on: app)
         let topic = try Topic.create(subject: subject, on: app)
         let subtopic = try Subtopic.create(topic: topic, on: app)
+
         _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
         _ = try TaskDatabaseModel.create(subtopic: subtopic, on: app)
@@ -28,7 +31,7 @@ class TaskTests: VaporTestCase {
         _ = try TaskDatabaseModel.create(on: app)
 
         let tasks = try taskRepository
-            .getTasks(in: subject)
+            .getTasks(in: subject.id, user: user, query: nil, maxAmount: nil, withSoftDeleted: false)
             .wait()
         XCTAssertEqual(tasks.count, 4)
     }
