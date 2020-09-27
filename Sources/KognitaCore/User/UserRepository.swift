@@ -23,6 +23,7 @@ public protocol UserRepository: ResetPasswordRepositoring {
     func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User>
 
     func login(with user: User) throws -> EventLoopFuture<User.Login.Token>
+    func logLogin(for user: User, with ipAddress: String?) -> EventLoopFuture<Void>
     func verify(email: String, with password: String) -> EventLoopFuture<User?>
     func user(with token: String) -> EventLoopFuture<User?>
 
@@ -125,6 +126,11 @@ extension User.DatabaseRepository: UserRepository {
         // save and return token
         return token.save(on: database)
             .flatMapThrowing { try token.content() }
+    }
+
+    public func logLogin(for user: User, with ipAddress: String?) -> EventLoopFuture<Void> {
+        User.Login.Log(userID: user.id, ipAddress: ipAddress)
+            .save(on: database)
     }
 
     public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User> {
