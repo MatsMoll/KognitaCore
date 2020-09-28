@@ -22,32 +22,39 @@ extension LectureNote {
         let repositories: DatabaseRepositories
 
         var taskRepository: TaskRepository { repositories.taskRepository }
+        var lectureNoteTaskingSession: LectureNoteTakingSessionRepository { repositories.lectureNoteTakingRepository }
     }
 }
 
 extension LectureNote.DatabaseRepository {
 
     func create(from content: LectureNote.Create.Data, by user: User) throws -> EventLoopFuture<LectureNote.ID> {
-        try self.taskRepository
-            .create(
-                from: TaskDatabaseModel.Create.Data(
-                    content: content,
-                    subtopicID: content.subtopicID,
-                    solution: content.solution ?? ""
-                ),
-                by: user
-        ).failableFlatMap { task in
-            try LectureNote.DatabaseModel(id: task.requireID(), noteSession: content.noteSession)
-                .create(on: self.database)
-                .failableFlatMap {
-                    // Endables editing as flash card task
-                    try FlashCardTask(task: task).save(on: self.database)
+
+        lectureNoteTaskingSession.isOwnerOf(sessionID: content.noteSession, userID: user.id)
+            .ifFalse(throw: Abort(.badRequest))
+            .failableFlatMap {
+
+                try taskRepository
+                    .create(
+                        from: TaskDatabaseModel.Create.Data(
+                            content: content,
+                            subtopicID: content.subtopicID,
+                            solution: content.solution ?? ""
+                        ),
+                        by: user
+                ).failableFlatMap { task in
+                    try LectureNote.DatabaseModel(id: task.requireID(), noteSession: content.noteSession)
+                        .create(on: database)
+                        .failableFlatMap {
+                            // Endables editing as flash card task
+                            try FlashCardTask(task: task).save(on: database)
+                        }
+                        .flatMap {
+                            // Sets deletedAt in order to not use them while a note
+                            task.delete(on: database)
+                    }
+                    .transform(to: task.id!)
                 }
-                .flatMap {
-                    // Sets deletedAt in order to not use them while a note
-                    task.delete(on: self.database)
-            }
-            .transform(to: task.id!)
         }
     }
 
