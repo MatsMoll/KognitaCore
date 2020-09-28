@@ -38,6 +38,7 @@ public class DatabaseMigrations {
             User.ResetPassword.Token.Migrations.Create(),
             User.Login.Token.Migrations.Create(),
             User.VerifyEmail.Token.Migrations.Create(),
+            User.Login.Log.Create(),
 
             Subject.Migrations.Create(),
             Topic.Migrations.Create(),
