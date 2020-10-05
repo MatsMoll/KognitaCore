@@ -16,6 +16,7 @@ public protocol RepositoriesRepresentable {
     var taskResultRepository: TaskResultRepositoring { get }
     var lectureNoteRepository: LectureNoteRepository { get }
     var lectureNoteTakingRepository: LectureNoteTakingSessionRepository { get }
+    var lectureNoteRecapRepository: LectureNoteRecapSessionRepository { get }
 }
 
 struct DatabaseRepositoriesProvider: LifecycleHandler {
@@ -68,6 +69,8 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     public lazy var lectureNoteRepository: LectureNoteRepository = LectureNote.DatabaseRepository(database: database, repositories: self)
 
     public lazy var lectureNoteTakingRepository: LectureNoteTakingSessionRepository = LectureNote.TakingSession.DatabaseRepository(database: database)
+
+    public lazy var lectureNoteRecapRepository: LectureNoteRecapSessionRepository = LectureNote.RecapSession.DatabaseRepository(database: database, repositories: self)
 }
 
 struct RepositoriesFactory {

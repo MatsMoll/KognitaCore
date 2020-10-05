@@ -17,6 +17,8 @@ public class DatabaseMigrations {
         }
         if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
             app.migrations.add(LectureNote.Migrations.NoteTakingSession())
+            app.migrations.add(LectureNote.RecapSession.Migrations.Create())
+            app.migrations.add(LectureNote.RecapSession.Migrations.CreateAssignedTask())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
@@ -52,6 +54,8 @@ public class DatabaseMigrations {
             MultipleChoiseTaskAnswer.Migrations.Create(),
             LectureNote.TakingSession.Migrations.Create(),
             LectureNote.Migrations.Create(),
+            LectureNote.RecapSession.Migrations.Create(),
+            LectureNote.RecapSession.Migrations.CreateAssignedTask(),
 
             TaskSolution.Migrations.Create(),
             TaskSolution.Pivot.Vote.Migrations.Create(),

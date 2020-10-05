@@ -13,7 +13,7 @@ public protocol FlashCardTaskRepository: DeleteModelRepository {
     func updateModelWith(id: Int, to data: TypingTask.Update.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response>
     func importTask(from task: TaskBetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
-    func createAnswer(for task: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer>
+    func createAnswer(for task: TypingTask.ID, withTextSubmittion submit: String) -> EventLoopFuture<TaskAnswer>
     func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
     func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
 }
@@ -272,7 +272,7 @@ extension FlashCardTask.DatabaseRepository {
 //        }
     }
 
-    public func createAnswer(for taskID: TypingTask.ID, with submit: TypingTask.Submit) -> EventLoopFuture<TaskAnswer> {
+    public func createAnswer(for taskID: TypingTask.ID, withTextSubmittion submit: String) -> EventLoopFuture<TaskAnswer> {
 
         let answer = TaskAnswer()
 
@@ -281,7 +281,7 @@ extension FlashCardTask.DatabaseRepository {
                 try FlashCardAnswer(
                     answerID: answer.requireID(),
                     taskID: taskID,
-                    answer: submit.answer
+                    answer: submit
                 )
         }
         .create(on: database)

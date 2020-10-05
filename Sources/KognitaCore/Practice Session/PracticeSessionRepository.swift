@@ -379,7 +379,7 @@ extension PracticeSession.DatabaseRepository {
                 self.get(FlashCardTask.self, at: submit.taskIndex, for: sessionID)
             }.failableFlatMap { task in
                 try self.flashCardRepository
-                    .createAnswer(for: task.requireID(), with: submit)
+                    .createAnswer(for: task.requireID(), withTextSubmittion: submit.answer)
                     .flatMap { answer in
                         self.update(submit, in: sessionID)
                             .map { return TaskSessionResult(result: submit, score: 0, progress: 0) }
@@ -486,7 +486,7 @@ extension PracticeSession.DatabaseRepository {
             .flatMap { (result: TaskResult.DatabaseModel) in
                 result.resultScore = ScoreEvaluater.shared.compress(score: submit.knowledge, range: 0...4)
                 result.isSetManually = true
-                return result.save(on: self.database)
+                return result.save(on: database)
                     .transform(to: ())
         }
     }
