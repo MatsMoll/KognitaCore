@@ -373,6 +373,30 @@ extension TaskResult.DatabaseRepository {
             .flatMapThrowing { try result.content() }
     }
 
+    public func updateResult(with result: TaskSubmitResultRepresentable, userID: User.ID, with sessionID: Sessions.ID?) -> EventLoopFuture<UpdateResultOutcom> {
+        TaskResult.DatabaseModel.query(on: database)
+            .filter(\.$task.$id == result.taskID)
+            .filter(\.$session.$id == sessionID)
+            .first()
+            .failableFlatMap { savedResult in
+                if let savedResult = savedResult {
+                    savedResult.isSetManually = true
+                    savedResult.resultScore = result.score.clamped(to: 0...1)
+
+                    let numberOfDays = ScoreEvaluater.shared.daysUntillReview(score: savedResult.resultScore)
+                    let interval = Double(numberOfDays) * 60 * 60 * 24
+                    savedResult.revisitDate = Date().addingTimeInterval(interval)
+
+                    let content = try savedResult.content()
+                    return savedResult.save(on: database)
+                        .transform(to: .updated(result: content))
+                } else {
+                    return createResult(from: result, userID: userID, with: sessionID)
+                        .map { .created(result: $0) }
+                }
+            }
+    }
+
     public func getUserLevel(for userId: User.ID, in topics: [Topic.ID]) -> EventLoopFuture<[Topic.UserLevel]> {
 
         guard topics.isEmpty == false else { return database.eventLoop.future([]) }
@@ -493,6 +517,15 @@ extension TaskResult.DatabaseRepository {
 //                .map(Set.init)
 //                .map(Array.init)
 //        }
+    }
+
+    public func getResult(for taskID: Task.ID, by userID: User.ID, sessionID: Int) -> EventLoopFuture<TaskResult?> {
+        TaskResult.DatabaseModel.query(on: database)
+            .filter(\.$session.$id == sessionID)
+            .filter(\.$task.$id == taskID)
+            .filter(\.$user.$id == userID)
+            .first()
+            .flatMapThrowing { try $0?.content() }
     }
 }
 

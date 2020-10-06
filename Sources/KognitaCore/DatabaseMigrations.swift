@@ -16,15 +16,9 @@ public class DatabaseMigrations {
             extraDatabase(migrations: app.migrations)
         }
         if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
-//            app.migrations.add(VaporFourMigration())
-//            app.migrations.add(VaporFourMigration.SubtopicTopicIDColumn())
-//            app.migrations.add(VaporFourMigration.TopicSubjectIDColumn())
-//            app.migrations.add(VaporFourMigration.SubjectCreatorIDColumn())
-//            app.migrations.add(VaporFourMigration.SubjectColorClassDeletrion())
-//            app.migrations.add(TaskDatabaseModel.Migrations.IsDraft())
-//            app.migrations.add(Topic.Migrations.RemoveUniqueConstraint())
-//            app.migrations.add(LectureNote.Migrations.NoteSession())
-//            app.migrations.add(VaporFourMigration.TaskCreatorIDColumn())
+            app.migrations.add(LectureNote.Migrations.NoteTakingSession())
+            app.migrations.add(LectureNote.RecapSession.Migrations.Create())
+            app.migrations.add(LectureNote.RecapSession.Migrations.CreateAssignedTask())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
@@ -58,7 +52,10 @@ public class DatabaseMigrations {
             TaskAnswer.Migrations.Create(),
             FlashCardAnswer.Migrations.Create(),
             MultipleChoiseTaskAnswer.Migrations.Create(),
+            LectureNote.TakingSession.Migrations.Create(),
             LectureNote.Migrations.Create(),
+            LectureNote.RecapSession.Migrations.Create(),
+            LectureNote.RecapSession.Migrations.CreateAssignedTask(),
 
             TaskSolution.Migrations.Create(),
             TaskSolution.Pivot.Vote.Migrations.Create(),
