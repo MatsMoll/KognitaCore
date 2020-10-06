@@ -167,8 +167,8 @@ extension LectureNote.RecapSession {
 
         private func assignTaskFor(sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Int?> {
             LectureNote.RecapSession.DatabaseModel.query(on: database)
-                .filter(\.$id == sessionID)
-                .join(parent: \.$noteTakingSession)
+                .filter(\LectureNote.RecapSession.DatabaseModel.$id == sessionID)
+                .join(parent: \LectureNote.RecapSession.DatabaseModel.$noteTakingSession)
                 .first(LectureNote.TakingSession.DatabaseModel.self)
                 .unwrap(or: Abort(.badRequest))
                 .flatMap { noteTakingSession in
@@ -197,7 +197,7 @@ extension LectureNote.RecapSession {
 
         public func currentTaskIndex(sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Int> {
             LectureNote.RecapSession.AssignedTask.query(on: database)
-                .join(parent: \.$recapSession)
+                .join(parent: \LectureNote.RecapSession.AssignedTask.$recapSession)
                 .sort(\.$index, .descending)
                 .first()
                 .unwrap(or: Abort(.internalServerError))
@@ -207,9 +207,9 @@ extension LectureNote.RecapSession {
         public func taskWith(index: Int, sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<GenericTask> {
             LectureNote.RecapSession.AssignedTask.query(on: database)
                 .withDeleted()
-                .filter(\.$index == index)
-                .filter(\.$recapSession.$id == sessionID)
-                .join(parent: \.$task)
+                .filter(\LectureNote.RecapSession.AssignedTask.$index == index)
+                .filter(\LectureNote.RecapSession.AssignedTask.$recapSession.$id == sessionID)
+                .join(parent: \LectureNote.RecapSession.AssignedTask.$task)
                 .first(TaskDatabaseModel.self)
                 .unwrap(or: Abort(.badRequest))
                 .content()
@@ -218,8 +218,8 @@ extension LectureNote.RecapSession {
         public func submit(answer: LectureNote.RecapSession.Submit, forIndex index: Int, userID: User.ID, sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Void> {
             LectureNote.RecapSession.DatabaseModel.query(on: database)
                 .join(superclass: TaskSession.self, with: LectureNote.RecapSession.DatabaseModel.self)
-                .join(children: \.$assignedTasks)
-                .filter(\.$id == sessionID)
+                .join(children: \LectureNote.RecapSession.DatabaseModel.$assignedTasks)
+                .filter(\LectureNote.RecapSession.DatabaseModel.$id == sessionID)
                 .filter(TaskSession.self, \.$user.$id == userID)
                 .filter(LectureNote.RecapSession.AssignedTask.self, \.$index == index)
                 .first(LectureNote.RecapSession.AssignedTask.self)
@@ -305,10 +305,10 @@ extension LectureNote.RecapSession {
         public func taskIDFor(index: Int, sessionID: LectureNote.RecapSession.ID, userID: User.ID) -> EventLoopFuture<Task.ID> {
             LectureNote.RecapSession.AssignedTask.query(on: database)
                 .withDeleted()
-                .filter(\.$index == index)
-                .filter(\.$recapSession.$id == sessionID)
+                .filter(\LectureNote.RecapSession.AssignedTask.$index == index)
+                .filter(\LectureNote.RecapSession.AssignedTask.$recapSession.$id == sessionID)
                 .filter(TaskSession.self, \.$user.$id == userID)
-                .join(parent: \.$recapSession)
+                .join(parent: \LectureNote.RecapSession.AssignedTask.$recapSession)
                 .join(superclass: TaskSession.self, with: LectureNote.RecapSession.DatabaseModel.self)
                 .first()
                 .unwrap(or: Abort(.badRequest))
@@ -318,8 +318,8 @@ extension LectureNote.RecapSession {
         public func subjectFor(sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Subject> {
             LectureNote.RecapSession.AssignedTask.query(on: database)
                 .withDeleted()
-                .filter(\.$recapSession.$id == sessionID)
-                .join(parent: \.$task)
+                .filter(\LectureNote.RecapSession.AssignedTask.$recapSession.$id == sessionID)
+                .join(parent: \LectureNote.RecapSession.AssignedTask.$task)
                 .join(parent: \TaskDatabaseModel.$subtopic)
                 .join(parent: \Subtopic.DatabaseModel.$topic)
                 .join(parent: \Topic.DatabaseModel.$subject)
