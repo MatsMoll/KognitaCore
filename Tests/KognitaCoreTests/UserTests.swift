@@ -2,7 +2,6 @@ import XCTest
 import Vapor
 @testable import KognitaCore
 import KognitaCoreTestable
-// swiftlint:disable force_cast
 
 class UserTests: VaporTestCase {
 
@@ -111,7 +110,7 @@ class UserTests: VaporTestCase {
         let user = try User.create(on: app)
 
         let tokenResponse = try resetPasswordRepository.startReset(for: user).wait()
-        var token = try User.ResetPassword.Token.DatabaseModel.query(on: database)
+        let token = try User.ResetPassword.Token.DatabaseModel.query(on: database)
             .filter(\.$string == tokenResponse.token)
             .first()
             .unwrap(or: Abort(.badRequest))
@@ -132,6 +131,18 @@ class UserTests: VaporTestCase {
         )
         let savedUser = try User.DatabaseModel.find(user.id, on: database).unwrap(or: Abort(.internalServerError)).wait()
         XCTAssertFalse(try app.password.verify(newPassword, created: savedUser.passwordHash))
+    }
+
+    func testUserLoginLog() throws {
+        let user = try User.create(on: app)
+
+        try userRepository.logLogin(for: user, with: "127.0.0.1").wait()
+        try userRepository.logLogin(for: user, with: nil).wait()
+
+        let logs = try User.Login.Log.query(on: database).all().wait()
+
+        XCTAssertEqual(logs.filter({ $0.ipAddress == "127.0.0.1" && $0.$user.id == user.id }).count, 1)
+        XCTAssertEqual(logs.filter({ $0.ipAddress == nil && $0.$user.id == user.id }).count, 1)
     }
 
     static let allTests = [

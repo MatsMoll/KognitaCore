@@ -29,7 +29,17 @@ jobs:
     - name: GitHub Action for SwiftLint
       uses: norio-nomura/action-swiftlint@3.1.0
     - name: Run unit tests
-      run: swift test
+      if: github.ref != 'refs/heads/master'
+      run: swift test --enable-test-discovery
+      env:
+        BUILD_TYPE: DEV
+        DATABASE_USER: postgres
+        DATABASE_PASSWORD: postgres
+        DATABASE_DB: postgres
+        DATABASE_HOSTNAME: localhost
+    - name: Run unit tests master
+      if: github.ref == 'refs/heads/master'
+      run: swift test --enable-test-discovery
       env:
         DATABASE_USER: postgres
         DATABASE_PASSWORD: postgres
