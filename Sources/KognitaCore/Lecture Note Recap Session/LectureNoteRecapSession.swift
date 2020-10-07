@@ -89,6 +89,8 @@ extension LectureNote.RecapSession {
 extension LectureNote.RecapSession.Migrations {
     struct Create: KognitaModelMigration {
 
+        var name: String = "LectureNote.RecapSession.Create"
+
         typealias Model = LectureNote.RecapSession.DatabaseModel
 
         func build(schema: SchemaBuilder) -> SchemaBuilder {
@@ -101,6 +103,8 @@ extension LectureNote.RecapSession.Migrations {
     }
 
     struct CreateAssignedTask: Migration {
+
+        var name: String = "LectureNote.RecapSession.AssignedTask.Create"
 
         let schema = LectureNote.RecapSession.AssignedTask.schema
 

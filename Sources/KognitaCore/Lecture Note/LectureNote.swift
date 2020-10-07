@@ -63,6 +63,9 @@ extension LectureNote {
         }
 
         struct NoteTakingSession: Migration {
+
+            var name: String = "LectureNote.Convert.NoteTakingSession"
+
             func prepare(on database: Database) -> EventLoopFuture<Void> {
 
                 database.transaction { transaction in

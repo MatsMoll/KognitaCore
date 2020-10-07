@@ -38,6 +38,8 @@ extension LectureNote.TakingSession {
     enum Migrations {
         struct Create: Migration {
 
+            var name: String = "LectureNote.TakingSession.Create"
+
             let schema = LectureNote.TakingSession.DatabaseModel.schema
 
             func prepare(on database: Database) -> EventLoopFuture<Void> {
