@@ -63,14 +63,21 @@ extension TaskResult.DatabaseRepository {
         let topicID: Int
     }
 
+    private struct RecommendedTopics: Codable {
+        let topicID: Topic.ID
+        let revisitAt: Date
+    }
+
     private enum Query {
 
         case subtopics
         case taskResults
         case flowTasks(userID: User.ID, sessionID: PracticeSession.ID)
+        case recommendedTopics(userID: User.ID, lowerDate: Date, upperDate: Date, limit: Int)
         case results(revisitingAfter: Date, for: User.ID)
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
+        case resultsInTopicsBetweenDates([Topic.ID], for: User.ID, lowerDate: Date, upperDate: Date)
 
         var rawQuery: SQLQueryString {
             switch self {
@@ -83,6 +90,10 @@ extension TaskResult.DatabaseRepository {
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInSubject(let subjectID, let userID):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectID" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+            case .recommendedTopics(let userID, let lowerDate, let upperDate, let limit):
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate" AS "revisitAt", "Subtopic"."topicID" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Subtopic"."id" = "Task"."subtopicID" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "TaskResult"."userID" = \#(bind: userID) AND "Task"."isTestable" = 'false' ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC LIMIT \#(bind: limit)"#
+            case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
         }
 
@@ -92,7 +103,7 @@ extension TaskResult.DatabaseRepository {
                 throw Abort(.internalServerError)
             }
             switch self {
-            case .resultsInSubject, .flowTasks, .results, .resultsInTopics:
+            case .resultsInSubject, .flowTasks, .results, .resultsInTopics, .recommendedTopics, .resultsInTopicsBetweenDates:
                 return sqlDB.raw(self.rawQuery)
             case .subtopics, .taskResults:
                 throw Errors.incompleateSqlStatment
@@ -526,6 +537,72 @@ extension TaskResult.DatabaseRepository {
             .filter(\.$user.$id == userID)
             .first()
             .flatMapThrowing { try $0?.content() }
+    }
+
+    public func recommendedRecap(for userID: User.ID, upperBoundDays: Int, lowerBoundDays: Int) -> EventLoopFuture<[RecommendedRecap]> {
+
+        let upperBoundDate = Calendar.current.date(byAdding: .day, value: upperBoundDays, to: .now) ?? .now
+        let lowerBoundDate = Calendar.current.date(byAdding: .day, value: lowerBoundDays, to: .now) ?? .now
+
+        return failable(eventLoop: database.eventLoop) {
+            try Query.recommendedTopics(
+                userID: userID,
+                lowerDate: lowerBoundDate,
+                upperDate: upperBoundDate,
+                limit: 10
+            )
+                .query(for: database)
+                .all(decoding: RecommendedTopics.self)
+                .failableFlatMap { topics -> EventLoopFuture<[RecommendedRecap]> in
+
+                    try Query.resultsInTopics(
+                        topics.map { $0.topicID },
+                        for: userID
+                    )
+                        .query(for: database)
+                        .all(decoding: SubqueryTopicResult.self)
+                        .flatMap { results -> EventLoopFuture<[RecommendedRecap]> in
+
+                            guard results.isEmpty == false, let sqlDB = database as? SQLDatabase else {
+                                return self.database.eventLoop.future([])
+                            }
+                            return sqlDB.select()
+                                .column(\Topic.DatabaseModel.$id, as: "topicID")
+                                .column(\Topic.DatabaseModel.$name, as: "topicName")
+                                .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
+                                .column(\Subject.DatabaseModel.$name, as: "subjectName")
+                                .column(\TaskResult.DatabaseModel.$revisitDate, as: "revisitAt")
+                                .from(TaskResult.DatabaseModel.schema)
+                                .where(SQLColumn("id", table: TaskResult.DatabaseModel.schemaOrAlias), .in, SQLBind.group(results.map { $0.id }))
+                                .join(parent: \TaskResult.DatabaseModel.$task)
+                                .join(parent: \TaskDatabaseModel.$subtopic)
+                                .join(parent: \Subtopic.DatabaseModel.$topic)
+                                .join(parent: \Topic.DatabaseModel.$subject)
+                                .all(decoding: RecommendedRecap.self)
+                    }
+                    .flatMap { scores -> EventLoopFuture<[RecommendedRecap]> in
+                        scores.group(by: \.topicID)
+                            .map { topicID, grouped -> EventLoopFuture<RecommendedRecap> in
+
+                                TaskDatabaseModel.query(on: self.database)
+                                    .join(parent: \TaskDatabaseModel.$subtopic)
+                                    .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
+                                    .count()
+                                    .map { maxScore in
+                                        RecommendedRecap(
+                                            subjectName: grouped.first!.subjectName,
+                                            topicName: grouped.first!.topicName,
+                                            topicID: topicID,
+                                            resultScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) } / Double(maxScore),
+                                            revisitAt: topics.first(where: { $0.topicID == topicID })!.revisitAt
+                                        )
+                                }
+                        }
+                        .flatten(on: database.eventLoop)
+                        .map { $0.sorted(by: \.revisitAt, direction: .decending) }
+                    }
+                }
+        }
     }
 }
 

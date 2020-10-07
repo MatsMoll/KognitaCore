@@ -18,4 +18,6 @@ public protocol TaskResultRepositoring {
     func getResult(for taskID: Task.ID, by userID: User.ID, sessionID: Int) -> EventLoopFuture<TaskResult?>
     func getAmountHistory(for user: User, in subjectId: Subject.ID, numberOfWeeks: Int) -> EventLoopFuture<[TaskResult.History]>
     func getAmountHistory(for user: User, numberOfWeeks: Int) -> EventLoopFuture<[TaskResult.History]>
+
+    func recommendedRecap(for user: User.ID, upperBoundDays: Int, lowerBoundDays: Int) -> EventLoopFuture<[RecommendedRecap]>
 }
