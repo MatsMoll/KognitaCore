@@ -16,6 +16,7 @@ public class DatabaseMigrations {
             extraDatabase(migrations: app.migrations)
         }
         if Environment.get("VAPOR_MIGRATION")?.lowercased() == "true" {
+            app.migrations.add(User.Login.Log.Create())
             app.migrations.add(LectureNote.TakingSession.Migrations.Create())
             app.migrations.add(LectureNote.Migrations.NoteTakingSession())
             app.migrations.add(LectureNote.RecapSession.Migrations.Create())
