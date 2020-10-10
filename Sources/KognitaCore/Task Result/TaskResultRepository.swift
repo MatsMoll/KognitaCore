@@ -91,7 +91,21 @@ extension TaskResult.DatabaseRepository {
             case .resultsInSubject(let subjectID, let userID):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectID" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .recommendedTopics(let userID, let lowerDate, let upperDate, let limit):
-                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate" AS "revisitAt", "Subtopic"."topicID" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Subtopic"."id" = "Task"."subtopicID" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "TaskResult"."userID" = \#(bind: userID) AND "Task"."isTestable" = 'false' ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC LIMIT \#(bind: limit)"#
+                return """
+                    SELECT *
+                    FROM (
+                    SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate" AS "revisitAt", "Subtopic"."topicID" AS "topicID"
+                    FROM "TaskResult"
+                    INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id"
+                    INNER JOIN "Subtopic" ON "Subtopic"."id" = "Task"."subtopicID"
+                    WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL
+                    AND "TaskResult"."userID" = \(bind: userID)
+                    AND "Task"."isTestable" = 'false'
+                    ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC LIMIT \(bind: limit)
+                    ) TaskResult
+                    WHERE TaskResult."revisitAt" < \(bind: upperDate)
+                    AND TaskResult."revisitAt" > \(bind: lowerDate)
+                    """
             case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
