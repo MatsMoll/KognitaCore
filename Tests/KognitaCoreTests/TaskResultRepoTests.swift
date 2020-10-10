@@ -201,11 +201,78 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5, on: database)
     }
 
+    func testRecommendedRecap() throws {
+
+        let user = try User.create(on: app)
+
+        let topic1 = try Topic.create(on: app)
+        let topic2 = try Topic.create(on: app)
+
+        let subtopic1 = try Subtopic.create(topicId: topic1.id, on: database)
+        let subtopic2 = try Subtopic.create(topicId: topic2.id, on: database)
+
+        let numberOfTasksInTopic1 = 3
+        let numberOfTasksInTopic2 = 1
+
+        let tasks1 = try (1...numberOfTasksInTopic1).map { _ in try TaskDatabaseModel.create(subtopic: subtopic1, on: app) }
+        let tasks2 = try (1...numberOfTasksInTopic2).map { _ in try TaskDatabaseModel.create(subtopic: subtopic2, on: app) }
+
+        let session1 = TaskSession(userID: user.id)
+        let session2 = TaskSession(userID: user.id)
+        let session3 = TaskSession(userID: user.id)
+
+        // Creating sessions in database
+        try [session1, session2, session3].map { $0.create(on: database) }.flatten(on: database.eventLoop).wait()
+
+        let firstTopic1Scores = [0.4, 0.8]
+
+        _ = try TaskResult.create(task: tasks1[0], sessionID: session1.id!, user: user, score: firstTopic1Scores[0], on: database)
+        _ = try TaskResult.create(task: tasks1[1], sessionID: session1.id!, user: user, score: firstTopic1Scores[1], on: database)
+        _ = try TaskResult.create(task: tasks2[0], sessionID: session1.id!, user: user, score: 1, on: database)
+
+        let firstRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        XCTAssertEqual(firstRecaps.count, 1)
+        let firstRecap = try XCTUnwrap(firstRecaps.first)
+        XCTAssertEqual(firstRecap.topicID, topic1.id)
+        XCTAssertEqual(firstRecap.resultScore, firstTopic1Scores.reduce(0, +) / Double(numberOfTasksInTopic1))
+
+        let topic2Score = 0.2
+
+        _ = try TaskResult.create(task: tasks1[0], sessionID: session2.id!, user: user, score: 0.9, on: database)
+        _ = try TaskResult.create(task: tasks1[1], sessionID: session2.id!, user: user, score: 0.9, on: database)
+        _ = try TaskResult.create(task: tasks2[0], sessionID: session2.id!, user: user, score: topic2Score, on: database)
+        _ = try TaskResult.create(task: tasks1[2], sessionID: session2.id!, user: user, score: 1, on: database)
+
+        let secondRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        XCTAssertEqual(secondRecaps.count, 1)
+        let secondRecap = try XCTUnwrap(secondRecaps.first)
+        XCTAssertEqual(secondRecap.topicID, topic2.id)
+        XCTAssertEqual(secondRecap.resultScore, topic2Score / Double(numberOfTasksInTopic2))
+
+        let thirdTopic1Scores = [0.2, 0.9, 1]
+        let thirdTopic2Scores = [0.5]
+
+        _ = try TaskResult.create(task: tasks1[0], sessionID: session3.id!, user: user, score: thirdTopic1Scores[0], on: database)
+        _ = try TaskResult.create(task: tasks1[1], sessionID: session3.id!, user: user, score: thirdTopic1Scores[1], on: database)
+        _ = try TaskResult.create(task: tasks2[0], sessionID: session3.id!, user: user, score: thirdTopic2Scores[0], on: database)
+        _ = try TaskResult.create(task: tasks1[2], sessionID: session3.id!, user: user, score: thirdTopic1Scores[2], on: database)
+
+        let thirdRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        XCTAssertEqual(thirdRecaps.count, 2)
+        let thirdRecap = try XCTUnwrap(thirdRecaps.first)
+        let lastRecap = try XCTUnwrap(thirdRecaps.last)
+        XCTAssertEqual(thirdRecap.topicID, topic1.id)
+        XCTAssertEqual(lastRecap.topicID, topic2.id)
+        XCTAssertEqual(thirdRecap.resultScore, thirdTopic1Scores.reduce(0, +) / Double(numberOfTasksInTopic1))
+        XCTAssertEqual(lastRecap.resultScore, thirdTopic2Scores.reduce(0, +) / Double(numberOfTasksInTopic2))
+    }
+
     static var allTests = [
         ("testHistogramRoute", testHistogramRoute),
         ("testSpaceRepetitionWithMultipleUsers", testSpaceRepetitionWithMultipleUsers),
         ("testSpaceRepetitionWithDeletedTask", testSpaceRepetitionWithDeletedTask),
         ("testSpaceRepetitionWithTestTask", testSpaceRepetitionWithTestTask),
-        ("testSubjectProgress", testSubjectProgress)
+        ("testSubjectProgress", testSubjectProgress),
+        ("testRecommendedRecap", testRecommendedRecap)
     ]
 }
