@@ -44,7 +44,7 @@ extension TaskSolution {
         init() {}
 
         init(data: Create.Data, creatorID: User.ID) throws {
-            self.solution = try data.solution.cleanXSS(whitelist: .basicWithImages())
+            self.solution = try data.solution.cleanXSS(whitelist: .relaxed())
             self.presentUser = data.presentUser
             self.$task.id = data.taskID
             self.$creator.id = creatorID
@@ -55,7 +55,7 @@ extension TaskSolution {
 
         public func update(with data: TaskSolution.Update.Data) throws {
             if let solution = data.solution {
-                self.solution = try solution.cleanXSS(whitelist: .basicWithImages())
+                self.solution = try solution.cleanXSS(whitelist: .relaxed())
             }
             if let presentUser = data.presentUser {
                 self.presentUser = presentUser
