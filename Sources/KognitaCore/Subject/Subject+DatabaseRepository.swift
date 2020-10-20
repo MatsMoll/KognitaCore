@@ -274,7 +274,7 @@ extension Subject.DatabaseRepository {
         return subject.create(on: database)
             .failableFlatMap {
                 try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
-                    .flatten(on: self.database.eventLoop)
+                    .flatten(on: database.eventLoop)
                     .flatMapThrowing { try subject.content() }
         }
     }
