@@ -121,8 +121,8 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     ) throws {
         self.id             = id
         self.$subtopic.id     = subtopicID
-        self.description    = try content.description?.cleanXSS(whitelist: .basicWithImages())
-        self.question       = try content.question.cleanXSS(whitelist: .basicWithImages())
+        self.description    = try content.description?.cleanXSS(whitelist: .relaxed())
+        self.question       = try content.question.cleanXSS(whitelist: .relaxed())
         self.isTestable     = content.isTestable
         self.$creator.id      = creator.id
         self.examPaperSemester = nil
