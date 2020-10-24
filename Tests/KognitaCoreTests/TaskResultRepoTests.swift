@@ -214,6 +214,8 @@ class TaskResultRepoTests: VaporTestCase {
         let numberOfTasksInTopic1 = 3
         let numberOfTasksInTopic2 = 1
 
+        let limit = 2
+
         let tasks1 = try (1...numberOfTasksInTopic1).map { _ in try TaskDatabaseModel.create(subtopic: subtopic1, on: app) }
         let tasks2 = try (1...numberOfTasksInTopic2).map { _ in try TaskDatabaseModel.create(subtopic: subtopic2, on: app) }
 
@@ -230,7 +232,7 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: tasks1[1], sessionID: session1.id!, user: user, score: firstTopic1Scores[1], on: database)
         _ = try TaskResult.create(task: tasks2[0], sessionID: session1.id!, user: user, score: 1, on: database)
 
-        let firstRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        let firstRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3, limit: limit).wait()
         XCTAssertEqual(firstRecaps.count, 1)
         let firstRecap = try XCTUnwrap(firstRecaps.first)
         XCTAssertEqual(firstRecap.topicID, topic1.id)
@@ -243,7 +245,7 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: tasks2[0], sessionID: session2.id!, user: user, score: topic2Score, on: database)
         _ = try TaskResult.create(task: tasks1[2], sessionID: session2.id!, user: user, score: 1, on: database)
 
-        let secondRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        let secondRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3, limit: limit).wait()
         XCTAssertEqual(secondRecaps.count, 1)
         let secondRecap = try XCTUnwrap(secondRecaps.first)
         XCTAssertEqual(secondRecap.topicID, topic2.id)
@@ -257,7 +259,7 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: tasks2[0], sessionID: session3.id!, user: user, score: thirdTopic2Scores[0], on: database)
         _ = try TaskResult.create(task: tasks1[2], sessionID: session3.id!, user: user, score: thirdTopic1Scores[2], on: database)
 
-        let thirdRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3).wait()
+        let thirdRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3, limit: limit).wait()
         XCTAssertEqual(thirdRecaps.count, 2)
         let thirdRecap = try XCTUnwrap(thirdRecaps.first)
         let lastRecap = try XCTUnwrap(thirdRecaps.last)
