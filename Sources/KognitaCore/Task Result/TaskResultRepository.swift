@@ -101,10 +101,11 @@ extension TaskResult.DatabaseRepository {
                     WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL
                     AND "TaskResult"."userID" = \(bind: userID)
                     AND "Task"."isTestable" = 'false'
-                    ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC LIMIT \(bind: limit)
+                    ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC
                     ) TaskResult
                     WHERE TaskResult."revisitAt" < \(bind: upperDate)
                     AND TaskResult."revisitAt" > \(bind: lowerDate)
+                    LIMIT \(bind: limit)
                     """
             case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
@@ -553,7 +554,7 @@ extension TaskResult.DatabaseRepository {
             .flatMapThrowing { try $0?.content() }
     }
 
-    public func recommendedRecap(for userID: User.ID, upperBoundDays: Int, lowerBoundDays: Int) -> EventLoopFuture<[RecommendedRecap]> {
+    public func recommendedRecap(for userID: User.ID, upperBoundDays: Int, lowerBoundDays: Int, limit: Int) -> EventLoopFuture<[RecommendedRecap]> {
 
         let upperBoundDate = Calendar.current.date(byAdding: .day, value: upperBoundDays, to: .now) ?? .now
         let lowerBoundDate = Calendar.current.date(byAdding: .day, value: lowerBoundDays, to: .now) ?? .now
@@ -563,7 +564,7 @@ extension TaskResult.DatabaseRepository {
                 userID: userID,
                 lowerDate: lowerBoundDate,
                 upperDate: upperBoundDate,
-                limit: 10
+                limit: limit
             )
                 .query(for: database)
                 .all(decoding: RecommendedTopics.self)
