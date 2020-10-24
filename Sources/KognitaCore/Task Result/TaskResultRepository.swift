@@ -585,6 +585,7 @@ extension TaskResult.DatabaseRepository {
                                 .column(\Topic.DatabaseModel.$name, as: "topicName")
                                 .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
                                 .column(\Subject.DatabaseModel.$name, as: "subjectName")
+                                .column(\Subject.DatabaseModel.$id, as: "subjectID")
                                 .column(\TaskResult.DatabaseModel.$revisitDate, as: "revisitAt")
                                 .from(TaskResult.DatabaseModel.schema)
                                 .where(SQLColumn("id", table: TaskResult.DatabaseModel.schemaOrAlias), .in, SQLBind.group(results.map { $0.id }))
@@ -605,6 +606,7 @@ extension TaskResult.DatabaseRepository {
                                     .map { maxScore in
                                         RecommendedRecap(
                                             subjectName: grouped.first!.subjectName,
+                                            subjectID: grouped.first!.subjectID,
                                             topicName: grouped.first!.topicName,
                                             topicID: topicID,
                                             resultScore: grouped.reduce(0) { $0 + $1.resultScore.clamped(to: 0...1) } / Double(maxScore),
