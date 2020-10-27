@@ -35,6 +35,7 @@ public struct TimelyTopic: Codable {
 
 struct TopicTaskCount: Codable {
     let taskCount: Int
+    let multipleChoiceTaskCount: Int
 }
 
 extension TaskBetaFormat {
@@ -53,10 +54,14 @@ extension TaskBetaFormat {
 extension Topic {
     public struct WithTaskCount: Content {
         public let topic: Topic
-        public let taskCount: Int
+
+        public let typingTaskCount: Int
+        public let multipleChoiceTaskCount: Int
+
+        public var totalTaskCount: Int { typingTaskCount + multipleChoiceTaskCount }
 
         public func userLevelZero() -> UserLevel {
-            .init(topicID: topic.id, correctScore: 0, maxScore: Double(taskCount))
+            .init(topicID: topic.id, correctScore: 0, maxScore: Double(totalTaskCount))
         }
     }
 }
@@ -198,9 +203,11 @@ extension Topic.DatabaseRepository: TopicRepository {
         return sql.select()
             .column(SQLColumn(SQLLiteral.all, table: SQLIdentifier(Topic.DatabaseModel.schema)))
             .count(\TaskDatabaseModel.$id, as: "taskCount")
+            .count(\MultipleChoiceTask.DatabaseModel.$id, as: "multipleChoiceTaskCount")
             .from(TaskDatabaseModel.schema)
             .join(parent: \TaskDatabaseModel.$subtopic)
             .join(parent: \Subtopic.DatabaseModel.$topic)
+            .join(from: \TaskDatabaseModel.$id, to: \MultipleChoiceTask.DatabaseModel.$id, method: .left)
             .groupBy(\Topic.DatabaseModel.$id)
             .where("subjectID", .equal, subjectID)
             .where("isTestable", .equal, false)
@@ -210,7 +217,8 @@ extension Topic.DatabaseRepository: TopicRepository {
                 topics.map { data in
                     Topic.WithTaskCount(
                         topic: data.0,
-                        taskCount: data.1.taskCount
+                        typingTaskCount: data.1.taskCount - data.1.multipleChoiceTaskCount,
+                        multipleChoiceTaskCount: data.1.multipleChoiceTaskCount
                     )
                 }
                 .sorted(by: { $0.topic.chapter < $1.topic.chapter })
