@@ -52,36 +52,36 @@ extension SQLSelectBuilder {
         self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, OptionalFieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, OptionalFieldProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, FieldProperty<From, IDValue>>, to path: KeyPath<To, IDProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
-    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>) -> Self {
-        self.join(To.schemaOrAlias, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
+    func join<From: Model, To: Model, IDValue>(from: KeyPath<From, IDProperty<From, IDValue>>, to path: KeyPath<To, FieldProperty<To, IDValue>>, method: SQLJoinMethod = .inner) -> Self {
+        self.join(To.schemaOrAlias, method: method, on: "\"\(From.schemaOrAlias)\".\"\(From()[keyPath: from].key.description)\"=\"\(To.schemaOrAlias)\".\"\(To()[keyPath: path].key.description)\"")
     }
 
     public func all<A, B>(decoding: A.Type, _ bType: B.Type) -> EventLoopFuture<[(A, B)]>

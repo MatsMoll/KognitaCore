@@ -42,6 +42,14 @@ extension PracticeSession {
         @Timestamp(key: "deletedAt", on: .delete)
         public var deletedAt: Date?
 
+        @Field(key: "useTypingTasks")
+        var useTypingTasks: Bool
+
+        @Field(key: "useMultipleChoiceTasks")
+        var useMultipleChoiceTasks: Bool
+
+        var useAllTaskTypes: Bool { useTypingTasks && useMultipleChoiceTasks }
+
         @Siblings(through: PracticeSession.Pivot.Subtopic.self, from: \.$session, to: \.$subtopic)
         var subtopics: [Subtopic.DatabaseModel]
 
@@ -50,12 +58,14 @@ extension PracticeSession {
 
         init() {}
 
-        init(sessionID: TaskSession.IDValue, numberOfTaskGoal: Int) throws {
+        init(sessionID: TaskSession.IDValue, numberOfTaskGoal: Int, useTypingTasks: Bool, useMultipleChoiceTasks: Bool) throws {
             self.id = sessionID
             guard numberOfTaskGoal > 0 else {
                 throw Abort(.badRequest, reason: "Needs more then 0 task goal")
             }
             self.numberOfTaskGoal = numberOfTaskGoal
+            self.useTypingTasks = useTypingTasks
+            self.useMultipleChoiceTasks = useMultipleChoiceTasks
             self.endedAt = nil
             self.deletedAt = nil
         }
@@ -78,7 +88,26 @@ extension PracticeSession {
                     .field("numberOfTaskGoal", .int, .required)
                     .field("deletedAt", .datetime)
                     .foreignKey("id", references: TaskSession.schema, .id, onDelete: .cascade, onUpdate: .cascade)
+                    .field("useTypingTasks", .bool, .sql(.default(true)))
+                    .field("useMultipleChoiceTasks", .bool, .sql(.default(true)))
                     .defaultTimestamps()
+            }
+        }
+
+        struct SelectiveTaskType: Migration {
+
+            func prepare(on database: Database) -> EventLoopFuture<Void> {
+                database.schema(PracticeSession.DatabaseModel.schema)
+                    .field("useTypingTasks", .bool, .sql(.default(true)))
+                    .field("useMultipleChoiceTasks", .bool, .sql(.default(true)))
+                    .update()
+            }
+
+            func revert(on database: Database) -> EventLoopFuture<Void> {
+                database.schema(PracticeSession.DatabaseModel.schema)
+                    .deleteField("useTypingTasks")
+                    .deleteField("useMultipleChoiceTasks")
+                    .update()
             }
         }
     }

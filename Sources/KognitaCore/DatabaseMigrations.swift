@@ -21,6 +21,7 @@ public class DatabaseMigrations {
 //            app.migrations.add(LectureNote.Migrations.NoteTakingSession())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.Create())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.CreateAssignedTask())
+            app.migrations.add(PracticeSession.Migrations.SelectiveTaskType())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
