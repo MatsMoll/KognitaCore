@@ -469,9 +469,14 @@ extension Subject.DatabaseRepository {
         let canPractice: Bool
     }
 
-    public func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]> {
+    public func allSubjects(for user: User, searchQuery: Subject.ListOverview.SearchQuery) -> EventLoopFuture<[Subject.ListOverview]> {
 
-        return Subject.DatabaseModel.query(on: database)
+        var query = Subject.DatabaseModel.query(on: database)
+        if let subjectName = searchQuery.name {
+            // Inefficent search method
+            query = query.filter(\.$name, .custom("ILIKE"), "%\(subjectName)%")
+        }
+        return query
             .all()
             .flatMap { subjects in
 

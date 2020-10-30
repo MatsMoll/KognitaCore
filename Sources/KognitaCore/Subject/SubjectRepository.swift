@@ -19,7 +19,7 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     func create(from content: Subject.Create.Data, by user: User?) throws -> EventLoopFuture<Subject.Create.Response>
     func updateModelWith(id: Int, to data: Subject.Update.Data, by user: User) throws -> EventLoopFuture<Subject.Update.Response>
     func subjectFor(topicID: Topic.ID) -> EventLoopFuture<Subject>
-    func allSubjects(for user: User) throws -> EventLoopFuture<[Subject.ListOverview]>
+    func allSubjects(for user: User, searchQuery: Subject.ListOverview.SearchQuery) -> EventLoopFuture<[Subject.ListOverview]>
     func allActive(for user: User) throws -> EventLoopFuture<[Subject]>
     func active(subject: Subject, for user: User) throws -> EventLoopFuture<User.ActiveSubject?>
     func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void>
