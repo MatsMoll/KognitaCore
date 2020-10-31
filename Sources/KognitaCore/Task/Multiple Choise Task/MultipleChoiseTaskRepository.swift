@@ -97,6 +97,9 @@ extension MultipleChoiceTask.DatabaseRepository {
         guard let user = user else {
             throw Abort(.unauthorized)
         }
+        guard content.choises.isEmpty == false else {
+            throw Abort(.badRequest)
+        }
         return self.subtopicRepository
             .find(content.subtopicId, or: TaskDatabaseModel.Create.Errors.invalidTopic)
             .failableFlatMap { subtopic in
