@@ -9,8 +9,9 @@ var dependencies: [Package.Dependency] = [
     .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.29.0"),
 
     // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
-    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0"),
-
+    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.1.0"),
+    
+    .package(url: "https://github.com/vapor/sql-kit", from: "3.7.0"),
 
     .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
 

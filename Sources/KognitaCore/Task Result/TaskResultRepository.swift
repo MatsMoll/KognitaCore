@@ -634,7 +634,7 @@ extension TaskResult.DatabaseRepository {
                                 }
                         }
                         .flatten(on: database.eventLoop)
-                        .map { $0.sorted(by: \.revisitAt, direction: .acending) }
+                        .map { $0.sorted(by: \.revisitAt, direction: .decending) }
                     }
                 }
         }
