@@ -102,6 +102,7 @@ extension TaskResult.DatabaseRepository {
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectID" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .recommendedTopics(let userID, let lowerDate, let upperDate, let limit):
                 return """
+                    SELECT * FROM (
                     SELECT DISTINCT ON ("topicID") *
                     FROM (
                     SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate" AS "revisitAt", "Subtopic"."topicID" AS "topicID"
@@ -115,6 +116,8 @@ extension TaskResult.DatabaseRepository {
                     ) TaskResult
                     WHERE TaskResult."revisitAt" < \(bind: upperDate)
                     AND TaskResult."revisitAt" > \(bind: lowerDate)
+                    ) TaskResult
+                    ORDER BY TaskResult."revisitAt"
                     LIMIT \(bind: limit)
                     """
             case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
@@ -631,7 +634,7 @@ extension TaskResult.DatabaseRepository {
                                 }
                         }
                         .flatten(on: database.eventLoop)
-                        .map { $0.sorted(by: \.revisitAt, direction: .decending) }
+                        .map { $0.sorted(by: \.revisitAt, direction: .acending) }
                     }
                 }
         }
