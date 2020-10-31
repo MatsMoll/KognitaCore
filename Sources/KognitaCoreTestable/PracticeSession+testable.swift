@@ -100,7 +100,9 @@ extension PracticeSession {
                 from: Create.Data(
                     numberOfTaskGoal: numberOfTaskGoal,
                     subtopicsIDs: subtopicIDs,
-                    topicIDs: nil
+                    topicIDs: nil,
+                    useTypingTasks: true,
+                    useMultipleChoiceTasks: true
                 ),
                 by: user
             )

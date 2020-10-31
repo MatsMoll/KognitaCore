@@ -72,7 +72,7 @@ extension TaskResult.DatabaseRepository {
 
         case subtopics
         case taskResults
-        case flowTasks(userID: User.ID, sessionID: PracticeSession.ID)
+        case spaceRepetitionTask(userID: User.ID, sessionID: PracticeSession.ID, useTypingTasks: Bool, useMultipleChoiceTasks: Bool)
         case recommendedTopics(userID: User.ID, lowerDate: Date, upperDate: Date, limit: Int)
         case results(revisitingAfter: Date, for: User.ID)
         case resultsInSubject(Subject.ID, for: User.ID)
@@ -83,7 +83,17 @@ extension TaskResult.DatabaseRepository {
             switch self {
             case .subtopics: return #"SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "PracticeSession_Subtopic"."sessionID" = ($2)"#
             case .taskResults: return #"SELECT DISTINCT ON ("taskID") * FROM "TaskResult" WHERE "TaskResult"."userID" = ($1) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
-            case .flowTasks(let userID, let sessionID): return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = \#(bind: userID) AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = \#(bind: sessionID)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
+            case .spaceRepetitionTask(let userID, let sessionID, let useTypingTasks, let useMultipleChoiceTasks):
+
+                var taskTypeJoin = ""
+                switch (useTypingTasks, useMultipleChoiceTasks) {
+                case (true, true): break
+                case (false, true): taskTypeJoin = #" INNER JOIN "\#(MultipleChoiceTask.DatabaseModel.schema)" ON "Task"."id"="\#(MultipleChoiceTask.DatabaseModel.schema)"."id" "#
+                case (true, false): taskTypeJoin = #" INNER JOIN "FlashCardTask" ON "Task"."id"="FlashCardTask"."id" "#
+                default: break
+                }
+
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate", "TaskResult"."sessionID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id"\#(raw: taskTypeJoin) WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "TaskResult"."userID" = \#(bind: userID) AND "Task"."subtopicID" = ANY (SELECT "PracticeSession_Subtopic"."subtopicID" FROM "PracticeSession_Subtopic" WHERE "Task"."isTestable" = 'false' AND "PracticeSession_Subtopic"."sessionID" = \#(bind: sessionID)) ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC"#
             case .results:
                 return #"SELECT DISTINCT ON ("taskID") "TaskResult"."id", "taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "TaskResult"."userID" = ($1) AND "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" > ($2) ORDER BY "taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInTopics(let topicIDs, let userID):
@@ -92,6 +102,7 @@ extension TaskResult.DatabaseRepository {
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectID" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .recommendedTopics(let userID, let lowerDate, let upperDate, let limit):
                 return """
+                    SELECT * FROM (
                     SELECT DISTINCT ON ("topicID") *
                     FROM (
                     SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."taskID", "TaskResult"."createdAt" AS "createdAt", "TaskResult"."revisitDate" AS "revisitAt", "Subtopic"."topicID" AS "topicID"
@@ -105,6 +116,8 @@ extension TaskResult.DatabaseRepository {
                     ) TaskResult
                     WHERE TaskResult."revisitAt" < \(bind: upperDate)
                     AND TaskResult."revisitAt" > \(bind: lowerDate)
+                    ) TaskResult
+                    ORDER BY TaskResult."revisitAt"
                     LIMIT \(bind: limit)
                     """
             case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
@@ -118,7 +131,7 @@ extension TaskResult.DatabaseRepository {
                 throw Abort(.internalServerError)
             }
             switch self {
-            case .resultsInSubject, .flowTasks, .results, .resultsInTopics, .recommendedTopics, .resultsInTopicsBetweenDates:
+            case .resultsInSubject, .spaceRepetitionTask, .results, .resultsInTopics, .recommendedTopics, .resultsInTopicsBetweenDates:
                 return sqlDB.raw(self.rawQuery)
             case .subtopics, .taskResults:
                 throw Errors.incompleateSqlStatment
@@ -167,24 +180,29 @@ extension TaskResult.DatabaseRepository {
 
     public func getSpaceRepetitionTask(for userID: User.ID, sessionID: PracticeSession.ID) -> EventLoopFuture<SpaceRepetitionTask?> {
 
-        failable(eventLoop: database.eventLoop) {
-            try Query.flowTasks(
-                userID: userID,
-                sessionID: sessionID
-            )
-                .query(for: self.database)
-                .all(decoding: SpaceRepetitionTask.self)
-                .map { tasks in
-                    let uncompletedTasks = tasks.filter { $0.sessionID != sessionID }
-                    let now = Date()
-                    let timeInADay: TimeInterval = 60 * 60 * 24
+        PracticeSession.DatabaseModel.find(sessionID, on: database)
+            .unwrap(or: Abort(.badRequest))
+            .failableFlatMap { session in
 
-                    return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
-                    .filter { $0.key < 10 }
-                    .min { first, second in
-                        first.key > second.key
-                    }?.value.randomElement()
-            }
+                try Query.spaceRepetitionTask(
+                    userID: userID,
+                    sessionID: sessionID,
+                    useTypingTasks: session.useTypingTasks,
+                    useMultipleChoiceTasks: session.useMultipleChoiceTasks
+                )
+                    .query(for: self.database)
+                    .all(decoding: SpaceRepetitionTask.self)
+                    .map { tasks in
+                        let uncompletedTasks = tasks.filter { $0.sessionID != sessionID }
+                        let now = Date()
+                        let timeInADay: TimeInterval = 60 * 60 * 24
+
+                        return Dictionary(grouping: uncompletedTasks) { task in Int(now.timeIntervalSince(task.revisitDate) / timeInADay) }
+                        .filter { $0.key < 10 }
+                        .min { first, second in
+                            first.key > second.key
+                        }?.value.randomElement()
+                }
         }
     }
 

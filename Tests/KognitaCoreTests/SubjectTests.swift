@@ -190,7 +190,7 @@ class SubjectTests: VaporTestCase {
 
             try subjectRepository.mark(active: subject.content(), canPractice: true, for: userTwo).wait()
 
-            let subjects = try subjectRepository.allSubjects(for: user).wait()
+            let subjects = try subjectRepository.allSubjects(for: user, searchQuery: .init()).wait()
             XCTAssertEqual(subjects.count, 4)
         }
     }
