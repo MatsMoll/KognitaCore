@@ -6,6 +6,7 @@
 //
 
 import FluentKit
+import Foundation
 
 extension TaskSession {
     enum Pivot {}

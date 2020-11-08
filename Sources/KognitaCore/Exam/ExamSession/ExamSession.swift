@@ -6,6 +6,7 @@
 //
 
 import FluentKit
+import Foundation
 
 extension ExamSession {
     final class DatabaseModel: Model {
