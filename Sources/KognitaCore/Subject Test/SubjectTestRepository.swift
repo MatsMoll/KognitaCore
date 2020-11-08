@@ -16,8 +16,20 @@ extension SQLSelectBuilder {
         self.column(table: T.schemaOrAlias, column: T()[keyPath: path].key.description)
     }
 
+    func column<T: Model, Value>(_ path: KeyPath<T, OptionalFieldProperty<T, Value>>) -> Self {
+        self.column(table: T.schemaOrAlias, column: T()[keyPath: path].key.description)
+    }
+
     func column<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>, as identifier: String) -> Self {
         return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
+    }
+
+    func column<T: Model, Value>(_ path: KeyPath<T, OptionalFieldProperty<T, Value>>, as identifier: String) -> Self {
+        return self.column(SQLAlias(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias), as: SQLIdentifier(identifier)))
+    }
+
+    func column<T: Model, Format: TimestampFormat>(_ path: KeyPath<T, TimestampProperty<T, Format>>) -> Self {
+        return self.column(SQLColumn(T()[keyPath: path].$timestamp.key.description, table: T.schemaOrAlias))
     }
 
     func column<T: Model, Format: TimestampFormat>(_ path: KeyPath<T, TimestampProperty<T, Format>>, as identifier: String) -> Self {
@@ -45,6 +57,10 @@ extension SQLSelectBuilder {
     }
 
     func groupBy<T: Model, Value>(_ path: KeyPath<T, FieldProperty<T, Value>>) -> Self {
+        self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
+    }
+
+    func groupBy<T: Model, Value>(_ path: KeyPath<T, OptionalFieldProperty<T, Value>>) -> Self {
         self.groupBy(SQLColumn(T()[keyPath: path].key.description, table: T.schemaOrAlias))
     }
 

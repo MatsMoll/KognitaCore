@@ -43,6 +43,7 @@ extension TaskDatabaseModel {
         explenation: String          = "Some explenation",
         createSolution: Bool            = true,
         isTestable: Bool            = false,
+        examID: Exam.ID? = nil,
         on app: Application
     ) throws -> TaskDatabaseModel {
 
@@ -50,6 +51,7 @@ extension TaskDatabaseModel {
                                      description: description,
                                      question: question,
                                      creatorID: creator.id,
+                                     examID: examID,
                                      isTestable: isTestable)
 
         return try task.save(on: app.db)

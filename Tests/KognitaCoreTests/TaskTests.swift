@@ -76,8 +76,7 @@ class TaskTests: VaporTestCase {
             question: "Some question",
             solution: "",
             isTestable: false,
-            examPaperSemester: nil,
-            examPaperYear: nil
+            examID: nil
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -101,8 +100,7 @@ Hallo
 Dette er flere linjer
 """,
             isTestable: false,
-            examPaperSemester: nil,
-            examPaperYear: nil
+            examID: nil
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -124,8 +122,7 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examPaperSemester: nil,
-            examPaperYear: nil
+            examID: nil
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -148,8 +145,7 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examPaperSemester: nil,
-            examPaperYear: nil
+            examID: nil
         )
         let task = try typingTaskRepository.create(from: xssData, by: user).wait()
         let flashCardTask = try FlashCardTask.find(task.id, on: database).unwrap(or: Errors.badTest).wait()
@@ -174,8 +170,7 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examPaperSemester: nil,
-            examPaperYear: nil
+            examID: nil
         )
         let task = try typingTaskRepository.create(from: xssData, by: user).wait()
 

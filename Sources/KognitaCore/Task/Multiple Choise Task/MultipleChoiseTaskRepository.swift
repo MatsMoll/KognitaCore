@@ -18,7 +18,7 @@ public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<MultipleChoiceTask.ModifyContent>
     func create(answer submit: MultipleChoiceTask.Submit, sessionID: TestSession.ID) -> EventLoopFuture<[TaskAnswer]>
     func evaluate(_ choises: [MultipleChoiceTaskChoice.ID], for taskID: MultipleChoiceTask.ID) throws -> EventLoopFuture<TaskSessionResult<[MultipleChoiceTaskChoice.Result]>>
-    func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
+    func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
     func createAnswer(choiseID: MultipleChoiceTaskChoice.ID, sessionID: TestSession.ID) -> EventLoopFuture<TaskAnswer>
     func choisesFor(taskID: MultipleChoiceTask.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]>
     func correctChoisesFor(taskID: Task.ID) -> EventLoopFuture<[MultipleChoiceTaskChoice]>
@@ -177,52 +177,59 @@ extension MultipleChoiceTask.DatabaseRepository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiceTask.BetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
+    public func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void> {
 
-        let savedTask = TaskDatabaseModel(
-            subtopicID: subtopic.id,
-            description: taskContent.task.description,
-            question: taskContent.task.question,
-            creatorID: 1
-        )
+        guard taskContent.solutions.isEmpty == false else {
+            return database.eventLoop.future(error: Abort(.badRequest, reason: "Mutliple Choice Task do not contain any solutions"))
+        }
+        // The ID is the only one that should be used
+        let unknownUser = User(id: 1, username: "", email: "", registrationDate: .init(), isAdmin: false, isEmailVerified: true)
 
-        return savedTask.create(on: database)
-            .failableFlatMap {
+        return database.eventLoop.future()
+            .flatMap { () -> EventLoopFuture<Void> in
 
-                if let solution = taskContent.task.solution {
-                    return try TaskSolution.DatabaseModel(
-                        data: TaskSolution.Create.Data(
-                            solution: solution,
-                            presentUser: true,
-                            taskID: savedTask.requireID()),
-                        creatorID: 1
-                    )
-                        .create(on: self.database)
-                        .failableFlatMap {
-                            try MultipleChoiceTask.DatabaseModel(
-                                isMultipleSelect: taskContent.isMultipleSelect,
-                                taskID: savedTask.requireID()
-                            )
-                            .create(on: self.database)
-                    }
+                if let examID = examID {
+                    // Throws an error if the exam do not exist
+                    return repositories.examRepository
+                        .find(id: examID)
+                        .transform(to: ())
                 } else {
-                    return try MultipleChoiceTask.DatabaseModel(
-                        isMultipleSelect: taskContent.isMultipleSelect,
-                        taskID: savedTask.requireID()
-                    )
-                        .create(on: self.database)
+                    return database.eventLoop.future()
                 }
-        }.failableFlatMap {
-            try taskContent.choises
-                .map { choise in
-                    try MultipleChoiseTaskChoise(
-                        choise: choise.choice,
-                        isCorrect: choise.isCorrect,
-                        taskId: savedTask.requireID()
-                    )
-                    .create(on: self.database)
             }
-            .flatten(on: self.database.eventLoop)
+            .failableFlatMap {
+                try create(
+                    from: .init(
+                        subtopicId: subtopic.id,
+                        description: taskContent.description,
+                        question: taskContent.question,
+                        solution: taskContent.solutions.first!.solution,
+                        isMultipleSelect: taskContent.isMultipleSelect,
+                        examID: examID,
+                        isTestable: false,
+                        choises: taskContent.choices.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
+                    ),
+                    by: unknownUser
+                )
+                .failableFlatMap { task -> EventLoopFuture<Void> in
+                    let otherSolutions = Array(taskContent.solutions.dropFirst())
+                    guard otherSolutions.isEmpty == false else {
+                        return database.eventLoop.future()
+                    }
+
+                    return try otherSolutions.map { solution in
+                        try repositories.taskSolutionRepository.create(
+                            from: TaskSolution.Create.Data(
+                                solution: solution.solution,
+                                presentUser: true,
+                                taskID: task.id
+                            ),
+                            by: unknownUser
+                        )
+                    }
+                    .flatten(on: database.eventLoop)
+                    .transform(to: ())
+                }
         }
     }
 
@@ -370,34 +377,40 @@ extension MultipleChoiceTask.DatabaseRepository {
                     .all()
                     .flatMap { solutions in
 
-                        self.subjectRepository
+                        subjectRepository
                             .overviewContaining(subtopicID: task.$subtopic.id)
                             .flatMap { subjectOverview in
 
-                                self.topicRepository
-                                    .topicsWithSubtopics(subjectID: subjectOverview.id)
-                                    .flatMap { topics in
+                                repositories.examRepository
+                                    .allExamsWith(subjectID: subjectOverview.id)
+                                    .flatMap { exams in
 
-                                        self.choisesFor(taskID: taskID)
-                                            .flatMapThrowing { choices in
+                                        topicRepository
+                                            .topicsWithSubtopics(subjectID: subjectOverview.id)
+                                            .flatMap { topics in
 
-                                                try MultipleChoiceTask.ModifyContent(
-                                                    task: TaskModifyContent(
-                                                        task: task.content(),
-                                                        solutions: solutions.compactMap { try? $0.content() }
-                                                    ),
-                                                    subject: Subject(
-                                                        id: subjectOverview.id,
-                                                        name: subjectOverview.name,
-                                                        description: subjectOverview.description,
-                                                        category: subjectOverview.category
-                                                    ),
-                                                    isMultipleSelect: multipleChoice.isMultipleSelect,
-                                                    choises: choices,
-                                                    topics: topics
-                                                )
+                                                choisesFor(taskID: taskID)
+                                                    .flatMapThrowing { choices in
+
+                                                        try MultipleChoiceTask.ModifyContent(
+                                                            task: TaskModifyContent(
+                                                                task: task.content(),
+                                                                solutions: solutions.compactMap { try? $0.content() }
+                                                            ),
+                                                            subject: Subject(
+                                                                id: subjectOverview.id,
+                                                                name: subjectOverview.name,
+                                                                description: subjectOverview.description,
+                                                                category: subjectOverview.category
+                                                            ),
+                                                            isMultipleSelect: multipleChoice.isMultipleSelect,
+                                                            choises: choices,
+                                                            topics: topics,
+                                                            exams: exams
+                                                        )
+                                                }
                                         }
-                                }
+                                    }
                         }
                 }
         }
