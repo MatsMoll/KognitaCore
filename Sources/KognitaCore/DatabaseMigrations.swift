@@ -21,7 +21,10 @@ public class DatabaseMigrations {
 //            app.migrations.add(LectureNote.Migrations.NoteTakingSession())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.Create())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.CreateAssignedTask())
-            app.migrations.add(PracticeSession.Migrations.SelectiveTaskType())
+            app.migrations.add(Exam.Migrations.Create())
+            app.migrations.add(TaskDatabaseModel.Migrations.ExamParent())
+            app.migrations.add(TaskSession.Pivot.Task.Migrations.Create())
+            app.migrations.add(ExamSession.Migrations.Create())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
@@ -40,6 +43,8 @@ public class DatabaseMigrations {
             Subject.Migrations.Create(),
             Topic.Migrations.Create(),
             Subtopic.Migrations.Create(),
+
+            Exam.Migrations.Create(),
 
             User.ActiveSubject.Migrations.Create(),
             User.ModeratorPrivilege.Migrations.Create(),
@@ -71,9 +76,12 @@ public class DatabaseMigrations {
             SubjectTest.Migrations.Create(),
             SubjectTest.Pivot.Task.Migrations.Create(),
             TestSession.Migrations.Create(),
+            TaskSession.Pivot.Task.Migrations.Create(),
 
             TaskResult.Migrations.Create(),
-            TaskSessionAnswer.Migrations.Create()
+            TaskSessionAnswer.Migrations.Create(),
+
+            ExamSession.Migrations.Create()
         ])
     }
 

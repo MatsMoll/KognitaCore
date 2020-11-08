@@ -58,7 +58,7 @@ extension PracticeSession {
 
         init() {}
 
-        init(sessionID: TaskSession.IDValue, numberOfTaskGoal: Int, useTypingTasks: Bool, useMultipleChoiceTasks: Bool) throws {
+        init(sessionID: TaskSession.IDValue, numberOfTaskGoal: Int, useTypingTasks: Bool, useMultipleChoiceTasks: Bool, addTasksLazely: Bool) throws {
             self.id = sessionID
             guard numberOfTaskGoal > 0 else {
                 throw Abort(.badRequest, reason: "Needs more then 0 task goal")
@@ -167,32 +167,11 @@ extension PracticeSession.DatabaseModel {
 
 extension PracticeSession: Content {}
 
-public struct TaskType: Content {
-
-    public let task: GenericTask
-    public let isMultipleSelect: Bool?
-
-    public var taskID: Task.ID { task.id }
-
-    init(content: (task: TaskDatabaseModel, chocie: MultipleChoiceTask.DatabaseModel?)) {
-        self.task = GenericTask(task: content.task)
-        self.isMultipleSelect = content.chocie?.isMultipleSelect
-    }
-}
-
-extension PracticeSession {
-    public struct CurrentTask: Content {
-
-        public let sessionID: PracticeSession.ID
-        public let task: TaskType
-        public let index: Int
-        public let user: User
-
-        public init(sessionID: PracticeSession.ID, task: TaskType, index: Int, user: User) {
-            self.sessionID = sessionID
-            self.task = task
-            self.index = index
-            self.user = user
-        }
+extension TaskType {
+    init(content: (task: TaskDatabaseModel, chocie: MultipleChoiceTask.DatabaseModel?, exam: Exam.DatabaseModel?)) {
+        self.init(
+            task: GenericTask(task: content.task, exam: try? content.exam?.content()),
+            isMultipleSelect: content.chocie?.isMultipleSelect
+        )
     }
 }

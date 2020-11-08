@@ -23,12 +23,11 @@ class MultipleChoiseTaskTests: VaporTestCase {
 
         let taskData = MultipleChoiceTask.Create.Data(
             subtopicId: subtopic.id,
-            description: "",
+            description: nil,
             question: "Some question",
             solution: "Some solution",
             isMultipleSelect: false,
-            examPaperSemester: nil,
-            examPaperYear: nil,
+            examID: nil,
             isTestable: true,
             choises: [
                 .init(choice: "not", isCorrect: false),
@@ -63,8 +62,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             question: "Some question",
             solution: "Some solution",
             isMultipleSelect: false,
-            examPaperSemester: nil,
-            examPaperYear: nil,
+            examID: nil,
             isTestable: true,
             choises: [
                 .init(choice: "not", isCorrect: false),
@@ -98,8 +96,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             question: "Some question",
             solution: "Some solution",
             isMultipleSelect: false,
-            examPaperSemester: nil,
-            examPaperYear: nil,
+            examID: nil,
             isTestable: true,
             choises: [
                 .init(choice: "not", isCorrect: false),
@@ -132,8 +129,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             question: "Some question",
             solution: "Some solution",
             isMultipleSelect: false,
-            examPaperSemester: nil,
-            examPaperYear: nil,
+            examID: nil,
             isTestable: true,
             choises: [
                 .init(choice: "not", isCorrect: false),
@@ -171,8 +167,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             question: startingMultiple.question,
             solution: "Something",
             isMultipleSelect: startingMultiple.isMultipleSelect,
-            examPaperSemester: nil,
-            examPaperYear: startingMultiple.examYear,
+            examID: nil,
             isTestable: startingMultiple.isTestable,
             choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
         )
@@ -203,8 +198,7 @@ class MultipleChoiseTaskTests: VaporTestCase {
             question: startingMultiple.question,
             solution: "Something",
             isMultipleSelect: startingMultiple.isMultipleSelect,
-            examPaperSemester: nil,
-            examPaperYear: startingMultiple.examYear,
+            examID: nil,
             isTestable: startingMultiple.isTestable,
             choises: (0...3).map { _ in MultipleChoiceTaskChoice.Create.Data(choice: "Test", isCorrect: false) }
         )

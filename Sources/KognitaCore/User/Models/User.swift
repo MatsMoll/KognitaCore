@@ -103,13 +103,15 @@ extension User.Migrations {
 public struct BasicUserAuthenticator: BasicAuthenticator {
 
     public func authenticate(basic: BasicAuthorization, for request: Request) -> EventLoopFuture<Void> {
-        request.repositories
-            .userRepository
-            .verify(email: basic.username, with: basic.password)
-            .map { user in
-                if let user = user {
-                    request.auth.login(user)
-                }
+        request.repositories { repositories in
+            repositories
+                .userRepository
+                .verify(email: basic.username, with: basic.password)
+                .map { user in
+                    if let user = user {
+                        request.auth.login(user)
+                    }
+            }
         }
     }
 }
@@ -117,12 +119,14 @@ public struct BasicUserAuthenticator: BasicAuthenticator {
 public struct BearerUserAuthenticator: BearerAuthenticator {
 
     public func authenticate(bearer: BearerAuthorization, for request: Request) -> EventLoopFuture<Void> {
-        request.repositories.userRepository
-            .user(with: bearer.token)
-            .map { user in
-                if let user = user {
-                    request.auth.login(user)
-                }
+        request.repositories { repositories in
+            repositories.userRepository
+                .user(with: bearer.token)
+                .map { user in
+                    if let user = user {
+                        request.auth.login(user)
+                    }
+            }
         }
     }
 }
@@ -136,11 +140,13 @@ public struct SessionUserAuthenticator: SessionAuthenticator {
     public typealias User = KognitaModels.User
 
     public func authenticate(sessionID: User.ID, for request: Request) -> EventLoopFuture<Void> {
-        request.repositories.userRepository.find(sessionID)
-            .map { user in
-                if let user = user {
-                    request.auth.login(user)
-                }
+        request.repositories { repositories in
+            repositories.userRepository.find(sessionID)
+                .map { user in
+                    if let user = user {
+                        request.auth.login(user)
+                    }
+            }
         }
     }
 }

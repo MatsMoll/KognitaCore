@@ -20,4 +20,5 @@ public protocol TaskResultRepositoring {
     func getAmountHistory(for user: User, numberOfWeeks: Int) -> EventLoopFuture<[TaskResult.History]>
 
     func recommendedRecap(for user: User.ID, upperBoundDays: Int, lowerBoundDays: Int, limit: Int) -> EventLoopFuture<[RecommendedRecap]>
+    func completionInExamWith(ids: [Exam.ID], userID: User.ID) -> EventLoopFuture<[Exam.Completion]>
 }

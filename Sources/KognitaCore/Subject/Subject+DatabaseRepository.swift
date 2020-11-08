@@ -145,6 +145,20 @@ extension QueryBuilder {
             return (joined, try? $0?.joined(JoinedTwo.self))
         }
     }
+
+    public func first<Joined, JoinedTwo, JoinedThird>(
+        _ joined: Joined.Type, _ joinedTwo: Optional<JoinedTwo>.Type, _ joinedThird: Optional<JoinedThird>.Type
+    ) -> EventLoopFuture<(Joined, JoinedTwo?, JoinedThird?)?>
+        where
+        Joined: Schema,
+        JoinedTwo: Schema,
+        JoinedThird: Schema {
+        let copy = self.copy()
+        return copy.first().flatMapThrowing {
+            guard let joined = try $0?.joined(Joined.self) else { return nil }
+            return (joined, try? $0?.joined(JoinedTwo.self), try? $0?.joined(JoinedThird.self))
+        }
+    }
 }
 
 extension String {
@@ -169,19 +183,17 @@ extension Subject {
 
         init(database: Database, repositories: RepositoriesRepresentable, taskRepository: TaskRepository) {
             self.database = database
-            self.userRepository = repositories.userRepository
-            self.topicRepository = repositories.topicRepository
-            self.subtopicRepository = repositories.subtopicRepository
-            self.multipleChoiseRepository = repositories.multipleChoiceTaskRepository
+            self.repositories = repositories
             self.taskRepository = taskRepository
         }
 
         public let database: Database
+        private let repositories: RepositoriesRepresentable
 
-        private let userRepository: UserRepository
-        private let topicRepository: TopicRepository
-        private let subtopicRepository: SubtopicRepositoring
-        private let multipleChoiseRepository: MultipleChoiseTaskRepository
+        private var userRepository: UserRepository { repositories.userRepository }
+        private var topicRepository: TopicRepository { repositories.topicRepository }
+        private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
+        private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
         private let taskRepository: TaskRepository
     }
 }
@@ -264,19 +276,45 @@ extension Subject.DatabaseRepository {
             .flatMapThrowing { try $0.content() }
     }
 
-    public func importContent(_ content: SubjectExportContent) -> EventLoopFuture<Subject> {
+    public func importContent(_ content: Subject.Import) -> EventLoopFuture<Subject> {
         let subject = Subject.DatabaseModel(
             name: content.subject.name,
             category: content.subject.category,
             description: content.subject.description,
             creatorId: 1
         )
+
         return subject.create(on: database)
-            .failableFlatMap {
-                try content.topics.map { try self.topicRepository.importContent(from: $0, in: subject.content()) }
-                    .flatten(on: database.eventLoop)
-                    .flatMapThrowing { try subject.content() }
+            .flatMapThrowing {
+                try subject.requireID()
+            }
+            .flatMap { subjectID in
+                handle(exams: content.exams, subjectID: subjectID)
+                    .flatMap {
+                        content.topics.map { topicRepository.importContent(from: $0, in: subjectID) }
+                            .flatten(on: database.eventLoop)
+                }
+            }
+            .flatMapThrowing { try subject.content() }
+    }
+
+    private func handle(exams: Set<Exam.Compact>, subjectID: Subject.ID) -> EventLoopFuture<Void> {
+
+        return exams.map { exam in
+            repositories.examRepository
+                .findExamWith(subjectID: subjectID, year: exam.year, type: exam.type)
+                .flatMap { savedExam in
+                    if savedExam != nil {
+                        return database.eventLoop.future()
+                    } else {
+                        return repositories.examRepository.create(
+                            from: Exam.Create.Data(subjectID: subjectID, type: exam.type, year: exam.year)
+                        )
+                        .transform(to: ())
+                    }
+                }
         }
+        .flatten(on: database.eventLoop)
     }
 
     public func importContent(in subject: Subject, peerWise: [TaskPeerWise], user: User) throws -> EventLoopFuture<Void> {
@@ -319,14 +357,13 @@ extension Subject.DatabaseRepository {
                                                     question: task.question,
                                                     solution: task.solution,
                                                     isMultipleSelect: false,
-                                                    examPaperSemester: nil,
-                                                    examPaperYear: nil,
+                                                    examID: nil,
                                                     isTestable: false,
                                                     choises: task.choises
                                                 ),
                                                 by: user
                                             )
-                                                .transform(to: ())
+                                            .transform(to: ())
                                         }
                                         .flatten(on: self.database.eventLoop)
                                 }

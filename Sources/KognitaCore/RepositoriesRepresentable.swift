@@ -17,11 +17,13 @@ public protocol RepositoriesRepresentable {
     var lectureNoteRepository: LectureNoteRepository { get }
     var lectureNoteTakingRepository: LectureNoteTakingSessionRepository { get }
     var lectureNoteRecapRepository: LectureNoteRecapSessionRepository { get }
+    var examRepository: ExamRepository { get }
+    var examSessionRepository: ExamSessionRepository { get }
 }
 
 struct DatabaseRepositoriesProvider: LifecycleHandler {
     func willBoot(_ application: Application) throws {
-        application.repositoriesFactory.use(DatabaseRepositories.init)
+        application.repositoriesFactory.use(DatabaseRepositorieFactory())
     }
 }
 
@@ -30,21 +32,24 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     internal init(request: Request) {
         self.database = request.db
         self.password = request.password
+        self.logger = request.logger
     }
 
-    internal init(database: Database, password: PasswordHasher) {
+    internal init(database: Database, password: PasswordHasher, logger: Logger) {
         self.database = database
         self.password = password
+        self.logger = logger
     }
 
     var password: PasswordHasher
     var database: Database
+    var logger: Logger
 
     lazy var taskRepository: TaskRepository = TaskDatabaseModel.DatabaseRepository(database: self.database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository)
 
     public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository)
 
-    public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(database: database, repositories: self)
+    public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(database: database, repositories: self, logger: logger)
 
     public lazy var subjectTestRepository: SubjectTestRepositoring = SubjectTest.DatabaseRepository(database: database, repositories: self)
 
@@ -71,12 +76,21 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     public lazy var lectureNoteTakingRepository: LectureNoteTakingSessionRepository = LectureNote.TakingSession.DatabaseRepository(database: database)
 
     public lazy var lectureNoteRecapRepository: LectureNoteRecapSessionRepository = LectureNote.RecapSession.DatabaseRepository(database: database, repositories: self)
+
+    public lazy var examRepository: ExamRepository = ExamDatabaseRepository(database: database, repositories: self)
+
+    public lazy var examSessionRepository: ExamSessionRepository = ExamSession.DatabaseRepository(database: database, repositories: self)
+}
+
+protocol AsyncRepositoriesFactory {
+    func repositories<T>(req: Request, tran: @escaping (RepositoriesRepresentable) -> EventLoopFuture<T>) -> EventLoopFuture<T>
+    func repositories<T>(app: Application, tran: @escaping (RepositoriesRepresentable) -> EventLoopFuture<T>) -> EventLoopFuture<T>
 }
 
 struct RepositoriesFactory {
-    var make: ((Request) -> RepositoriesRepresentable)?
+    var make: AsyncRepositoriesFactory?
 
-    mutating func use(_ make: @escaping ((Request) -> RepositoriesRepresentable)) {
+    mutating func use(_ make: AsyncRepositoriesFactory) {
         self.make = make
     }
 }
@@ -93,7 +107,22 @@ extension Application {
 }
 
 extension Request {
-    public var repositories: RepositoriesRepresentable {
-        self.application.repositoriesFactory.make!(self)
+
+    public func repositories<T>(_ transaction: @escaping (RepositoriesRepresentable) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+        self.application.repositoriesFactory.make!.repositories(req: self, tran: transaction)
     }
+
+    public func repositories<T>(_ transaction: @escaping (RepositoriesRepresentable) throws -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+        self.application.repositoriesFactory.make!.repositories(req: self) { repo in
+            do {
+                return try transaction(repo)
+            } catch {
+                return self.eventLoop.future(error: error)
+            }
+        }
+    }
+
+//    public var repositories: RepositoriesRepresentable {
+//        self.application.repositoriesFactory.make!(self)
+//    }
 }

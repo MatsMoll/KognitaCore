@@ -11,7 +11,7 @@ import FluentKit
 public protocol FlashCardTaskRepository: DeleteModelRepository {
     func create(from content: TypingTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask.Create.Response>
     func updateModelWith(id: Int, to data: TypingTask.Update.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response>
-    func importTask(from task: TaskBetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void>
+    func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
     func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
     func createAnswer(for task: TypingTask.ID, withTextSubmittion submit: String) -> EventLoopFuture<TaskAnswer>
     func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
@@ -19,14 +19,12 @@ public protocol FlashCardTaskRepository: DeleteModelRepository {
 }
 
 extension TypingTask.Create.Data: TaskCreationContentable {
-    public var examPaperSemester: TaskExamSemester? { nil }
     public var isDraft: Bool { false }
 }
 extension LectureNote.Create.Data: TaskCreationContentable {
     public var isTestable: Bool { false }
     public var isDraft: Bool { true }
-    public var examPaperSemester: TaskExamSemester? { nil }
-    public var examPaperYear: Int? { nil }
+    public var examID: Exam.ID? { nil }
 }
 
 extension KognitaModels.TypingTask {
@@ -37,8 +35,7 @@ extension KognitaModels.TypingTask {
             description: task.description,
             question: task.question,
             creatorID: task.creatorID,
-            examType: task.examType,
-            examYear: task.examYear,
+            exam: task.exam,
             isTestable: task.isTestable,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
@@ -54,8 +51,7 @@ extension KognitaModels.TypingTask {
             description: task.description,
             question: task.question,
             creatorID: task.$creator.id,
-            examType: nil,
-            examYear: task.examPaperYear,
+            exam: (try? task.exam?.content().compactData),
             isTestable: task.isTestable,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
@@ -66,15 +62,14 @@ extension KognitaModels.TypingTask {
 }
 
 extension KognitaModels.GenericTask {
-    init(task: TaskDatabaseModel) {
+    init(task: TaskDatabaseModel, exam: Exam?) {
         self.init(
             id: task.id ?? 0,
             subtopicID: task.$subtopic.id,
             description: task.description,
             question: task.question,
             creatorID: task.$creator.id,
-            examType: nil,
-            examYear: task.examPaperYear,
+            exam: exam?.compactData,
             isTestable: task.isTestable,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
@@ -159,25 +154,6 @@ extension FlashCardTask.DatabaseRepository {
         .map { TypingTask(task: $0) }
     }
 
-//    private func update(task: Parent<FlashCardTask, Task>, to content: FlashCardTask.Create.Data, by user: User) throws -> EventLoopFuture<TaskDatabaseModel> {
-//
-//        conn.transaction(on: .psql) { conn in
-//            try FlashCardTask.DatabaseRepository(conn: conn, repositories: self.repositories)
-//                .create(from: content, by: user)
-//                .flatMap { newTask in
-//
-//                    task.get(on: conn)
-//                        .flatMap { task in
-//                            task.deletedAt = Date()  // Equilent to .delete(on: conn)
-//                            task.editedTaskID = newTask.id
-//                            return task
-//                                .save(on: conn)
-//                                .transform(to: newTask)
-//                    }
-//                }
-//        }
-//    }
-
     public func deleteModelWith(id: Int, by user: User?) throws -> EventLoopFuture<Void> {
         FlashCardTask.find(id, on: database)
             .unwrap(or: Abort(.badRequest))
@@ -206,14 +182,19 @@ extension FlashCardTask.DatabaseRepository {
         }
     }
 
-    public func importTask(from task: TaskBetaFormat, in subtopic: Subtopic) throws -> EventLoopFuture<Void> {
+    public func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) -> EventLoopFuture<Void> {
 
         let savedTask = TaskDatabaseModel(
             subtopicID: subtopic.id,
             description: task.description,
             question: task.question,
-            creatorID: 1
+            creatorID: 1,
+            examID: examID
         )
+
+        guard task.solutions.isEmpty == false else {
+            return database.eventLoop.future(error: Abort(.badRequest, reason: "Missing solutions for typing task"))
+        }
 
         return savedTask.create(on: database)
             .flatMapThrowing {
@@ -221,19 +202,18 @@ extension FlashCardTask.DatabaseRepository {
             }
             .create(on: self.database)
             .failableFlatMap { _ in
-                if let solution = task.solution {
-                    return try TaskSolution.DatabaseModel(
+                try task.solutions.map { solution in
+                    try TaskSolution.DatabaseModel(
                         data: TaskSolution.Create.Data(
-                            solution: solution,
+                            solution: solution.solution,
                             presentUser: true,
                             taskID: savedTask.requireID()
                         ),
                         creatorID: 1
                     )
-                    .create(on: self.database)
-                } else {
-                    return self.database.eventLoop.future()
+                    .create(on: database)
                 }
+                .flatten(on: database.eventLoop)
         }
     }
 
@@ -288,7 +268,7 @@ extension FlashCardTask.DatabaseRepository {
         .transform(to: answer)
     }
 
-    public func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent> {
+    public func modifyContent(forID taskID: Task.ID) -> EventLoopFuture<TypingTask.ModifyContent> {
 
         TaskDatabaseModel.query(on: database)
             .withDeleted()
@@ -298,33 +278,39 @@ extension FlashCardTask.DatabaseRepository {
             .unwrap(or: Abort(.internalServerError))
             .flatMap { (task) in
 
-                TaskSolution.DatabaseModel.query(on: self.database)
+                TaskSolution.DatabaseModel.query(on: database)
                     .filter(\.$task.$id == taskID)
                     .all()
                     .flatMap { solutions in
 
-                        self.subjectRepository
+                        subjectRepository
                             .overviewContaining(subtopicID: task.$subtopic.id)
                             .flatMap { subjectOverview in
 
-                                self.repositories.topicRepository
-                                    .topicsWithSubtopics(subjectID: subjectOverview.id)
-                                    .flatMapThrowing { topics in
+                                repositories.examRepository
+                                    .allExamsWith(subjectID: subjectOverview.id)
+                                    .flatMap { exams in
 
-                                        try TypingTask.ModifyContent(
-                                            subject: Subject(
-                                                id: subjectOverview.id,
-                                                name: subjectOverview.name,
-                                                description: subjectOverview.description,
-                                                category: subjectOverview.category
-                                            ),
-                                            topics: topics,
-                                            task: TaskModifyContent(
-                                                task: task.content(),
-                                                solutions: solutions.compactMap { try? $0.content() }
-                                            )
-                                        )
-                                }
+                                        repositories.topicRepository
+                                            .topicsWithSubtopics(subjectID: subjectOverview.id)
+                                            .flatMapThrowing { topics in
+
+                                                try TypingTask.ModifyContent(
+                                                    subject: Subject(
+                                                        id: subjectOverview.id,
+                                                        name: subjectOverview.name,
+                                                        description: subjectOverview.description,
+                                                        category: subjectOverview.category
+                                                    ),
+                                                    topics: topics,
+                                                    exams: exams,
+                                                    task: TaskModifyContent(
+                                                        task: task.content(),
+                                                        solutions: solutions.compactMap { try? $0.content() }
+                                                    )
+                                                )
+                                        }
+                                    }
                         }
                 }
         }

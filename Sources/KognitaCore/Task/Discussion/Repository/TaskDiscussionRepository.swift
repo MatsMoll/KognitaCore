@@ -7,8 +7,8 @@ extension QueryBuilder {
         join(To.self, on: parent.appending(path: \.$id) == \To._$id)
     }
 
-    func join<From, To>(parent: KeyPath<From, OptionalParentProperty<From, To>>) -> Self {
-        join(To.self, on: parent.appending(path: \.$id) == \To._$id, method: .left)
+    func join<From, To>(parent: KeyPath<From, OptionalParentProperty<From, To>>, method: DatabaseQuery.Join.Method = .left) -> Self {
+        join(To.self, on: parent.appending(path: \.$id) == \To._$id, method: method)
     }
 
     func join<From, To>(superclass: To.Type, with: From.Type, method: DatabaseQuery.Join.Method = .inner) -> Self where From: FluentKit.Model, To: FluentKit.Model, To.IDValue == From.IDValue {

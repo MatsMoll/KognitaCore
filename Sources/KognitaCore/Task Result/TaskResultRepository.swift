@@ -68,6 +68,22 @@ extension TaskResult.DatabaseRepository {
         let revisitAt: Date
     }
 
+    private struct SubqueryExamResult: Codable {
+        let id: TaskResult.ID
+        let taskID: Task.ID
+        let examID: Exam.ID
+    }
+
+    private struct ExamResult: Codable {
+        let examID: Exam.ID
+        let resultScore: Double
+    }
+
+    private struct ExamCount: Codable {
+        let examID: Exam.ID
+        let taskCount: Int
+    }
+
     private enum Query {
 
         case subtopics
@@ -78,6 +94,7 @@ extension TaskResult.DatabaseRepository {
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
         case resultsInTopicsBetweenDates([Topic.ID], for: User.ID, lowerDate: Date, upperDate: Date)
+        case resultsInExam([Exam.ID], User.ID)
 
         var rawQuery: SQLQueryString {
             switch self {
@@ -122,6 +139,8 @@ extension TaskResult.DatabaseRepository {
                     """
             case .resultsInTopicsBetweenDates(let topicIDs, let userID, let lowerDate, let upperDate):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" < \#(bind: upperDate) AND "TaskResult"."revisitDate" > \#(bind: lowerDate) AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
+            case .resultsInExam(let examIDs, let userID):
+                return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Task"."examID" AS "examID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "examID" = ANY(\#(bind: examIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             }
         }
 
@@ -131,7 +150,7 @@ extension TaskResult.DatabaseRepository {
                 throw Abort(.internalServerError)
             }
             switch self {
-            case .resultsInSubject, .spaceRepetitionTask, .results, .resultsInTopics, .recommendedTopics, .resultsInTopicsBetweenDates:
+            case .resultsInSubject, .spaceRepetitionTask, .results, .resultsInTopics, .recommendedTopics, .resultsInTopicsBetweenDates, .resultsInExam:
                 return sqlDB.raw(self.rawQuery)
             case .subtopics, .taskResults:
                 throw Errors.incompleateSqlStatment
@@ -636,6 +655,53 @@ extension TaskResult.DatabaseRepository {
                         .flatten(on: database.eventLoop)
                         .map { $0.sorted(by: \.revisitAt, direction: .decending) }
                     }
+                }
+        }
+    }
+
+    public func completionInExamWith(ids: [Exam.ID], userID: User.ID) -> EventLoopFuture<[Exam.Completion]> {
+
+        guard ids.isEmpty == false else { return database.eventLoop.future([]) }
+        guard let sqlDB = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError))
+        }
+
+        return failable(eventLoop: database.eventLoop) {
+            try Query.resultsInExam(ids, userID)
+                .query(for: database)
+                .all(decoding: SubqueryExamResult.self)
+                .flatMap { results -> EventLoopFuture<[ExamResult]> in
+                    guard results.isEmpty == false else {
+                        return self.database.eventLoop.future([])
+                    }
+                    return sqlDB.select()
+                        .column(\TaskResult.DatabaseModel.$resultScore, as: "resultScore")
+                        .column(\TaskDatabaseModel.$exam.$id, as: "examID")
+                        .from(TaskResult.DatabaseModel.schema)
+                        .where(SQLColumn("id", table: TaskResult.DatabaseModel.schemaOrAlias), .in, SQLBind.group(results.map { $0.id }))
+                        .join(parent: \TaskResult.DatabaseModel.$task)
+                        .all(decoding: ExamResult.self)
+            }
+        }
+        .flatMap { scores -> EventLoopFuture<[Exam.Completion]> in
+
+            sqlDB.select()
+                .count(\TaskDatabaseModel.$id, as: "taskCount")
+                .column(\TaskDatabaseModel.$exam.$id, as: "examID")
+                .from(TaskDatabaseModel.schema)
+                .where("examID", .in, ids)
+                .groupBy(\TaskDatabaseModel.$exam.$id)
+                .all(decoding: ExamCount.self)
+                .map { examCounts -> [Exam.Completion] in
+
+                    scores.group(by: \ExamResult.examID)
+                        .map { examID, results -> Exam.Completion in
+                            Exam.Completion(
+                                examID: examID,
+                                score: results.map(\.resultScore).reduce(0.0, +),
+                                maxScore: Double((examCounts.first(where: { $0.examID == examID })?.taskCount) ?? 1)
+                            )
+                        }
                 }
         }
     }

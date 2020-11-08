@@ -60,13 +60,8 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
     @Parent(key: "creatorID")
     var creator: User.DatabaseModel
 
-    /// The semester of the exam
-    @Field(key: "examPaperSemester")
-    var examPaperSemester: ExamSemester?
-
-    /// The year of the exam
-    @Field(key: "examPaperYear")
-    var examPaperYear: Int?
+    @OptionalParent(key: "examID")
+    var exam: Exam.DatabaseModel?
 
     /// If the task can be used for testing
     @Field(key: "isTestable")
@@ -95,8 +90,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         description: String?,
         question: String,
         creatorID: User.ID,
-        examPaperSemester: ExamSemester? = nil,
-        examPaperYear: Int? = nil,
+        examID: Exam.ID?,
         isTestable: Bool = false,
         id: IDValue? = nil
     ) {
@@ -107,10 +101,7 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         self.$creator.id    = creatorID
         self.isTestable     = isTestable
         self.deletedAt      = nil
-        if examPaperSemester != nil, examPaperYear != nil {
-            self.examPaperYear  = examPaperYear
-            self.examPaperSemester = examPaperSemester
-        }
+        self.$exam.id       = examID
     }
 
     init(
@@ -120,14 +111,13 @@ final class TaskDatabaseModel: KognitaPersistenceModel, SoftDeleatableModel {
         id: IDValue? = nil
     ) throws {
         self.id             = id
-        self.$subtopic.id     = subtopicID
+        self.$subtopic.id   = subtopicID
         self.description    = try content.description?.cleanXSS(whitelist: .relaxed())
         self.question       = try content.question.cleanXSS(whitelist: .relaxed())
         self.isTestable     = content.isTestable
-        self.$creator.id      = creator.id
-        self.examPaperSemester = nil
-        self.examPaperYear  = content.examPaperYear
-        self.deletedAt  = nil
+        self.$creator.id    = creator.id
+        self.deletedAt      = nil
+        self.$exam.id       = content.examID
         if description?.isEmpty == true {
             self.description = nil
         }
@@ -141,7 +131,6 @@ extension TaskDatabaseModel {
         self.description = try? content.description?.cleanXSS(whitelist: .basicWithImages())
         self.question = try content.question.cleanXSS(whitelist: .basicWithImages())
         self.isTestable = content.isTestable
-        self.examPaperYear = content.examPaperYear
         self.deletedAt = nil
         return self
     }
@@ -162,8 +151,7 @@ extension TaskDatabaseModel.Migrations {
                 .field("question", .string, .required)
                 .field("description", .string)
                 .field("isTestable", .bool, .required)
-                .field("examPaperYear", .int)
-                .field("examPaperSemester", .string)
+                .field("examID", .uint, .references(Exam.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                 .field("deletedAt", .datetime)
                 .defaultTimestamps()
         }
@@ -182,6 +170,24 @@ extension TaskDatabaseModel.Migrations {
                 .update()
         }
     }
+
+    struct ExamParent: Migration {
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(TaskDatabaseModel.schema)
+                .field("examID", .uint, .references(Exam.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                .deleteField("examPaperSemester")
+                .deleteField("examPaperYear")
+                .update()
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(TaskDatabaseModel.schema)
+                .field("examPaperSemester", .string)
+                .field("examPaperYear", .int)
+                .deleteField("examID")
+                .update()
+        }
+    }
 }
 
 extension TaskDatabaseModel: ContentConvertable {
@@ -192,8 +198,7 @@ extension TaskDatabaseModel: ContentConvertable {
             description: description,
             question: question,
             creatorID: $creator.id,
-            examType: nil,
-            examYear: nil,
+            exam: (try? exam?.content().compactData),
             isTestable: isTestable,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -211,7 +216,7 @@ extension TaskDatabaseModel {
             question: question,
             solution: nil,
             examPaperSemester: nil,
-            examPaperYear: examPaperYear,
+            examPaperYear: nil,
             editedTaskID: nil
         )
     }

@@ -14,10 +14,7 @@ public protocol TaskCreationContentable {
     var isDraft: Bool { get }
 
     /// The semester of the exam
-    var examPaperSemester: TaskExamSemester? { get }
-
-    /// The year of the exam
-    var examPaperYear: Int? { get }
+    var examID: Exam.ID? { get }
 }
 
 extension TaskCreationContentable where Self: Validatable {
@@ -33,6 +30,5 @@ extension TaskCreationContentable where Self: Validatable {
 }
 
 extension MultipleChoiceTask.Create.Data: TaskCreationContentable {
-    public var examPaperSemester: TaskExamSemester? { nil }
     public var isDraft: Bool { false }
 }

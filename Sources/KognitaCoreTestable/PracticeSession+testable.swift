@@ -11,6 +11,10 @@ import FluentKit
 
 public class TestableRepositories: RepositoriesRepresentable {
 
+    public var examRepository: ExamRepository
+
+    public var examSessionRepository: ExamSessionRepository
+
     public var lectureNoteRepository: LectureNoteRepository
 
     public var taskResultRepository: TaskResultRepositoring
@@ -57,6 +61,8 @@ public class TestableRepositories: RepositoriesRepresentable {
         self.taskDiscussionRepository = repositories.taskDiscussionRepository
         self.lectureNoteTakingRepository = repositories.lectureNoteTakingRepository
         self.lectureNoteRecapRepository = repositories.lectureNoteRecapRepository
+        self.examRepository = repositories.examRepository
+        self.examSessionRepository = repositories.examSessionRepository
     }
 
     private static var shared: TestableRepositories!
@@ -67,7 +73,7 @@ public class TestableRepositories: RepositoriesRepresentable {
 
     public static func testable(database: Database, password: PasswordHasher) -> TestableRepositories {
         if shared == nil {
-            shared = TestableRepositories(repositories: DatabaseRepositories(database: database, password: password))
+            shared = TestableRepositories(repositories: DatabaseRepositories(database: database, password: password, logger: database.logger))
         }
         return shared
     }

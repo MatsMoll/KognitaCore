@@ -43,12 +43,82 @@ class SubjectTests: VaporTestCase {
         }
         XCTAssertEqual(topicExport.topic.id, topic.id)
         XCTAssertEqual(topicExport.subtopics.count, 2)
-        XCTAssertEqual(topicExport.subtopics.first?.multipleChoiseTasks.count, 2)
-        XCTAssertEqual(topicExport.subtopics.first?.flashCards.count, 1)
-        XCTAssertEqual(topicExport.subtopics.last?.multipleChoiseTasks.count, 1)
-        XCTAssertEqual(topicExport.subtopics.last?.flashCards.count, 1)
+        XCTAssertEqual(topicExport.subtopics.first?.multipleChoiceTasks.count, 2)
+        XCTAssertEqual(topicExport.subtopics.first?.typingTasks.count, 1)
+        XCTAssertEqual(topicExport.subtopics.last?.multipleChoiceTasks.count, 1)
+        XCTAssertEqual(topicExport.subtopics.last?.typingTasks.count, 1)
 
-        _ = try subjectRepository.importContent(subjectExport).wait()
+        _ = try subjectRepository.importContent(subjectExport.importContent).wait()
+
+        XCTAssertEqual(try taskRepository.all().wait().count, 10)
+        XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: database).all().wait().count, 10)
+    }
+
+    func testExportAndInvalidImport() throws {
+        let subject     = try Subject.create(on: app)
+        let topic       = try Topic.create(subject: subject, on: app)
+        let subtopicOne = try Subtopic.create(topic: topic, on: app)
+        let subtopicTwo = try Subtopic.create(topic: topic, on: app)
+
+        _ = try MultipleChoiceTask.create(subtopic: subtopicOne, on: app)
+        _ = try MultipleChoiceTask.create(subtopic: subtopicOne, on: app)
+        _ = try FlashCardTask.create(subtopic: subtopicOne, on: app)
+
+        _ = try MultipleChoiceTask.create(subtopic: subtopicTwo, on: app)
+        _ = try FlashCardTask.create(subtopic: subtopicTwo, on: app)
+
+        let subjectExport = try topicRepository
+            .exportTopics(in: subject).wait()
+        let subjectImport = subjectExport.importContent
+        let modefiedImport = Subject.Import(
+            subject: subjectImport.subject,
+            topics: subjectImport.topics + [
+                Topic.Import(
+                    topic: .init(
+                        subjectID: 0,
+                        name: "Import",
+                        chapter: 10
+                    ),
+                    subtopics: [
+                        Subtopic.Import(
+                            subtopic: .init(name: "Test", topicId: 0),
+                            multipleChoiceTasks: [
+                                MultipleChoiceTask.Import(
+                                    description: nil,
+                                    question: "Test",
+                                    exam: nil,
+                                    isTestable: false,
+                                    isMultipleSelect: false,
+                                    // Should cause an error
+                                    choices: [],
+                                    solutions: []
+                                )
+                            ],
+                            typingTasks: []
+                        )
+                    ]
+                )
+            ]
+        )
+
+        do {
+            _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
+                repo.subjectRepository.importContent(modefiedImport)
+            }
+            .wait()
+        } catch let error as Abort {
+            XCTAssertEqual(error.status, .badRequest)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
+        XCTAssertEqual(try taskRepository.all().wait().count, 5)
+        XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: database).all().wait().count, 5)
+
+        _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
+            repo.subjectRepository.importContent(subjectImport)
+        }
+        .wait()
 
         XCTAssertEqual(try taskRepository.all().wait().count, 10)
         XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: database).all().wait().count, 10)
@@ -248,6 +318,32 @@ class SubjectTests: VaporTestCase {
             XCTAssertEqual(subjectOne.id, sessionSubjectOne.id)
             XCTAssertEqual(subjectTwo.id, sessionSubjectTwo.id)
         }
+    }
+
+    func testImportTopicToSubjectWithExamQuestions() throws {
+
+        _ = try User.create(on: app)
+
+        let numberOfTopics = 2
+        let expectedNumberOfTasks = numberOfTopics * 7
+        let expectedNumberOfExamTasks = numberOfTopics * 5
+
+        let importContent = Subject.Import(
+            subject: .init(name: "Test", description: "Test", category: "Test"),
+            topics: (1...numberOfTopics).map {
+                Topic.Import.testData(chapter: $0, topicName: "Test \($0)")
+            }
+        )
+
+        _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
+            repo.subjectRepository.importContent(importContent)
+        }
+        .wait()
+
+        let allTasks = try TaskDatabaseModel.query(on: database).all().wait()
+        XCTAssertEqual(allTasks.count, expectedNumberOfTasks)
+        let numberOfExamTasks = allTasks.filter { $0.$exam.id != nil }
+        XCTAssertEqual(numberOfExamTasks.count, expectedNumberOfExamTasks)
     }
 
     static let allTests = [

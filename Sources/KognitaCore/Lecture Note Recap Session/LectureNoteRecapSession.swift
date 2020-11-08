@@ -134,7 +134,7 @@ public protocol LectureNoteRecapSessionRepository {
     func submit(answer: LectureNote.RecapSession.Submit, forIndex index: Int, userID: User.ID, sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Void>
     func taskContentFor(index: Int, sessionID: LectureNote.RecapSession.ID, userID: User.ID) -> EventLoopFuture<LectureNote.RecapSession.ExecuteTask>
     func taskIDFor(index: Int, sessionID: LectureNote.RecapSession.ID, userID: User.ID) -> EventLoopFuture<Task.ID>
-    func getResult(for sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<[PracticeSession.TaskResult]>
+    func getResult(for sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<[Sessions.TaskResult]>
     func subjectFor(sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<Subject>
 }
 
@@ -332,7 +332,7 @@ extension LectureNote.RecapSession {
                 .content()
         }
 
-        public func getResult(for sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<[PracticeSession.TaskResult]> {
+        public func getResult(for sessionID: LectureNote.RecapSession.ID) -> EventLoopFuture<[Sessions.TaskResult]> {
 
             guard let sql = database as? SQLDatabase else {
                 return database.eventLoop.future(error: Abort(.internalServerError))
@@ -354,7 +354,7 @@ extension LectureNote.RecapSession {
                 .join(from: \TaskDatabaseModel.$id, to: \TaskResult.DatabaseModel.$task.$id)
                 .where(SQLColumn("sessionID", table: TaskResult.DatabaseModel.schema), .equal, SQLBind(sessionID))
                 .where(SQLColumn("recapSessionID", table: LectureNote.RecapSession.AssignedTask.schema), .equal, SQLBind(sessionID))
-                .all(decoding: PracticeSession.TaskResult.self)
+                .all(decoding: Sessions.TaskResult.self)
         }
     }
 }
