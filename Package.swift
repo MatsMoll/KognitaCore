@@ -9,7 +9,9 @@ var dependencies: [Package.Dependency] = [
     .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.29.0"),
 
     // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
-    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.1.0"),
+    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.1.1"),
+    
+    .package(url: "https://github.com/vapor/postgres-kit.git", from: "2.3.0"),
     
     .package(url: "https://github.com/vapor/sql-kit", from: "3.7.0"),
 
@@ -63,6 +65,8 @@ let package = Package(
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "KognitaModels", package: "KognitaModels"),
+                .product(name: "PostgresKit", package: "postgres-kit"),
+                .product(name: "SQLKit", package: "sql-kit"),
             ]
         ),
         .target(
