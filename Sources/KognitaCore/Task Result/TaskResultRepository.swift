@@ -661,6 +661,7 @@ extension TaskResult.DatabaseRepository {
 
     public func completionInExamWith(ids: [Exam.ID], userID: User.ID) -> EventLoopFuture<[Exam.Completion]> {
 
+        guard ids.isEmpty == false else { return database.eventLoop.future([]) }
         guard let sqlDB = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
