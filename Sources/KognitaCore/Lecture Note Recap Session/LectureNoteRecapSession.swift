@@ -13,6 +13,7 @@ import FluentSQL
 // DB - Model
 
 extension LectureNote.RecapSession {
+    /// A database model of a recap session
     final class DatabaseModel: Model {
 
         static var schema: String = "LectureNoteRecapSession"

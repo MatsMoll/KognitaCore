@@ -1,85 +1,15 @@
 //
-//  FlashCardRepository.swift
+//  TypingTask+DatabaseRepository.swift
 //  KognitaCore
 //
-//  Created by Mats Mollestad on 11/04/2019.
+//  Created by Mats Mollestad on 14/11/2020.
 //
 
 import Vapor
 import FluentKit
 
-public protocol TypingTaskRepository: DeleteModelRepository {
-    func create(from content: TypingTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask.Create.Response>
-    func updateModelWith(id: Int, to data: TypingTask.Update.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response>
-    func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
-    func modifyContent(forID taskID: Task.ID) throws -> EventLoopFuture<TypingTask.ModifyContent>
-    func createAnswer(for task: TypingTask.ID, withTextSubmittion submit: String) -> EventLoopFuture<TaskAnswer>
-    func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?>
-    func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
-}
-
-extension TypingTask.Create.Data: TaskCreationContentable {
-    public var isDraft: Bool { false }
-}
-extension LectureNote.Create.Data: TaskCreationContentable {
-    public var isTestable: Bool { false }
-    public var isDraft: Bool { true }
-    public var examID: Exam.ID? { nil }
-}
-
-extension KognitaModels.TypingTask {
-    init(task: Task) {
-        self.init(
-            id: task.id,
-            subtopicID: task.subtopicID,
-            description: task.description,
-            question: task.question,
-            creatorID: task.creatorID,
-            exam: task.exam,
-            isTestable: task.isTestable,
-            createdAt: task.createdAt,
-            updatedAt: task.updatedAt,
-            deletedAt: task.deletedAt,
-            editedTaskID: task.editedTaskID
-        )
-    }
-
-    init(task: TaskDatabaseModel) {
-        self.init(
-            id: task.id ?? 0,
-            subtopicID: task.$subtopic.id,
-            description: task.description,
-            question: task.question,
-            creatorID: task.$creator.id,
-            exam: (try? task.exam?.content().compactData),
-            isTestable: task.isTestable,
-            createdAt: task.createdAt,
-            updatedAt: task.updatedAt,
-            deletedAt: task.deletedAt,
-            editedTaskID: nil
-        )
-    }
-}
-
-extension KognitaModels.GenericTask {
-    init(task: TaskDatabaseModel, exam: Exam?) {
-        self.init(
-            id: task.id ?? 0,
-            subtopicID: task.$subtopic.id,
-            description: task.description,
-            question: task.question,
-            creatorID: task.$creator.id,
-            exam: exam?.compactData,
-            isTestable: task.isTestable,
-            createdAt: task.createdAt,
-            updatedAt: task.updatedAt,
-            editedTaskID: nil,
-            deletedAt: task.deletedAt
-        )
-    }
-}
-
-extension FlashCardTask {
+extension TypingTask {
+    /// A database implementation of a `TypingTaskRepository`
     public struct DatabaseRepository: TypingTaskRepository, DatabaseConnectableRepository {
 
         init(database: Database, repositories: RepositoriesRepresentable) {
@@ -88,18 +18,23 @@ extension FlashCardTask {
             self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: repositories.taskResultRepository, userRepository: repositories.userRepository)
         }
 
+        /// The database the repo is connected to
         public let database: Database
+
+        /// The other repositories needed
         private let repositories: RepositoriesRepresentable
+
+        /// The task repository to use
+        private let taskRepository: TaskRepository
 
         private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
         private var userRepository: UserRepository { repositories.userRepository }
-        private let taskRepository: TaskRepository
         private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
         private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
 
-extension FlashCardTask.DatabaseRepository {
+extension TypingTask.DatabaseRepository {
 
     public func typingTaskAnswer(in sessionID: Sessions.ID, taskID: Task.ID) -> EventLoopFuture<TypingTask.Answer?> {
         self.taskAnswerRepository.typingTaskAnswer(in: sessionID, taskID: taskID)

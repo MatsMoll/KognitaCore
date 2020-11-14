@@ -17,7 +17,9 @@ import FluentKit
 //    func updateModelWith(id: Int, to data: UpdateData, by user: User) throws -> EventLoopFuture<UpdateResponse>
 //}
 
+/// A repository connectiong to a database
 public protocol DatabaseConnectableRepository {
+    /// The database to connect to
     var database: Database { get }
 }
 

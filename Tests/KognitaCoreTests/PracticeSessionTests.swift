@@ -399,7 +399,7 @@ final class PracticeSessionTests: VaporTestCase {
 
             XCTAssertEqual(parameterSession.numberOfTaskGoal, 10)
             try practiceSessionRepository.extend(session: parameterSession.requireID(), for: user).wait()
-            
+
             let updatedSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), database: database).wait()
             XCTAssertEqual(updatedSession.numberOfTaskGoal, 15)
         }
