@@ -52,7 +52,7 @@ public class DatabaseRepositories: RepositoriesRepresentable {
 
     public lazy var multipleChoiceTaskRepository: MultipleChoiseTaskRepository = MultipleChoiceTask.DatabaseRepository(database: database, repositories: self)
 
-    public lazy var typingTaskRepository: TypingTaskRepository = FlashCardTask.DatabaseRepository(database: database, repositories: self)
+    public lazy var typingTaskRepository: TypingTaskRepository = TypingTask.DatabaseRepository(database: database, repositories: self)
 
     public lazy var taskSolutionRepository: TaskSolutionRepositoring = TaskSolution.DatabaseRepository(database: database, userRepository: self.userRepository)
 

@@ -9,9 +9,13 @@ import FluentKit
 import FluentSQL
 import Vapor
 
+/// A database implementatino of a `ExamRepository`
 struct ExamDatabaseRepository: ExamRepository {
 
+    /// The database to connect to
     let database: Database
+
+    /// The different repositories to use
     let repositories: RepositoriesRepresentable
 
     func find(id: Exam.ID) -> EventLoopFuture<Exam> {

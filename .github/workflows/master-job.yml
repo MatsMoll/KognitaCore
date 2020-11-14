@@ -6,7 +6,20 @@ on:
       - master
 
 jobs:
+  check-doc-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1.2.0
+      - name: Calculate Documentation Coverage
+        uses: MatsMoll/swift-doc@master
+        with:
+          inputs: "Sources"
+          output: "dcov.json"
+      - name: Check Documentation Percent
+        run: sudo bash CI/check-percentage.sh dcov.json 20
+        
   bionic-tests:
+    needs: check-doc-coverage
     services:
       postgres:
         image: postgres
@@ -32,13 +45,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1.2.0
-      - name: Calculate Documentation Coverage
-        uses: MatsMoll/swift-doc@master
-        with:
-          inputs: "Sources"
-          output: "dcov.json"
-      - name: Check Documentation Percent
-        run: sudo bash CI/check-percentage.sh dcov.json 20
       - name: Generate Documentation
         uses: SwiftDocOrg/swift-doc@master
         with:
