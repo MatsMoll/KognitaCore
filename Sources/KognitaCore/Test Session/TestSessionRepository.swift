@@ -77,7 +77,7 @@ extension TestSession {
         public let database: Database
         private let repositories: RepositoriesRepresentable
 
-        private var typingTaskRepository: FlashCardTaskRepository { repositories.typingTaskRepository }
+        private var typingTaskRepository: TypingTaskRepository { repositories.typingTaskRepository }
         private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
         private var userRepository: UserRepository { repositories.userRepository }
         private var taskSolutionRepository: TaskSolutionRepositoring { repositories.taskSolutionRepository }

@@ -18,7 +18,7 @@ class UserTests: VaporTestCase {
             acceptedTerms: .accepted
         )
 
-        let user = try userRepository.create(from: createRequest, by: nil).wait()
+        let user = try userRepository.create(from: createRequest).wait()
         XCTAssertNoThrow(
             try User.VerifyEmail.Token.DatabaseModel.query(on: app.db).filter(\.$user.$id == user.id).first().unwrap(or: Abort(.internalServerError)).wait()
         )
@@ -35,7 +35,7 @@ class UserTests: VaporTestCase {
         )
 
         XCTAssertThrowsError(
-            try userRepository.create(from: createRequest, by: nil).wait()
+            try userRepository.create(from: createRequest).wait()
         )
     }
 
@@ -55,10 +55,10 @@ class UserTests: VaporTestCase {
             acceptedTerms: .accepted
         )
         XCTAssertNoThrow(
-            try userRepository.create(from: createRequestNTNU, by: nil).wait()
+            try userRepository.create(from: createRequestNTNU).wait()
         )
         XCTAssertThrowsError(
-            try userRepository.create(from: createRequestInvalid, by: nil).wait()
+            try userRepository.create(from: createRequestInvalid).wait()
         )
     }
 

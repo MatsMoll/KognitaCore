@@ -35,7 +35,7 @@ public class TestableRepositories: RepositoriesRepresentable {
 
     public var multipleChoiceTaskRepository: MultipleChoiseTaskRepository
 
-    public var typingTaskRepository: FlashCardTaskRepository
+    public var typingTaskRepository: TypingTaskRepository
 
     public var taskSolutionRepository: TaskSolutionRepositoring
 

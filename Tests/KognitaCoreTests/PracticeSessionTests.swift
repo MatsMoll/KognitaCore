@@ -76,9 +76,6 @@ final class PracticeSessionTests: VaporTestCase {
             try practiceSessionRepository.create(from: createSession, by: user).wait()
         )
         XCTAssertThrowsError(
-            try practiceSessionRepository.create(from: createSession, by: nil).wait()
-        )
-        XCTAssertThrowsError(
             try practiceSessionRepository.create(from: createSession, by: unverifiedUser).wait()
         )
     }
@@ -401,8 +398,10 @@ final class PracticeSessionTests: VaporTestCase {
             let parameterSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), database: database).wait()
 
             XCTAssertEqual(parameterSession.numberOfTaskGoal, 10)
-            try practiceSessionRepository.extend(session: parameterSession, for: user).wait()
-            XCTAssertEqual(parameterSession.numberOfTaskGoal, 15)
+            try practiceSessionRepository.extend(session: parameterSession.requireID(), for: user).wait()
+            
+            let updatedSession = try PracticeSession.PracticeParameter.resolveWith(createdSesssion.requireID(), database: database).wait()
+            XCTAssertEqual(updatedSession.numberOfTaskGoal, 15)
         }
     }
 

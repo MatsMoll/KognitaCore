@@ -8,8 +8,11 @@
 import Vapor
 import FluentKit
 
+/// A class adding the different database migrations needed to run the application
 public class DatabaseMigrations {
 
+    /// Configs an `Application` with the correct migrations based on the `Enviroment`
+    /// - Parameter app: The Application to config
     public static func migrationConfig(_ app: Application) {
         if Environment.get("CLEAN_SETUP_MIGRATIONS")?.lowercased() == "true" {
             setupTables(app.migrations)
@@ -21,16 +24,19 @@ public class DatabaseMigrations {
 //            app.migrations.add(LectureNote.Migrations.NoteTakingSession())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.Create())
 //            app.migrations.add(LectureNote.RecapSession.Migrations.CreateAssignedTask())
-            app.migrations.add(Exam.Migrations.Create())
-            app.migrations.add(TaskDatabaseModel.Migrations.ExamParent())
-            app.migrations.add(TaskSession.Pivot.Task.Migrations.Create())
-            app.migrations.add(ExamSession.Migrations.Create())
+//            app.migrations.add(Exam.Migrations.Create())
+//            app.migrations.add(TaskDatabaseModel.Migrations.ExamParent())
+//            app.migrations.add(TaskSession.Pivot.Task.Migrations.Create())
+//            app.migrations.add(ExamSession.Migrations.Create())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
         }
     }
 
+    /// Setup all the tables needed
+    /// Assumes it is a clean database
+    /// - Parameter migrations: The migration config to modify
     static func setupTables(_ migrations: Migrations) {
 
         migrations.add([
