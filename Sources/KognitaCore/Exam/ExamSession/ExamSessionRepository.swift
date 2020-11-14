@@ -41,7 +41,7 @@ extension ExamSession {
         let repositories: RepositoriesRepresentable
 
         var multipleChoiceRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
-        var typingTaskRepository: FlashCardTaskRepository { repositories.typingTaskRepository }
+        var typingTaskRepository: TypingTaskRepository { repositories.typingTaskRepository }
         var taskResultRepository: TaskResultRepositoring { repositories.taskResultRepository }
 
         func create(for examID: Exam.ID, by user: User) -> EventLoopFuture<ExamSession> {

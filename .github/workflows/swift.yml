@@ -2,18 +2,14 @@ name: Swift
 
 on:
   pull_request:
-    branches: 
-      - master
+    branches:
       - develop
   push:
-    branches: 
-      - master
+    branches:
       - develop
-      - rc/*
-      - 1.*
 
 jobs:
-  bionic-job:
+  bionic-tests:
     services:
       postgres:
         image: postgres
@@ -26,10 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1.2.0
-    - name: GitHub Action for SwiftLint
-      uses: norio-nomura/action-swiftlint@3.1.0
     - name: Run unit tests
-      if: github.ref != 'refs/heads/master'
       run: swift test --enable-test-discovery
       env:
         BUILD_TYPE: DEV
@@ -37,19 +30,3 @@ jobs:
         DATABASE_PASSWORD: postgres
         DATABASE_DB: postgres
         DATABASE_HOSTNAME: localhost
-    - name: Run unit tests master
-      if: github.ref == 'refs/heads/master'
-      run: swift test --enable-test-discovery
-      env:
-        DATABASE_USER: postgres
-        DATABASE_PASSWORD: postgres
-        DATABASE_DB: postgres
-        DATABASE_HOSTNAME: localhost
-    - name: Release new version
-      uses: MatsMoll/action-finch@master
-      if: github.ref == 'refs/heads/master'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ secrets.GITHUB_REPOSITORY }}
-        GITHUB_SHA: ${{ secrets.GITHUB_SHA }}
-        FINCH_CONFIG: CI/finch-config.yml

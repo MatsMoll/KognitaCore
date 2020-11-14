@@ -13,7 +13,7 @@ import KognitaCoreTestable
 
 class FlashCardTaskTests: VaporTestCase {
 
-    lazy var typingTaskRepository: FlashCardTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
+    lazy var typingTaskRepository: TypingTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
     lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: app).practiceSessionRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
 

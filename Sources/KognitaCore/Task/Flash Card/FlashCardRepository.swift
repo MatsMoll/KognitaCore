@@ -8,7 +8,7 @@
 import Vapor
 import FluentKit
 
-public protocol FlashCardTaskRepository: DeleteModelRepository {
+public protocol TypingTaskRepository: DeleteModelRepository {
     func create(from content: TypingTask.Create.Data, by user: User?) throws -> EventLoopFuture<TypingTask.Create.Response>
     func updateModelWith(id: Int, to data: TypingTask.Update.Data, by user: User) throws -> EventLoopFuture<TypingTask.Update.Response>
     func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
@@ -80,7 +80,7 @@ extension KognitaModels.GenericTask {
 }
 
 extension FlashCardTask {
-    public struct DatabaseRepository: FlashCardTaskRepository, DatabaseConnectableRepository {
+    public struct DatabaseRepository: TypingTaskRepository, DatabaseConnectableRepository {
 
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database

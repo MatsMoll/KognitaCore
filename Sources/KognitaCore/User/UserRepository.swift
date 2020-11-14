@@ -10,280 +10,102 @@ import Vapor
 import FluentKit
 
 extension EventLoopFuture where Value: ContentConvertable {
+    /// Converts a data type from it's database model to it's KognitaModels representation
+    /// - Returns: The public data model
     func content() -> EventLoopFuture<Value.ResponseModel> {
         flatMapThrowing { try $0.content() }
     }
 }
 
+/// A protocol defining the needed functionality for a repository handeling a `User`
 public protocol UserRepository: ResetPasswordRepositoring {
 
+    /// Finds the user given an id
+    /// - Parameter id: The id of the user
+    /// - Returns: A future user if it exists
     func find(_ id: User.ID) -> EventLoopFuture<User?>
+
+    /// Finds the user given an id
+    /// - Parameters:
+    ///   - id: The id of the user
+    ///   - error: An error if the user do not exist
+    /// - Returns: A future user
     func find(_ id: User.ID, or error: Error) -> EventLoopFuture<User>
 
-    func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User>
+    /// Creates a `User`
+    /// - Parameters:
+    ///   - content: The content defining the new user
+    func create(from content: User.Create.Data) throws -> EventLoopFuture<User>
 
+    /// Login using a token based method
+    /// - Parameter user: The user to login as
+    /// - Returns: A future `User.Login.Token`
     func login(with user: User) throws -> EventLoopFuture<User.Login.Token>
+
+    /// Logs a user login
+    /// - Parameters:
+    ///   - user: The user to log
+    ///   - ipAddress: The ip address if it exists
     func logLogin(for user: User, with ipAddress: String?) -> EventLoopFuture<Void>
+
+    /// Verify that the password is correct for a given email
+    /// - Parameters:
+    ///   - email: The email assosiated with an `User`
+    ///   - password: The password to verify
+    /// - Returns: A future user if the email password combo was correct
     func verify(email: String, with password: String) -> EventLoopFuture<User?>
+
+    /// Returns a user for a fiven login token
+    /// - Parameter token: The token assosiated with the user
+    /// - Returns: A future `User` if correct
     func user(with token: String) -> EventLoopFuture<User?>
 
+    /// Returns a user with a given email
+    /// - Parameter email: The email to filter on
     func first(with email: String) -> EventLoopFuture<User?>
 
+    /// Checks if a user is a moderator in a subject
+    /// - Parameters:
+    ///   - user: The user to check
+    ///   - subjectID: The subject id
+    /// - Returns: A future `Bool` indicating if the user is a moderator
     func isModerator(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
+
+    /// Checks if a user is a moderator in a subtopic
+    /// - Parameters:
+    ///   - user: The user to check
+    ///   - subtopicID: The subtopicid
+    /// - Returns: A future `Bool` indicating if the user is a moderator
     func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Bool>
+
+    /// Checks if a user is a moderator in a task
+    /// - Parameters:
+    ///   - user: The user to check
+    ///   - taskID: The task id
+    /// - Returns: A future `Bool` indicating if the user is a moderator
     func isModerator(user: User, taskID: Task.ID) -> EventLoopFuture<Bool>
+
+    /// Checks if a user is a moderator in a topic id
+    /// - Parameters:
+    ///   - user: The user to check
+    ///   - topicID: The topic id
+    /// - Returns: A future `Bool` indicating if the user is a moderator
     func isModerator(user: User, topicID: Topic.ID) throws -> EventLoopFuture<Bool>
 
+    /// Checks if a user can practice in a given subject
+    /// - Parameters:
+    ///   - user: The user to check
+    ///   - subjectID: The subject id
+    /// - Returns: A future `Bool` indicating if the user is can practice
     func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool>
 
+    /// Verify the email for a given user
+    /// - Parameters:
+    ///   - user: The user to verify
+    ///   - token: The token
     func verify(user: User, with token: User.VerifyEmail.Token) -> EventLoopFuture<Void>
+
+    /// Returns te verify token for a given user
+    /// - Parameter userID: The id assosiated with the `User`
     func verifyToken(for userID: User.ID) -> EventLoopFuture<User.VerifyEmail.Token>
-}
-
-extension User {
-    public struct DatabaseRepository: DatabaseConnectableRepository {
-
-        public init(database: Database, password: PasswordHasher) {
-            self.database = database
-            self.password = password
-        }
-
-        public let database: Database
-        let password: PasswordHasher
-    }
-}
-
-extension String {
-    var isValidEmail: Bool {
-        if let matchRange = self.range(of: "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}", options: [.regularExpression, .caseInsensitive]) {
-            if matchRange == startIndex..<endIndex {
-                return true
-            }
-        }
-        return false
-    }
-}
-
-extension User.DatabaseRepository: UserRepository {
-
-    public func verify(email: String, with password: String) -> EventLoopFuture<User?> {
-
-        User.DatabaseModel.query(on: database)
-            .filter(\.$email == email)
-            .first()
-            .flatMapThrowing { user in
-                if
-                    let user = user,
-                    (try? self.password.verify(password, created: user.passwordHash)) == true
-                {
-                    return try user.content()
-                }
-                return nil
-        }
-    }
-
-    public func user(with token: String) -> EventLoopFuture<User?> {
-        User.Login.Token.DatabaseModel.query(on: database)
-            .filter(\.$string == token)
-            .join(parent: \User.Login.Token.DatabaseModel.$user)
-            .first(User.DatabaseModel.self)
-            .flatMapThrowing { try $0?.content() }
-    }
-
-    public func find(_ id: Int) -> EventLoopFuture<User?> {
-        findDatabaseModel(User.DatabaseModel.self, withID: id)
-    }
-    public func find(_ id: Int, or error: Error) -> EventLoopFuture<User> {
-        findDatabaseModel(User.DatabaseModel.self, withID: id, or: Abort(.badRequest))
-    }
-
-    public enum Errors: LocalizedError {
-        case passwordMismatch
-        case missingInput
-        case misformed(field: String, reason: String)
-        case unauthorized
-        case existingUser(email: String)
-        case invalidRecruterToken
-        case invalidEmail
-
-        public var errorDescription: String? {
-            switch self {
-            case .missingInput:                     return "Sjekk at all informasjon er skrevet inn"
-            case .passwordMismatch:                 return "Passordet må skrives likt to ganger"
-            case .unauthorized:                     return "Sjekk at epost og passord stemmer"
-            case .existingUser(let email):          return "Det finnes allerede en bruker med epost: \(email)"
-            case .invalidRecruterToken:             return "Ugyldig rekrutteringskode"
-            case .misformed(let field, let reason): return "Ugyldig formatert \(field) fordi det \(reason)"
-            case .invalidEmail:                     return "Ugyldig epost. Må være en NTNU-addresse"
-            }
-        }
-    }
-
-    public func login(with user: User) throws -> EventLoopFuture<User.Login.Token> {
-        // create new token for this user
-        let token = try User.Login.Token.DatabaseModel.create(userID: user.id)
-
-        // save and return token
-        return token.save(on: database)
-            .flatMapThrowing { try token.content() }
-    }
-
-    public func logLogin(for user: User, with ipAddress: String?) -> EventLoopFuture<Void> {
-        User.Login.Log(userID: user.id, ipAddress: ipAddress)
-            .save(on: database)
-    }
-
-    public func create(from content: User.Create.Data, by user: User?) throws -> EventLoopFuture<User> {
-
-        guard content.hasAcceptedTerms else { throw Errors.missingInput }
-        guard !content.username.isEmpty, !content.email.isEmpty, !content.password.isEmpty else {
-            throw Errors.missingInput
-        }
-        guard content.password == content.verifyPassword else {
-            throw Errors.passwordMismatch
-        }
-        let lowercasedEmail = content.email.lowercased()
-        guard lowercasedEmail.isValidEmail else {
-            throw Errors.misformed(field: "email", reason: "innholder mellomrom eller lignende tegn")
-        }
-        guard lowercasedEmail.hasSuffix("ntnu.no") else {
-            throw Errors.invalidEmail
-        }
-
-        // hash user's password using BCrypt
-        let hash = try password.hash(content.password)
-        // save new user
-        let newUser = User.DatabaseModel(
-            username: content.username,
-            email: content.email,
-            passwordHash: hash
-        )
-
-        return User.DatabaseModel.query(on: database)
-            .filter(\.$email == newUser.email.lowercased())
-            .first()
-            .flatMap { existingUser in
-
-                guard existingUser == nil else {
-                    return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
-                }
-                return newUser.save(on: self.database)
-                    .failableFlatMap {
-
-                        try User.VerifyEmail.Token.DatabaseModel.create(userID: newUser.requireID())
-                            .save(on: self.database)
-                }
-                .flatMapThrowing { try newUser.content() }
-        }
-    }
-
-    public func first(with email: String) -> EventLoopFuture<User?> {
-        User.DatabaseModel.query(on: database)
-            .filter(\User.DatabaseModel.$email == email)
-            .first()
-            .flatMapThrowing { try $0?.content() }
-    }
-
-    public func isModerator(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool> {
-        guard user.isAdmin == false else {
-            return database.eventLoop.future(true)
-        }
-        return User.ModeratorPrivilege.query(on: database)
-            .filter(\.$subject.$id == subjectID)
-            .filter(\User.ModeratorPrivilege.$user.$id == user.id)
-            .first()
-            .map { $0 != nil }
-    }
-
-    public func isModerator(user: User, subtopicID: Subtopic.ID) throws -> EventLoopFuture<Bool> {
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        guard user.isAdmin == false else {
-//            return conn.future()
-//        }
-//        return Subtopic.DatabaseModel.query(on: conn)
-//            .filter(\.id == subtopicID)
-//            .filter(\User.ModeratorPrivilege.userID == user.id)
-//            .join(\Topic.DatabaseModel.id, to: \Subtopic.DatabaseModel.topicID)
-//            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)
-//            .first()
-//            .unwrap(or: Abort(.forbidden))
-//            .transform(to: ())
-    }
-
-    public func isModerator(user: User, taskID: Task.ID) -> EventLoopFuture<Bool> {
-        guard user.isAdmin == false else {
-            return database.eventLoop.future(true)
-        }
-        return TaskDatabaseModel.query(on: database)
-            .withDeleted()
-            .filter(\.$id == taskID)
-            .filter(User.ModeratorPrivilege.self, \User.ModeratorPrivilege.$user.$id == user.id)
-            .join(parent: \TaskDatabaseModel.$subtopic)
-            .join(parent: \Subtopic.DatabaseModel.$topic)
-            .join(parent: \Topic.DatabaseModel.$subject)
-            .join(User.ModeratorPrivilege.self, on: \User.ModeratorPrivilege.$subject.$id == \Topic.DatabaseModel.$id)
-            .first()
-            .map { $0 != nil }
-    }
-
-    public func isModerator(user: User, topicID: Topic.ID) throws -> EventLoopFuture<Bool> {
-        return database.eventLoop.future(error: Abort(.notImplemented))
-//        guard user.isAdmin == false else {
-//            return conn.future()
-//        }
-//        return Topic.DatabaseModel.query(on: conn)
-//            .filter(\.id == topicID)
-//            .filter(\User.ModeratorPrivilege.userID == user.id)
-//            .join(\User.ModeratorPrivilege.subjectID, to: \Topic.DatabaseModel.subjectId)
-//            .first()
-//            .unwrap(or: Abort(.forbidden))
-//            .transform(to: ())
-    }
-
-    public func canPractice(user: User, subjectID: Subject.ID) -> EventLoopFuture<Bool> {
-        guard user.isAdmin == false else {
-            return database.eventLoop.future(true)
-        }
-        guard user.isEmailVerified else {
-            return database.eventLoop.future(error: Abort(.forbidden))
-        }
-        return User.ActiveSubject.query(on: database)
-            .filter(\.$user.$id == user.id)
-            .filter(\.$subject.$id == subjectID)
-            .filter(\.$canPractice == true)
-            .first()
-            .map { $0 != nil }
-    }
-
-    public func verify(user: User, with token: User.VerifyEmail.Token) -> EventLoopFuture<Void> {
-
-        guard user.isEmailVerified == false else {
-            return database.eventLoop.future()
-        }
-
-        return User.DatabaseModel
-            .find(user.id, on: database)
-            .unwrap(or: Abort(.badRequest))
-            .flatMap { databaseUser in
-                User.VerifyEmail.Token.DatabaseModel
-                    .query(on: self.database)
-                    .filter(\.$token == token.token)
-                    .filter(\.$user.$id == user.id)
-                    .first()
-                    .unwrap(or: Abort(.badRequest))
-                    .flatMap { _ in
-                        databaseUser.isEmailVerified = true
-                        return databaseUser.save(on: self.database)
-                }
-        }
-    }
-
-    public func verifyToken(for userID: User.ID) -> EventLoopFuture<User.VerifyEmail.Token> {
-        User.VerifyEmail.Token.DatabaseModel
-            .query(on: database)
-            .filter(\User.VerifyEmail.Token.DatabaseModel.$user.$id == userID)
-            .first()
-            .unwrap(or: Abort(.internalServerError))
-            .map { User.VerifyEmail.Token(token: $0.token) }
-    }
 }
