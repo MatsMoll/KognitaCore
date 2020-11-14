@@ -10,7 +10,6 @@ on:
 
 jobs:
   check-doc-coverage:
-    needs: bionic-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1.2.0

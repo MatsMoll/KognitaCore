@@ -7,7 +7,6 @@ on:
 
 jobs:
   check-doc-coverage:
-    needs: bionic-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1.2.0
@@ -20,6 +19,7 @@ jobs:
         run: sudo bash CI/check-percentage.sh dcov.json 20
         
   bionic-tests:
+    needs: check-doc-coverage
     services:
       postgres:
         image: postgres
