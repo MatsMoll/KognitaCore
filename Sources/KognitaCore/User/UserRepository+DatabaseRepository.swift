@@ -254,7 +254,7 @@ extension User.DatabaseRepository: UserRepository {
             .query(on: database)
             .filter(\User.VerifyEmail.Token.DatabaseModel.$user.$id == userID)
             .first()
-            .unwrap(or: Abort(.internalServerError))
+            .unwrap(or: Abort(.badRequest))
             .map { User.VerifyEmail.Token(token: $0.token) }
     }
 }
