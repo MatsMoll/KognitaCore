@@ -12,6 +12,9 @@ import FluentKit
 /// This will lazely init all the repositories in order to improve performance
 public class DatabaseRepositories: RepositoriesRepresentable {
 
+    static var metricsTimerLabel: String { "repositories_duration" }
+    static var metricsErrorCounterLabel: String { "repositories_errors" }
+
     internal init(request: Request) {
         self.database = request.db
         self.password = request.password
