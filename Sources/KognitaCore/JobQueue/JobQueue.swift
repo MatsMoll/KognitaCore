@@ -22,7 +22,9 @@ struct DatabaseRepositorieFactory: AsyncRepositoriesFactory {
 public func config(app: Application) {
     DatabaseMigrations.migrationConfig(app)
     app.repositoriesFactory.use(DatabaseRepositorieFactory())
-    MetricsSystem.bootstrap(PrometheusClient())
+    if (try? MetricsSystem.prometheus()) == nil {
+        MetricsSystem.bootstrap(PrometheusClient())
+    }
     app.metricsFactory.use(factory: { _ in MetricsSystem.factory })
 
 //    services.register(RepositoriesRepresentable.self) { (container: Container) in
