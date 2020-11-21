@@ -1,5 +1,6 @@
 import Vapor
 import FluentKit
+import Metrics
 
 /// A protocol defining all the different repositories needed to run the service
 public protocol RepositoriesRepresentable {
@@ -55,12 +56,6 @@ public protocol RepositoriesRepresentable {
     var examSessionRepository: ExamSessionRepository { get }
 }
 
-struct DatabaseRepositoriesProvider: LifecycleHandler {
-    func willBoot(_ application: Application) throws {
-        application.repositoriesFactory.use(DatabaseRepositorieFactory())
-    }
-}
-
 /// A protocol defining how to connect to the different repositories
 /// This is using a colosure desing in order to facilitate the possibility of database transactions
 protocol AsyncRepositoriesFactory {
@@ -93,5 +88,12 @@ extension Application {
     var repositoriesFactory: RepositoriesFactory {
         get { self.storage[RepositoriesKey.self] ?? .init() }
         set { self.storage[RepositoriesKey.self] = newValue }
+    }
+}
+
+/// A Provider that sets up the correct `AsyncRepositoriesFactory`
+struct DatabaseRepositoriesProvider: LifecycleHandler {
+    func willBoot(_ application: Application) throws {
+        application.repositoriesFactory.use(DatabaseRepositorieFactory())
     }
 }

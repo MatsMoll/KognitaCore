@@ -19,6 +19,8 @@ var dependencies: [Package.Dependency] = [
 
     // SwiftSoup for HTML sanitizing
     .package(name: "SwiftSoup", url: "https://github.com/scinfu/SwiftSoup.git", from: "2.3.0"),
+    
+    .package(url: "https://github.com/MrLotU/SwiftPrometheus.git", from: "1.0.0-alpha")
 ]
 
 switch ProcessInfo.processInfo.environment["BUILD_TYPE"] {
@@ -67,6 +69,7 @@ let package = Package(
                 .product(name: "KognitaModels", package: "KognitaModels"),
                 .product(name: "PostgresKit", package: "postgres-kit"),
                 .product(name: "SQLKit", package: "sql-kit"),
+                .product(name: "SwiftPrometheus", package: "SwiftPrometheus"),
             ]
         ),
         .target(
