@@ -77,6 +77,18 @@ class VaporTestCase: XCTestCase {
             }
         }
     }
+
+    func throwsError<T: Error>(error: T, line: UInt = #line, file: StaticString = #file, test: () throws -> Void) {
+        do {
+            try test()
+            XCTFail("Did not throw an error", file: file, line: line)
+        } catch let error {
+            switch error {
+            case is T: return
+            default: XCTFail(error.localizedDescription, file: file, line: line)
+            }
+        }
+    }
 }
 
 extension Response {

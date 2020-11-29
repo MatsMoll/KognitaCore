@@ -39,6 +39,56 @@ class UserTests: VaporTestCase {
         )
     }
 
+    func testCreateUserWithExistingUsername() throws {
+
+        let createRequest = User.Create.Data(
+            username: "Test",
+            email: "test@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTerms: .accepted
+        )
+        let sameUsernameRequest = User.Create.Data(
+            username: createRequest.username,
+            email: "test2@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTerms: .accepted
+        )
+
+        XCTAssertNoThrow(
+            try userRepository.create(from: createRequest).wait()
+        )
+        throwsError(ofType: User.DatabaseRepository.Errors.self) {
+            _ = try userRepository.create(from: sameUsernameRequest).wait()
+        }
+    }
+
+    func testCreateUserWithExistingEmail() throws {
+
+        let createRequest = User.Create.Data(
+            username: "Test",
+            email: "test@ntnu.no",
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTerms: .accepted
+        )
+        let sameEamilRequest = User.Create.Data(
+            username: "Test 2",
+            email: createRequest.email,
+            password: "p1234",
+            verifyPassword: "p1234",
+            acceptedTerms: .accepted
+        )
+
+        XCTAssertNoThrow(
+            try userRepository.create(from: createRequest).wait()
+        )
+        throwsError(ofType: User.DatabaseRepository.Errors.self) {
+            _ = try userRepository.create(from: sameEamilRequest).wait()
+        }
+    }
+
     func testNotNTNUEmailCreateError() throws {
         let createRequestNTNU = User.Create.Data(
             username: "Test",
