@@ -76,6 +76,7 @@ extension User.DatabaseRepository: UserRepository {
         case misformed(field: String, reason: String)
         case unauthorized
         case existingUser(email: String)
+        case existingUsername(username: String)
         case invalidRecruterToken
         case invalidEmail
 
@@ -85,6 +86,7 @@ extension User.DatabaseRepository: UserRepository {
             case .passwordMismatch:                 return "Passordet må skrives likt to ganger"
             case .unauthorized:                     return "Sjekk at epost og passord stemmer"
             case .existingUser(let email):          return "Det finnes allerede en bruker med epost: \(email)"
+            case .existingUsername(let username):   return "Det finnes allerede en bruker med brukernavnet: \(username)"
             case .invalidRecruterToken:             return "Ugyldig rekrutteringskode"
             case .misformed(let field, let reason): return "Ugyldig formatert \(field) fordi det \(reason)"
             case .invalidEmail:                     return "Ugyldig epost. Må være en NTNU-addresse"
@@ -133,12 +135,20 @@ extension User.DatabaseRepository: UserRepository {
         )
 
         return User.DatabaseModel.query(on: database)
-            .filter(\.$email == newUser.email.lowercased())
+            .group(.or) {
+                $0
+                    .filter(\.$email == newUser.email.lowercased())
+                    .filter(\.$username == newUser.username)
+            }
             .first()
             .flatMap { existingUser in
 
                 guard existingUser == nil else {
-                    return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
+                    if existingUser?.username == newUser.username {
+                        return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
+                    } else {
+                        return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
+                    }
                 }
                 return newUser.save(on: self.database)
                     .failableFlatMap {

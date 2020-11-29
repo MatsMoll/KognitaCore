@@ -1,5 +1,6 @@
 import Vapor
 import FluentKit
+import Fluent
 
 extension User {
 
@@ -140,13 +141,15 @@ public struct SessionUserAuthenticator: SessionAuthenticator {
     public typealias User = KognitaModels.User
 
     public func authenticate(sessionID: User.ID, for request: Request) -> EventLoopFuture<Void> {
-        request.repositories { repositories in
-            repositories.userRepository.find(sessionID)
-                .map { user in
-                    if let user = user {
-                        request.auth.login(user)
+        User.DatabaseModel.find(sessionID, on: request.db)
+            .map { user in
+                if let user = user {
+                    do {
+                        try request.auth.login(user.content())
+                    } catch {
+                        request.logger.info("Error when converting DB model: \(error)")
                     }
-            }
+                }
         }
     }
 }

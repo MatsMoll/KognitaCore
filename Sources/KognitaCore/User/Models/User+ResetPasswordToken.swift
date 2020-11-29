@@ -120,14 +120,14 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
             .flatMap { tokenModel in
 
                 User.DatabaseModel
-                    .find(tokenModel.$user.id, on: self.database)
+                    .find(tokenModel.$user.id, on: database)
                     .unwrap(or: Abort(.badRequest))
             }
             .flatMapThrowing { (user: User.DatabaseModel) -> User.DatabaseModel in
-                user.passwordHash = try self.password.hash(content.password)
+                user.passwordHash = try password.hash(content.password)
                 return user
             }
-            .flatMap { $0.save(on: self.database) }
+            .flatMap { $0.save(on: database) }
             .transform(to: ())
     }
 }
