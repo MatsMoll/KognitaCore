@@ -37,39 +37,39 @@ public class DatabaseRepositories: RepositoriesRepresentable {
     var logger: Logger
 
     /// A internal task repository to use
-    lazy var taskRepository: TaskRepository = TaskDatabaseModel.DatabaseRepository(database: self.database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository)
+    var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: self.database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository) }
 
-    public lazy var subjectRepository: SubjectRepositoring = Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository)
+    public var subjectRepository: SubjectRepositoring { Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository) }
 
-    public lazy var topicRepository: TopicRepository = Topic.DatabaseRepository(database: database, repositories: self, logger: logger)
+    public var topicRepository: TopicRepository { Topic.DatabaseRepository(database: database, repositories: self, logger: logger) }
 
-    public lazy var subjectTestRepository: SubjectTestRepositoring = SubjectTest.DatabaseRepository(database: database, repositories: self)
+    public var subjectTestRepository: SubjectTestRepositoring { SubjectTest.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var userRepository: UserRepository = User.DatabaseRepository(database: database, password: password)
+    public var userRepository: UserRepository { User.DatabaseRepository(database: database, password: password) }
 
-    public lazy var subtopicRepository: SubtopicRepositoring = Subtopic.DatabaseRepository(database: database, userRepository: self.userRepository)
+    public var subtopicRepository: SubtopicRepositoring { Subtopic.DatabaseRepository(database: database, userRepository: self.userRepository) }
 
-    public lazy var testSessionRepository: TestSessionRepositoring = TestSession.DatabaseRepository(database: database, repositories: self)
+    public var testSessionRepository: TestSessionRepositoring { TestSession.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var practiceSessionRepository: PracticeSessionRepository = PracticeSession.DatabaseRepository(database: database, repositories: self)
+    public var practiceSessionRepository: PracticeSessionRepository { PracticeSession.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var multipleChoiceTaskRepository: MultipleChoiseTaskRepository = MultipleChoiceTask.DatabaseRepository(database: database, repositories: self)
+    public var multipleChoiceTaskRepository: MultipleChoiseTaskRepository { MultipleChoiceTask.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var typingTaskRepository: TypingTaskRepository = TypingTask.DatabaseRepository(database: database, repositories: self)
+    public var typingTaskRepository: TypingTaskRepository { TypingTask.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var taskSolutionRepository: TaskSolutionRepositoring = TaskSolution.DatabaseRepository(database: database, userRepository: self.userRepository)
+    public var taskSolutionRepository: TaskSolutionRepositoring { TaskSolution.DatabaseRepository(database: database, userRepository: self.userRepository) }
 
-    public lazy var taskDiscussionRepository: TaskDiscussionRepositoring = TaskDiscussion.DatabaseRepository(database: database)
+    public var taskDiscussionRepository: TaskDiscussionRepositoring { TaskDiscussion.DatabaseRepository(database: database) }
 
-    public lazy var taskResultRepository: TaskResultRepositoring = TaskResult.DatabaseRepository(database: database)
+    public var taskResultRepository: TaskResultRepositoring { TaskResult.DatabaseRepository(database: database) }
 
-    public lazy var lectureNoteRepository: LectureNoteRepository = LectureNote.DatabaseRepository(database: database, repositories: self)
+    public var lectureNoteRepository: LectureNoteRepository { LectureNote.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var lectureNoteTakingRepository: LectureNoteTakingSessionRepository = LectureNote.TakingSession.DatabaseRepository(database: database)
+    public var lectureNoteTakingRepository: LectureNoteTakingSessionRepository { LectureNote.TakingSession.DatabaseRepository(database: database) }
 
-    public lazy var lectureNoteRecapRepository: LectureNoteRecapSessionRepository = LectureNote.RecapSession.DatabaseRepository(database: database, repositories: self)
+    public var lectureNoteRecapRepository: LectureNoteRecapSessionRepository { LectureNote.RecapSession.DatabaseRepository(database: database, repositories: self) }
 
-    public lazy var examRepository: ExamRepository = ExamDatabaseRepository(database: database, repositories: self)
+    public var examRepository: ExamRepository { ExamDatabaseRepository(database: database, repositories: self) }
 
-    public lazy var examSessionRepository: ExamSessionRepository = ExamSession.DatabaseRepository(database: database, repositories: self)
+    public var examSessionRepository: ExamSessionRepository { ExamSession.DatabaseRepository(database: database, repositories: self) }
 }
