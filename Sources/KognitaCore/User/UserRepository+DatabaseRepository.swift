@@ -225,9 +225,6 @@ extension User.DatabaseRepository: UserRepository {
         guard user.isAdmin == false else {
             return database.eventLoop.future(true)
         }
-        guard user.isEmailVerified else {
-            return database.eventLoop.future(error: Abort(.forbidden))
-        }
         return User.ActiveSubject.query(on: database)
             .filter(\.$user.$id == user.id)
             .filter(\.$subject.$id == subjectID)

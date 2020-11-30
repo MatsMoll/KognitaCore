@@ -92,12 +92,12 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             return subjectRepository
                 .subjectIDFor(topicIDs: Array(topicIDs))
                 .failableFlatMap { subjectID in
-                    self.userRepository
+                    userRepository
                         .canPractice(user: user, subjectID: subjectID)
-                        .ifFalse(throw: Abort(.forbidden))
+                        .ifFalse(throw: Abort(.forbidden, reason: "You can not practice"))
                 }
                 .failableFlatMap {
-                    try self.create(
+                    try create(
                         topicIDs: topicIDs,
                         content: content,
                         user: user
@@ -108,12 +108,12 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             return subjectRepository
                 .subjectIDFor(subtopicIDs: Array(subtopicIDs))
                 .failableFlatMap { subjectID in
-                    self.userRepository
+                    userRepository
                         .canPractice(user: user, subjectID: subjectID)
-                        .ifFalse(throw: Abort(.forbidden))
+                        .ifFalse(throw: Abort(.forbidden, reason: "You can not practice"))
                 }
                 .failableFlatMap {
-                    try self.create(
+                    try create(
                         subtopicIDs: subtopicIDs,
                         content: content,
                         user: user

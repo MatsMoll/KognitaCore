@@ -52,7 +52,7 @@ extension ExamSession {
                 .flatMap { taskIDs in
 
                     guard taskIDs.isEmpty == false else {
-                        return database.eventLoop.future(error: Abort(.badRequest))
+                        return database.eventLoop.future(error: Abort(.badRequest, reason: "Exam with id: \(examID) contains no tasks"))
                     }
 
                     let session = TaskSession(userID: user.id)

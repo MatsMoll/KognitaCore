@@ -108,5 +108,6 @@ extension PracticeSession {
 }
 
 extension PracticeSession.DatabaseModel {
+    /// converting a DatabaseModel to the PracticeSession Model
     public var practiceSession: PracticeSession { .init(model: self) }
 }
