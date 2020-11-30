@@ -14,6 +14,7 @@ final class PracticeSessionTests: VaporTestCase {
 
     lazy var practiceSessionRepository: PracticeSessionRepository = { TestableRepositories.testable(with: app).practiceSessionRepository }()
     lazy var multipleChoiceRepository: MultipleChoiseTaskRepository = { TestableRepositories.testable(with: app).multipleChoiceTaskRepository }()
+    lazy var subjectRepository: SubjectRepositoring = { TestableRepositories.testable(with: app).subjectRepository }()
 
     func testUpdateFlashAnswer() {
         failableTest {
@@ -60,6 +61,9 @@ final class PracticeSessionTests: VaporTestCase {
         let unverifiedUser = try User.create(isAdmin: false, isEmailVerified: false, on: app)
 
         let subtopic = try Subtopic.create(on: app)
+        let subjectID = try subjectRepository.subjectIDFor(subtopicIDs: [subtopic.id]).wait()
+        let subject = try subjectRepository.find(subjectID, or: Abort(.internalServerError)).wait()
+        try subject.makeActive(for: unverifiedUser, canPractice: true, on: app)
 
         _ = try FlashCardTask.create(subtopic: subtopic, on: app)
         _ = try FlashCardTask.create(subtopic: subtopic, on: app)
@@ -75,7 +79,7 @@ final class PracticeSessionTests: VaporTestCase {
         XCTAssertNoThrow(
             try practiceSessionRepository.create(from: createSession, by: user).wait()
         )
-        XCTAssertThrowsError(
+        XCTAssertNoThrow(
             try practiceSessionRepository.create(from: createSession, by: unverifiedUser).wait()
         )
     }
@@ -316,7 +320,7 @@ final class PracticeSessionTests: VaporTestCase {
         let secondTask = try practiceSessionRepository.currentActiveTask(in: session).wait()
 
         XCTAssertNotNil(secondTask.isMultipleSelect)
-        try XCTAssertNotEqual(secondTask.taskID, firstTask.taskID)
+        XCTAssertNotEqual(secondTask.taskID, firstTask.taskID)
     }
 
     func testAsignTaskWithTaskResult() throws {
