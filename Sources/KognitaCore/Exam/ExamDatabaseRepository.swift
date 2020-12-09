@@ -81,6 +81,7 @@ struct ExamDatabaseRepository: ExamRepository {
             .from(Exam.DatabaseModel.schema)
             .join(from: \Exam.DatabaseModel.$id, to: \TaskDatabaseModel.$exam.$id)
             .where("subjectID", .equal, subjectID)
+            .where("deletedAt", .is, SQLLiteral.null)
             .groupBy(\Exam.DatabaseModel.$id)
             .all(decoding: Exam.WithNumberOfTasks.self)
             .flatMap { exams in

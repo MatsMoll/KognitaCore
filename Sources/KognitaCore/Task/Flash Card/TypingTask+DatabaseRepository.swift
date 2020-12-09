@@ -7,6 +7,7 @@
 
 import Vapor
 import FluentKit
+import FluentSQL
 
 extension TypingTask {
     /// A database implementation of a `TypingTaskRepository`
@@ -253,6 +254,34 @@ extension TypingTask.DatabaseRepository {
 
     public func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void> {
         taskRepository.forceDelete(taskID: taskID, by: user)
+    }
+
+    public func allTaskAnswers(for subjectID: Subject.ID) -> EventLoopFuture<[TypingTask.AnswerResult]> {
+
+        guard let sql = database as? SQLDatabase else {
+            return database.eventLoop.future(error: Abort(.internalServerError, reason: "Unable to connect to SQL database"))
+        }
+
+        return sql.select()
+            .column(\Topic.DatabaseModel.$subject.$id, as: "subjectID")
+            .column(\TaskResult.DatabaseModel.$resultScore, as: "score")
+            .column(\FlashCardAnswer.$answer, as: "answer")
+            .from(TaskSessionAnswer.schema)
+            .join(from: \TaskSessionAnswer.$taskAnswer.$id, to: \FlashCardAnswer.$id)
+            .join(from: \FlashCardAnswer.$task.$id, to: \TaskDatabaseModel.$id)
+            .join(from: \TaskDatabaseModel.$subtopic.$id, to: \Subtopic.DatabaseModel.$id)
+            .join(from: \Subtopic.DatabaseModel.$topic.$id, to: \Topic.DatabaseModel.$id)
+            .join(TaskResult.DatabaseModel.schema, on: #"("\#(TaskResult.DatabaseModel.schema)"."sessionID"="\#(TaskSessionAnswer.schema)"."sessionID" AND "\#(TaskResult.DatabaseModel.schema)"."taskID"="\#(TaskDatabaseModel.schema)"."id")"#)
+            .where("subjectID", .equal, subjectID)
+            .all(decoding: TypingTask.AnswerResult.self)
+
+//        TaskSessionAnswer.query(on: database)
+//            .join(parent: \TaskSessionAnswer.$taskAnswer)
+//            .join(superclass: FlashCardAnswer.self, with: TaskAnswer.self)
+//            .join(parent: \FlashCardAnswer.$task)
+//            .join(parent: \TaskDatabaseModel.$subtopic)
+//            .join(parent: \Subtopic.DatabaseModel.$topic)
+//            .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
     }
 
 //    public func createDraft(from content: TypingTask.Create.Draft, by user: User) throws -> EventLoopFuture<TypingTask.ID> {

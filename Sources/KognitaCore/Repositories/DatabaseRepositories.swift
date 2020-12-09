@@ -10,7 +10,7 @@ import FluentKit
 
 /// A representation of different database repositories
 /// This will lazely init all the repositories in order to improve performance
-public class DatabaseRepositories: RepositoriesRepresentable {
+public struct DatabaseRepositories: RepositoriesRepresentable {
 
     static var metricsTimerLabel: String { "repositories_duration" }
     static var metricsErrorCounterLabel: String { "repositories_errors" }
@@ -61,7 +61,7 @@ public class DatabaseRepositories: RepositoriesRepresentable {
 
     public var taskDiscussionRepository: TaskDiscussionRepositoring { TaskDiscussion.DatabaseRepository(database: database) }
 
-    public var taskResultRepository: TaskResultRepositoring { TaskResult.DatabaseRepository(database: database) }
+    public var taskResultRepository: TaskResultRepositoring { TaskResult.DatabaseRepository(database: database, repositories: self) }
 
     public var lectureNoteRepository: LectureNoteRepository { LectureNote.DatabaseRepository(database: database, repositories: self) }
 

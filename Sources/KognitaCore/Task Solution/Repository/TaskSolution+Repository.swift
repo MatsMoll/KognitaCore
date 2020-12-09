@@ -107,6 +107,18 @@ extension TaskSolution {
                     }
             }
         }
+        
+        public func solutionsFor(subjectID: Subject.ID) -> EventLoopFuture<[TaskSolution]> {
+            TaskSolution.DatabaseModel.query(on: database)
+                .join(parent: \TaskSolution.DatabaseModel.$task)
+                .join(parent: \TaskDatabaseModel.$subtopic)
+                .join(parent: \Subtopic.DatabaseModel.$topic)
+                .filter(Topic.DatabaseModel.self, \Topic.DatabaseModel.$subject.$id == subjectID)
+                .all()
+                .flatMapEachThrowing { (solution: TaskSolution.DatabaseModel) in
+                    try solution.content()
+                }
+        }
 
         public func upvote(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void> {
             TaskSolution.Pivot.Vote(userID: user.id, solutionID: solutionID)
