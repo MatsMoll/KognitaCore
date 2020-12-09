@@ -19,6 +19,7 @@ extension TaskDatabaseModel {
         explenation: String          = "Some explenation",
         createSolution: Bool            = true,
         isTestable: Bool            = false,
+        exam: Exam? = nil,
         on app: Application
     ) throws -> TaskDatabaseModel {
 
@@ -32,6 +33,7 @@ extension TaskDatabaseModel {
                           explenation: explenation,
                           createSolution: createSolution,
                           isTestable: isTestable,
+                          examID: exam?.id,
                           on: app)
     }
 

@@ -107,7 +107,7 @@ extension TaskSolution {
                     }
             }
         }
-        
+
         public func solutionsFor(subjectID: Subject.ID) -> EventLoopFuture<[TaskSolution]> {
             TaskSolution.DatabaseModel.query(on: database)
                 .join(parent: \TaskSolution.DatabaseModel.$task)

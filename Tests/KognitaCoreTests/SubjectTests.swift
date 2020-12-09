@@ -147,7 +147,7 @@ class SubjectTests: VaporTestCase {
 
             try firstSubject.makeActive(for: user, canPractice: true, on: app)
 
-            let activeSubjects = try subjectRepository.allActive(for: user).wait()
+            let activeSubjects = try subjectRepository.allActive(for: user.id).wait()
             XCTAssertEqual(activeSubjects.count, 1)
             let activeSubject = try XCTUnwrap(activeSubjects.first)
             XCTAssertEqual(activeSubject.id, firstSubject.id)
@@ -165,7 +165,7 @@ class SubjectTests: VaporTestCase {
             try subject.makeActive(for: user, canPractice: true, on: app)
             try subject.makeInactive(for: user, on: app)
 
-            let activeSubjects = try subjectRepository.allActive(for: user).wait()
+            let activeSubjects = try subjectRepository.allActive(for: user.id).wait()
             XCTAssertEqual(activeSubjects.count, 0)
         }
     }

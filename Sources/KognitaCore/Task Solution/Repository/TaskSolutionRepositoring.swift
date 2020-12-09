@@ -22,6 +22,6 @@ public protocol TaskSolutionRepositoring: DeleteModelRepository {
     func approve(for solutionID: TaskSolution.ID, by user: User) throws -> EventLoopFuture<Void>
 
     func unverifiedSolutions(in subjectID: Subject.ID, for moderator: User) throws -> EventLoopFuture<[TaskSolution.Unverified]>
-    
+
     func solutionsFor(subjectID: Subject.ID) -> EventLoopFuture<[TaskSolution]>
 }

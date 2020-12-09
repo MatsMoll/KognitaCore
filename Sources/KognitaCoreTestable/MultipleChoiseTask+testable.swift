@@ -19,10 +19,11 @@ extension MultipleChoiceTask {
         isMultipleSelect: Bool        = true,
         choises: [MultipleChoiceTaskChoice.Create.Data] = MultipleChoiceTaskChoice.Create.Data.standard,
         isTestable: Bool        = false,
+        exam: Exam? = nil,
         on app: Application
     ) throws -> MultipleChoiceTask {
 
-        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, isTestable: isTestable, on: app)
+        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, isTestable: isTestable, exam: exam, on: app)
 
         return try create(taskId: usedTask.requireID(),
                           isMultipleSelect: isMultipleSelect,
