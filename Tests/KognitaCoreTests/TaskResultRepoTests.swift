@@ -201,12 +201,50 @@ class TaskResultRepoTests: VaporTestCase {
         _ = try TaskResult.create(task: taskTwo, sessionID: newSession.requireID(), user: user, score: 0.5, on: database)
     }
 
-    func testRecommendedRecap() throws {
+    func testRecommendedRecapWithoutActiveSubjct() throws {
 
         let user = try User.create(on: app)
 
         let topic1 = try Topic.create(on: app)
         let topic2 = try Topic.create(on: app)
+
+        let subtopic1 = try Subtopic.create(topicId: topic1.id, on: database)
+        let subtopic2 = try Subtopic.create(topicId: topic2.id, on: database)
+
+        let numberOfTasksInTopic1 = 3
+        let numberOfTasksInTopic2 = 1
+
+        let limit = 2
+
+        let tasks1 = try (1...numberOfTasksInTopic1).map { _ in try TaskDatabaseModel.create(subtopic: subtopic1, on: app) }
+        let tasks2 = try (1...numberOfTasksInTopic2).map { _ in try TaskDatabaseModel.create(subtopic: subtopic2, on: app) }
+
+        let session1 = TaskSession(userID: user.id)
+        let session2 = TaskSession(userID: user.id)
+        let session3 = TaskSession(userID: user.id)
+
+        // Creating sessions in database
+        try [session1, session2, session3].map { $0.create(on: database) }.flatten(on: database.eventLoop).wait()
+
+        let firstTopic1Scores = [0.4, 0.8]
+
+        _ = try TaskResult.create(task: tasks1[0], sessionID: session1.id!, user: user, score: firstTopic1Scores[0], on: database)
+        _ = try TaskResult.create(task: tasks1[1], sessionID: session1.id!, user: user, score: firstTopic1Scores[1], on: database)
+        _ = try TaskResult.create(task: tasks2[0], sessionID: session1.id!, user: user, score: 1, on: database)
+
+        let firstRecaps = try taskResultRepository.recommendedRecap(for: user.id, upperBoundDays: 10, lowerBoundDays: -3, limit: limit).wait()
+        XCTAssertEqual(firstRecaps.count, 0)
+    }
+
+    func testRecommendedRecapWithActiveSubjct() throws {
+
+        let user = try User.create(on: app)
+
+        let subject = try Subject.create(on: app)
+        try subject.makeActive(for: user, canPractice: true, on: app)
+
+        let topic1 = try Topic.create(subjectId: subject.id, on: app.db)
+        let topic2 = try Topic.create(chapter: 2, subjectId: subject.id, on: app.db)
 
         let subtopic1 = try Subtopic.create(topicId: topic1.id, on: database)
         let subtopic2 = try Subtopic.create(topicId: topic2.id, on: database)
@@ -268,13 +306,4 @@ class TaskResultRepoTests: VaporTestCase {
         XCTAssertEqual(thirdRecap.resultScore, thirdTopic1Scores.reduce(0, +) / Double(numberOfTasksInTopic1))
         XCTAssertEqual(lastRecap.resultScore, thirdTopic2Scores.reduce(0, +) / Double(numberOfTasksInTopic2))
     }
-
-    static var allTests = [
-        ("testHistogramRoute", testHistogramRoute),
-        ("testSpaceRepetitionWithMultipleUsers", testSpaceRepetitionWithMultipleUsers),
-        ("testSpaceRepetitionWithDeletedTask", testSpaceRepetitionWithDeletedTask),
-        ("testSpaceRepetitionWithTestTask", testSpaceRepetitionWithTestTask),
-        ("testSubjectProgress", testSubjectProgress),
-        ("testRecommendedRecap", testRecommendedRecap)
-    ]
 }
