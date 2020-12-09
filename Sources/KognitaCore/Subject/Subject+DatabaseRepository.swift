@@ -57,6 +57,7 @@ extension Subject {
         private var topicRepository: TopicRepository { repositories.topicRepository }
         private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
         private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
+        private var examRepository: ExamRepository { repositories.examRepository }
         private let taskRepository: TaskRepository
     }
 }
@@ -164,7 +165,7 @@ extension Subject.DatabaseRepository {
     private func handle(exams: Set<Exam.Compact>, subjectID: Subject.ID) -> EventLoopFuture<Void> {
 
         return exams.map { exam in
-            repositories.examRepository
+            examRepository
                 .findExamWith(subjectID: subjectID, year: exam.year, type: exam.type)
                 .flatMap { savedExam in
                     if savedExam != nil {
@@ -237,11 +238,11 @@ extension Subject.DatabaseRepository {
         }
     }
 
-    public func allActive(for user: User) throws -> EventLoopFuture<[Subject]> {
+    public func allActive(for userID: User.ID) -> EventLoopFuture<[Subject]> {
 
         return Subject.DatabaseModel.query(on: database)
             .join(children: \Subject.DatabaseModel.$activeSubjects)
-            .filter(User.ActiveSubject.self, \User.ActiveSubject.$user.$id == user.id)
+            .filter(User.ActiveSubject.self, \User.ActiveSubject.$user.$id == userID)
             .all()
             .flatMapEachThrowing { try $0.content() }
     }

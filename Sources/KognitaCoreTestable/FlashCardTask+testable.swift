@@ -15,10 +15,11 @@ extension FlashCardTask {
         creator: User? = nil,
         subtopic: Subtopic? = nil,
         task: TaskDatabaseModel? = nil,
+        exam: Exam? = nil,
         on app: Application
     ) throws -> FlashCardTask {
 
-        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, on: app)
+        let usedTask = try task ?? TaskDatabaseModel.create(creator: creator, subtopic: subtopic, exam: exam, on: app)
 
         return try create(task: usedTask, on: app.db)
     }

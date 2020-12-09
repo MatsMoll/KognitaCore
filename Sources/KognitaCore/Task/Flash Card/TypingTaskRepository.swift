@@ -52,6 +52,10 @@ public protocol TypingTaskRepository: DeleteModelRepository {
     ///   - taskID: The task id to delete
     ///   - user: The user deleteing the task
     func forceDelete(taskID: Task.ID, by user: User) -> EventLoopFuture<Void>
+
+    /// Returns all the answers submitted for a given subject id
+    /// - Parameter subjectID: The id of the subject
+    func allTaskAnswers(for subjectID: Subject.ID) -> EventLoopFuture<[TypingTask.AnswerResult]>
 }
 
 extension TypingTask.Create.Data: TaskCreationContentable {

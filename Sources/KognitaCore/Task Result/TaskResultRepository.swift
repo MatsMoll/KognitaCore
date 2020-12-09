@@ -11,10 +11,13 @@ import Vapor
 extension TaskResult {
     public struct DatabaseRepository: TaskResultRepositoring {
 
-        let database: Database
+        private let database: Database
+        private let repositories: RepositoriesRepresentable
+        private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
 
-        public init(database: Database) {
+        public init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
+            self.repositories = repositories
         }
     }
 }
@@ -84,12 +87,13 @@ extension TaskResult.DatabaseRepository {
         let taskCount: Int
     }
 
+    /// A set of differnet queries needed for the TaskResultRepository
     private enum Query {
 
         case subtopics
         case taskResults
         case spaceRepetitionTask(userID: User.ID, sessionID: PracticeSession.ID, useTypingTasks: Bool, useMultipleChoiceTasks: Bool)
-        case recommendedTopics(userID: User.ID, lowerDate: Date, upperDate: Date, limit: Int)
+        case recommendedTopics(userID: User.ID, lowerDate: Date, upperDate: Date, limit: Int, activeSubjects: [Subject.ID])
         case results(revisitingAfter: Date, for: User.ID)
         case resultsInSubject(Subject.ID, for: User.ID)
         case resultsInTopics([Topic.ID], for: User.ID)
@@ -117,7 +121,7 @@ extension TaskResult.DatabaseRepository {
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID", "Topic"."id" AS "topicID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Topic"."id" = ANY(\#(bind: topicIDs)) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
             case .resultsInSubject(let subjectID, let userID):
                 return #"SELECT DISTINCT ON ("TaskResult"."taskID") "TaskResult"."id", "TaskResult"."taskID" FROM "TaskResult" INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id" INNER JOIN "Subtopic" ON "Task"."subtopicID" = "Subtopic"."id" INNER JOIN "Topic" ON "Subtopic"."topicID" = "Topic"."id" INNER JOIN "Subject" ON "Subject"."id" = "Topic"."subjectID" WHERE "Task"."deletedAt" IS NULL AND "userID" = \#(bind: userID) AND "Subject"."id" = \#(bind: subjectID) ORDER BY "TaskResult"."taskID", "TaskResult"."createdAt" DESC"#
-            case .recommendedTopics(let userID, let lowerDate, let upperDate, let limit):
+            case let .recommendedTopics(userID, lowerDate, upperDate, limit, activeSubjects):
                 return """
                     SELECT * FROM (
                     SELECT DISTINCT ON ("topicID") *
@@ -126,7 +130,8 @@ extension TaskResult.DatabaseRepository {
                     FROM "TaskResult"
                     INNER JOIN "Task" ON "TaskResult"."taskID" = "Task"."id"
                     INNER JOIN "Subtopic" ON "Subtopic"."id" = "Task"."subtopicID"
-                    WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL
+                    INNER JOIN "Topic" ON "Topic"."id" = "Subtopic"."topicID"
+                    WHERE "Task"."deletedAt" IS NULL AND "TaskResult"."revisitDate" IS NOT NULL AND "Topic"."subjectID" = ANY(\(bind: activeSubjects))
                     AND "TaskResult"."userID" = \(bind: userID)
                     AND "Task"."isTestable" = 'false'
                     ORDER BY "TaskResult"."taskID" DESC, "TaskResult"."createdAt" DESC
@@ -596,12 +601,14 @@ extension TaskResult.DatabaseRepository {
         let upperBoundDate = Calendar.current.date(byAdding: .day, value: upperBoundDays, to: .now) ?? .now
         let lowerBoundDate = Calendar.current.date(byAdding: .day, value: lowerBoundDays, to: .now) ?? .now
 
-        return failable(eventLoop: database.eventLoop) {
+        return subjectRepository.allActive(for: userID).failableFlatMap { subjects in
+
             try Query.recommendedTopics(
                 userID: userID,
                 lowerDate: lowerBoundDate,
                 upperDate: upperBoundDate,
-                limit: limit
+                limit: limit,
+                activeSubjects: subjects.map { $0.id }
             )
                 .query(for: database)
                 .all(decoding: RecommendedTopics.self)
