@@ -52,7 +52,7 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     /// - Parameters:
     ///   - user: The user requesting the subjects
     ///   - searchQuery: A search query if wanted
-    func allSubjects(for user: User, searchQuery: Subject.ListOverview.SearchQuery) -> EventLoopFuture<[Subject.ListOverview]>
+    func allSubjects(for userID: User.ID?, searchQuery: Subject.ListOverview.SearchQuery?) -> EventLoopFuture<[Subject.ListOverview]>
 
     /// Returns all the active subjects for a user
     /// - Parameter userID: The id of the user making the request

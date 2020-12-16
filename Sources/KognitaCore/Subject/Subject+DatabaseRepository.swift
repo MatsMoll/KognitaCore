@@ -342,7 +342,7 @@ extension Subject.DatabaseRepository {
         guard moderator.id != userID else {
             throw Abort(.badRequest)
         }
-        return try userRepository
+        return userRepository
             .isModerator(user: moderator, subjectID: subjectID)
             .ifFalse(throw: Abort(.forbidden))
             .flatMap {
@@ -370,10 +370,10 @@ extension Subject.DatabaseRepository {
         let canPractice: Bool
     }
 
-    public func allSubjects(for user: User, searchQuery: Subject.ListOverview.SearchQuery) -> EventLoopFuture<[Subject.ListOverview]> {
+    public func allSubjects(for userID: User.ID?, searchQuery: Subject.ListOverview.SearchQuery?) -> EventLoopFuture<[Subject.ListOverview]> {
 
         var query = Subject.DatabaseModel.query(on: database)
-        if let subjectName = searchQuery.name {
+        if let subjectName = searchQuery?.name {
             // Inefficent search method
             query = query.filter(\.$name, .custom("ILIKE"), "%\(subjectName)%")
         }
@@ -381,8 +381,15 @@ extension Subject.DatabaseRepository {
             .all()
             .flatMap { subjects in
 
-                User.ActiveSubject.query(on: self.database)
-                    .filter(\.$user.$id == user.id)
+                guard let userID = userID else {
+                    return database.eventLoop.future(
+                        subjects.map { subject in
+                            Subject.ListOverview(subject: subject, isActive: false)
+                        }
+                    )
+                }
+                return User.ActiveSubject.query(on: self.database)
+                    .filter(\.$user.$id == userID)
                     .all()
                     .map { activeSubjects in
                         subjects.map { subject in
