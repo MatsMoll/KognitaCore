@@ -43,5 +43,5 @@ public protocol ExamRepository {
     /// - Parameters:
     ///   - subjectID: The subject id
     ///   - userID: The id of the user that requests the information
-    func allExamsWithNumberOfTasksFor(subjectID: Subject.ID, userID: User.ID) -> EventLoopFuture<[Exam.WithCompletion]>
+    func allExamsWithNumberOfTasksFor(subjectID: Subject.ID, userID: User.ID?) -> EventLoopFuture<[Exam.WithCompletion]>
 }

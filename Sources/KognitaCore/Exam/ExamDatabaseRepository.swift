@@ -66,7 +66,7 @@ struct ExamDatabaseRepository: ExamRepository {
             }
     }
 
-    func allExamsWithNumberOfTasksFor(subjectID: Subject.ID, userID: User.ID) -> EventLoopFuture<[Exam.WithCompletion]> {
+    func allExamsWithNumberOfTasksFor(subjectID: Subject.ID, userID: User.ID?) -> EventLoopFuture<[Exam.WithCompletion]> {
         guard let sql = database as? SQLDatabase else {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
@@ -85,16 +85,27 @@ struct ExamDatabaseRepository: ExamRepository {
             .groupBy(\Exam.DatabaseModel.$id)
             .all(decoding: Exam.WithNumberOfTasks.self)
             .flatMap { exams in
-                repositories.taskResultRepository
-                    .completionInExamWith(ids: exams.map { $0.id }, userID: userID)
-                    .map { completions in
+                if let userID = userID {
+                    return repositories.taskResultRepository
+                        .completionInExamWith(ids: exams.map { $0.id }, userID: userID)
+                        .map { completions in
+                            exams.map { exam in
+                                Exam.WithCompletion(
+                                    exam: exam,
+                                    completion: completions.first(where: { $0.examID == exam.id })
+                                )
+                            }
+                        }
+                } else {
+                    return database.eventLoop.future(
                         exams.map { exam in
                             Exam.WithCompletion(
                                 exam: exam,
-                                completion: completions.first(where: { $0.examID == exam.id })
+                                completion: nil
                             )
                         }
-                    }
+                    )
+                }
             }
     }
 }
