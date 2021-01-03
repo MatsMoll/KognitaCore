@@ -17,6 +17,19 @@ extension EventLoopFuture where Value: ContentConvertable {
     }
 }
 
+public protocol UserRepresentable {
+    var email: String { get }
+    var username: String { get }
+    var usedPassword: String? { get }
+    var isEmailVerified: Bool { get }
+    var pictureUrl: String? { get }
+}
+
+public protocol TokenConfig {
+    var token: String { get }
+    var expiresAt: Date { get }
+}
+
 /// A protocol defining the needed functionality for a repository handeling a `User`
 public protocol UserRepository: ResetPasswordRepositoring {
 
@@ -37,10 +50,40 @@ public protocol UserRepository: ResetPasswordRepositoring {
     ///   - content: The content defining the new user
     func create(from content: User.Create.Data) throws -> EventLoopFuture<User>
 
+    /// Creates a `User` based on a more generalized data structure
+    /// NB: This will skip some verification
+    /// - Parameter user: The data needed to create the user in the database
+    /// - Parameter handleDuplicateSilently: If if should throw an error if there is an duplicate user
+    func unsafeCreate(_ user: UserRepresentable, handleDuplicateSilently: Bool) throws -> EventLoopFuture<User>
+
     /// Login using a token based method
     /// - Parameter user: The user to login as
     /// - Returns: A future `User.Login.Token`
     func login(with user: User) throws -> EventLoopFuture<User.Login.Token>
+
+    /// Login using a feide token
+    /// - Parameter tokenConfig: The token assosiated with the login
+    /// - Parameter userID: The id of the user assosiated with the token
+    /// - Returns: A future `User.Login.Token`
+    func loginWith(feide tokenConfig: TokenConfig, for userID: User.ID) throws -> EventLoopFuture<User.Login.Token>
+
+    /// Saves a users feide login grant, as it will be used on logout
+    /// - Parameters:
+    ///   - grant: The grant
+    ///   - userID: The id of the user assosiated with the grant
+    func saveFeide(grant: Feide.Grant, for userID: User.ID) -> EventLoopFuture<Void>
+
+    /// finds the latest grant if any
+    /// - Parameter userID: The user id assosiated with the grant
+    func latestFeideGrant(for userID: User.ID) -> EventLoopFuture<Feide.Grant?>
+
+    func latestFeideToken(for userID: User.ID) -> EventLoopFuture<User.Login.Token?>
+
+    /// Marks a Feide Grant as outdated
+    /// - Parameters:
+    ///   - grant: The grant to mark
+    ///   - userID: The id of the user requesting the mark
+    func markAsOutdated(grant: Feide.Grant, for userID: User.ID) -> EventLoopFuture<Void>
 
     /// Logs a user login
     /// - Parameters:

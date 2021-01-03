@@ -170,7 +170,7 @@ extension MultipleChoiceTask.DatabaseRepository {
             return database.eventLoop.future(error: Abort(.badRequest, reason: "Mutliple Choice Task do not contain any solutions"))
         }
         // The ID is the only one that should be used
-        let unknownUser = User(id: 1, username: "", email: "", registrationDate: .init(), isAdmin: false, isEmailVerified: true)
+        let unknownUser = User(id: 1, username: "", email: "", registrationDate: .init(), isAdmin: false, isEmailVerified: true, pictureUrl: nil)
 
         return database.eventLoop.future()
             .flatMap { () -> EventLoopFuture<Void> in
@@ -386,6 +386,7 @@ extension MultipleChoiceTask.DatabaseRepository {
                                                             ),
                                                             subject: Subject(
                                                                 id: subjectOverview.id,
+                                                                code: subjectOverview.code,
                                                                 name: subjectOverview.name,
                                                                 description: subjectOverview.description,
                                                                 category: subjectOverview.category

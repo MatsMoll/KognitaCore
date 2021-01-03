@@ -176,7 +176,7 @@ extension SubjectTest {
                             )
                         }
                         .flatMap { session in
-                            session.create(on: self.database)
+                            session.create(on: database)
                                 .flatMapThrowing { try session.content() }
                     }
             }
@@ -257,7 +257,7 @@ extension SubjectTest {
                                         .flatMap { (answers: [MultipleChoiseTaskAnswer]) in
 
                                             self.multipleChoiceTaskContent(
-                                                id: id,
+                                                id: taskID,
                                                 task: task,
                                                 multipleChoiceTask: multipleChoiseTask,
                                                 choices: choices,
@@ -328,7 +328,7 @@ extension SubjectTest {
                         .column(SQLAlias(SQLFunction("COUNT", args: "choiseID"), as: SQLIdentifier("numberOfAnswers")))
                         .from(TestSession.DatabaseModel.schema)
                         .join(from: \TestSession.DatabaseModel.$id, to: \TaskSessionAnswer.$session.$id)
-                        .join(from: \TaskSessionAnswer.$id, to: \MultipleChoiseTaskAnswer.$id)
+                        .join(from: \TaskSessionAnswer.$taskAnswer.$id, to: \MultipleChoiseTaskAnswer.$id)
                         .groupBy(\MultipleChoiseTaskAnswer.$choice.$id)
                         .where("testID", .equal, test.id)
                         .all(decoding: MultipleChoiseTaskAnswerCount.self)

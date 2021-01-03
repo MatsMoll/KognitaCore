@@ -1,6 +1,7 @@
 import Vapor
 import FluentKit
 import Fluent
+import SQLKit
 
 extension User {
 
@@ -24,9 +25,9 @@ extension User {
         @Field(key: "email")
         public private(set) var email: String
 
-        /// BCrypt hash of the user's password.
-        @Field(key: "passwordHash")
-        public var passwordHash: String
+        /// The uri if a picture if provided
+        @Field(key: "pictureUrl")
+        var pictureUrl: String?
 
         /// The role of the User
         @Field(key: "isAdmin")
@@ -54,11 +55,11 @@ extension User {
     //    public static var deletedAtKey: TimestampKey? = \.loseAccessDate
 
         /// Creates a new `User`.
-        init(id: Int? = nil, username: String, email: String, passwordHash: String, isAdmin: Bool = false, isEmailVerified: Bool = false) {
+        init(id: Int? = nil, username: String, email: String, pictureUrl: String?, isAdmin: Bool = false, isEmailVerified: Bool = false) {
             self.id = id
             self.username = username
             self.email = email.lowercased()
-            self.passwordHash = passwordHash
+            self.pictureUrl = pictureUrl
             self.isAdmin = isAdmin
             self.isEmailVerified = isEmailVerified
         }
@@ -73,7 +74,8 @@ extension User.DatabaseModel: ContentConvertable {
             email: email,
             registrationDate: createdAt ?? .now,
             isAdmin: isAdmin,
-            isEmailVerified: isEmailVerified
+            isEmailVerified: isEmailVerified,
+            pictureUrl: pictureUrl
         )
     }
 }
@@ -90,13 +92,70 @@ extension User.Migrations {
         func build(schema: SchemaBuilder) -> SchemaBuilder {
             schema.field("username", .string, .required)
                 .field("email", .string, .required)
-                .field("passwordHash", .string, .required)
                 .field("isAdmin", .bool, .required)
                 .field("isEmailVerified", .bool, .required)
                 .field("viewedNotificationsAt", .datetime)
                 .defaultTimestamps()
                 .unique(on: "email")
                 .unique(on: "username")
+                .field("pictureUrl", .string)
+        }
+    }
+
+    struct FeideSupport: Migration {
+
+        struct PasswordHashQuery: Codable {
+            let id: User.ID
+            let passwordHash: String
+        }
+
+        let createFeideUserMigration = FeideUser.Migrations.Create()
+        let createKognitaUserMigration = KognitaUser.Migrations.Create()
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            createFeideUserMigration.prepare(on: database)
+                .flatMap {
+                    createKognitaUserMigration.prepare(on: database)
+                }.flatMap {
+
+                    guard let sql = database as? SQLDatabase else {
+                        return database.eventLoop.future(error: Abort(.internalServerError, reason: "Expected SQL Database"))
+                    }
+
+                    return sql.select()
+                        .column("passwordHash")
+                        .column("id")
+                        .from(User.DatabaseModel.schema)
+                        .where("passwordHash", .isNot, SQLLiteral.null)
+                        .all(decoding: PasswordHashQuery.self)
+                        .flatMap { passwords in
+                            passwords.map { KognitaUser(id: $0.id, passwordHash: $0.passwordHash).create(on: database) }
+                                .flatten(on: database.eventLoop)
+                        }
+                }.flatMap {
+                    database.schema(User.DatabaseModel.schema)
+                        .field("pictureUrl", .string)
+                        .deleteField("passwordHash")
+                        .update()
+                }
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+
+            return database.eventLoop.future(error: Abort(.notImplemented, reason: "Need to set the old passwordHash"))
+
+//            return database.schema(User.DatabaseModel.schema)
+//                .deleteField("pictureUrl")
+//                .field("passwordHash", .string)
+//                .update()
+//                .flatMap {
+//                    KognitaUser.query(on: database)
+//                        .join(superclass: User.DatabaseModel.self, with: KognitaUser.self)
+//                        .all(KognitaUser.self, User.DatabaseModel.self)
+//                        .flatMap {
+//
+//                        }
+//                }
         }
     }
 }

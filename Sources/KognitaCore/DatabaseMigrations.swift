@@ -28,6 +28,12 @@ public class DatabaseMigrations {
 //            app.migrations.add(TaskDatabaseModel.Migrations.ExamParent())
 //            app.migrations.add(TaskSession.Pivot.Task.Migrations.Create())
 //            app.migrations.add(ExamSession.Migrations.Create())
+
+            app.migrations.add(User.Migrations.FeideSupport())
+            app.migrations.add(FeideUser.Token.Migrations.Create())
+            app.migrations.add(User.FeideSubject.Migrations.Create())
+            app.migrations.add(Subject.Migrations.CodeAttribute())
+            app.migrations.add(Feide.Grant.Migrations.Create())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
@@ -41,10 +47,16 @@ public class DatabaseMigrations {
 
         migrations.add([
             User.Migrations.Create(),
+            KognitaUser.Migrations.Create(),
+            FeideUser.Migrations.Create(),
+
             User.ResetPassword.Token.Migrations.Create(),
             User.Login.Token.Migrations.Create(),
             User.VerifyEmail.Token.Migrations.Create(),
             User.Login.Log.Create(),
+
+            FeideUser.Token.Migrations.Create(),
+            Feide.Grant.Migrations.Create(),
 
             Subject.Migrations.Create(),
             Topic.Migrations.Create(),

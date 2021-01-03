@@ -15,6 +15,7 @@ class UserTests: VaporTestCase {
             email: "test@ntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
 
@@ -31,6 +32,7 @@ class UserTests: VaporTestCase {
             email: "testntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
 
@@ -46,6 +48,7 @@ class UserTests: VaporTestCase {
             email: "test@ntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
         let sameUsernameRequest = User.Create.Data(
@@ -53,6 +56,7 @@ class UserTests: VaporTestCase {
             email: "test2@ntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
 
@@ -71,6 +75,7 @@ class UserTests: VaporTestCase {
             email: "test@ntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
         let sameEamilRequest = User.Create.Data(
@@ -78,6 +83,7 @@ class UserTests: VaporTestCase {
             email: createRequest.email,
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
 
@@ -95,6 +101,7 @@ class UserTests: VaporTestCase {
             email: "test@ntnu.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
         let createRequestInvalid = User.Create.Data(
@@ -102,6 +109,7 @@ class UserTests: VaporTestCase {
             email: "test@test.no",
             password: "p1234",
             verifyPassword: "p1234",
+            pictureUrl: nil,
             acceptedTerms: .accepted
         )
         XCTAssertNoThrow(
@@ -114,7 +122,7 @@ class UserTests: VaporTestCase {
 
     func testResetPassword() throws {
         let user = try User.create(on: app)
-        let dbUser = try User.DatabaseModel.find(user.id, on: database).unwrap(or: Errors.badTest).wait()
+        let dbUser = try KognitaUser.find(user.id, on: database).unwrap(or: Errors.badTest).wait()
 
         let tokenResponse = try resetPasswordRepository.startReset(for: user).wait()
 
@@ -130,7 +138,7 @@ class UserTests: VaporTestCase {
         try resetPasswordRepository
             .reset(to: resetRequest, with: tokenResponse.token).wait()
 
-        let savedUser = try User.DatabaseModel.find(user.id, on: database).unwrap(or: Errors.badTest).wait()
+        let savedUser = try KognitaUser.find(user.id, on: database).unwrap(or: Errors.badTest).wait()
 
         XCTAssert(try app.password.verify(newPassword, created: savedUser.passwordHash))
     }
@@ -151,8 +159,9 @@ class UserTests: VaporTestCase {
             try resetPasswordRepository
                 .reset(to: resetRequest, with: tokenResponse.token).wait()
         )
-        let savedUser = try User.DatabaseModel
-            .find(user.id, on: database).unwrap(or: Abort(.internalServerError)).wait()
+        let savedUser = try KognitaUser
+            .find(user.id, on: database)
+            .unwrap(or: Abort(.internalServerError)).wait()
         XCTAssertFalse(try app.password.verify(newPassword, created: savedUser.passwordHash))
     }
 
@@ -179,7 +188,7 @@ class UserTests: VaporTestCase {
             try resetPasswordRepository
                 .reset(to: resetRequest, with: tokenResponse.token).wait()
         )
-        let savedUser = try User.DatabaseModel.find(user.id, on: database).unwrap(or: Abort(.internalServerError)).wait()
+        let savedUser = try KognitaUser.find(user.id, on: database).unwrap(or: Abort(.internalServerError)).wait()
         XCTAssertFalse(try app.password.verify(newPassword, created: savedUser.passwordHash))
     }
 

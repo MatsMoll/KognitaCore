@@ -234,6 +234,7 @@ extension TypingTask.DatabaseRepository {
                                                 try TypingTask.ModifyContent(
                                                     subject: Subject(
                                                         id: subjectOverview.id,
+                                                        code: subjectOverview.code,
                                                         name: subjectOverview.name,
                                                         description: subjectOverview.description,
                                                         category: subjectOverview.category
