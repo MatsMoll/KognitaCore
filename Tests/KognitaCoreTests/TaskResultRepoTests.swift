@@ -43,7 +43,7 @@ class TaskResultRepoTests: VaporTestCase {
             let maxCompletedTasks = max(firstHistogram[3].numberOfTasksCompleted, firstHistogram[2].numberOfTasksCompleted)
             XCTAssertEqual(maxCompletedTasks, 4)
         } else {
-            XCTFail("Incorrect amount of histogramdata")
+            XCTFail("Incorrect amount of histogram data, found \(firstHistogram.count), but expected 4")
         }
 
         if secondHistogram.count == 7 {
@@ -51,7 +51,7 @@ class TaskResultRepoTests: VaporTestCase {
             let maxCompletedTasks = max(secondHistogram[6].numberOfTasksCompleted, secondHistogram[5].numberOfTasksCompleted)
             XCTAssertEqual(maxCompletedTasks, 4)
         } else {
-            XCTFail("Incorrect amount of histogramdata")
+            XCTFail("Incorrect amount of histogram data, found \(secondHistogram.count), but expected 7")
         }
 
     }
