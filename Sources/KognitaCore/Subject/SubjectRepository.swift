@@ -66,10 +66,10 @@ public protocol SubjectRepositoring: DeleteModelRepository {
 
     /// Mark a subject as active
     /// - Parameters:
-    ///   - subject: The subject to mark
+    ///   - subjectID: The subject to mark
     ///   - canPractice: If the user can practice in the subject
-    ///   - user: The user making the request
-    func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void>
+    ///   - userID: The user making the request
+    func mark(active subjectID: Subject.ID, canPractice: Bool, for userID: User.ID) -> EventLoopFuture<Void>
 
     /// Make a subject inactive
     /// - Parameters:
@@ -137,4 +137,14 @@ public protocol SubjectRepositoring: DeleteModelRepository {
     ///   - maxAmount: The max amount of tasks
     ///   - withSoftDeleted: If it should return tombstoned data
     func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]>
+
+    func feideSubjects(for userID: User.ID) -> EventLoopFuture<[User.FeideSubject]>
+
+    func save(subjects: [Feide.Subject], for userID: User.ID) -> EventLoopFuture<Void>
+
+    /// Updates the different potensial relevant subjects and mark them as active if wanted
+    /// - Parameters:
+    ///   - potensialSubjects: If the different subjects should be marked as active
+    ///   - userID: The user's id
+    func update(potensialSubjects: [User.FeideSubject.Update], for userID: User.ID) -> EventLoopFuture<Void>
 }

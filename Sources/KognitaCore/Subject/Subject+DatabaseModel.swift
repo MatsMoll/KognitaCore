@@ -16,31 +16,34 @@ extension Subject {
 
         /// The subject id
         @DBID(custom: "id")
-        public var id: Int?
+        var id: Int?
 
         /// A description of the topic
         @Field(key: "description")
-        public private(set) var description: String
+        var description: String
+
+        @Field(key: "code")
+        var code: String
 
         /// The name of the subject
         @Field(key: "name")
-        public private(set) var name: String
+        var name: String
 
         /// The creator of the subject
         @Parent(key: "creatorID")
-        public var creator: User.DatabaseModel
+        var creator: User.DatabaseModel
 
         /// The category describing the subject etc. Tech
         @Field(key: "category")
-        public var category: String
+        var category: String
 
         /// Creation data
         @Timestamp(key: "createdAt", on: .create)
-        public var createdAt: Date?
+        var createdAt: Date?
 
         /// Update date
         @Timestamp(key: "updatedAt", on: .update)
-        public var updatedAt: Date?
+        var updatedAt: Date?
 
         @Children(for: \.$subject)
         var activeSubjects: [User.ActiveSubject]
@@ -50,7 +53,8 @@ extension Subject {
 
         init() {}
 
-        init(name: String, category: String, description: String, creatorId: User.ID) {
+        init(code: String, name: String, category: String, description: String, creatorId: User.ID) {
+            self.code = code
             self.category = category
             self.name = name
             self.$creator.id = creatorId
@@ -58,6 +62,7 @@ extension Subject {
         }
 
         init(content: Create.Data, creator: User) {
+            self.code = content.code
             self.$creator.id = creator.id
             self.name = content.name
             self.description = content.description
@@ -86,6 +91,7 @@ extension Subject {
             self.name           = content.name
             self.category       = content.category
             self.description    = content.description
+            self.code           = content.code
 
             try validateSubject()
         }
@@ -104,6 +110,7 @@ extension Subject.Migrations {
         func prepare(on database: Database) -> EventLoopFuture<Void> {
             database.schema(schema)
                 .field("id", .uint, .identifier(auto: true))
+                .field("code", .string, .required, .sql(.unique))
                 .field("description", .string, .required)
                 .field("name", .string, .required)
                 .field("category", .string, .required)
@@ -116,12 +123,62 @@ extension Subject.Migrations {
             database.schema(schema).delete()
         }
     }
+
+    struct CodeAttribute: Migration {
+
+        func prepare(on database: Database) -> EventLoopFuture<Void> {
+            database.schema(Subject.DatabaseModel.schema)
+                .field("code", .string, .required, .sql(.default("Unknown")))
+                .update()
+                .flatMap {
+                    Subject.DatabaseModel.query(on: database)
+                        .all()
+                }.flatMap { subjects in
+                    for subject in subjects {
+                        let seperatedName = subject.name.split(separator: ":")
+                        if
+                            seperatedName.count == 2,
+                            let code = seperatedName.first,
+                            let name = seperatedName.last
+                        {
+                            subject.code = code.filter { !$0.isWhitespace }
+                            subject.name = String(name.drop(while: { $0.isWhitespace }))
+                        } else {
+                            subject.code = subject.name
+                        }
+                    }
+                    return subjects.map { $0.save(on: database) }
+                        .flatten(on: database.eventLoop)
+                }.flatMap {
+                    database.schema(Subject.DatabaseModel.schema)
+                        .constraint(.constraint(.unique(fields: [.key("code")]), name: "Subject.code:unique"))
+                        .update()
+                }
+        }
+
+        func revert(on database: Database) -> EventLoopFuture<Void> {
+            Subject.DatabaseModel.query(on: database)
+                .all()
+                .flatMap { subjects in
+                    subjects.forEach { subject in
+                        subject.name = "\(subject.code): \(subject.name)"
+                    }
+                    return subjects.map { $0.save(on: database) }
+                        .flatten(on: database.eventLoop)
+                }.flatMap {
+                    database.schema(Subject.DatabaseModel.schema)
+                        .deleteField("code")
+                        .update()
+                }
+        }
+    }
 }
 
 extension Subject.DatabaseModel: ContentConvertable {
     func content() throws -> Subject {
         try .init(
             id: requireID(),
+            code: code,
             name: name,
             description: description,
             category: category

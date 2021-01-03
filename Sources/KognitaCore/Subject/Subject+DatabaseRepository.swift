@@ -142,6 +142,7 @@ extension Subject.DatabaseRepository {
 
     public func importContent(_ content: Subject.Import) -> EventLoopFuture<Subject> {
         let subject = Subject.DatabaseModel(
+            code: content.subject.code,
             name: content.subject.name,
             category: content.subject.category,
             description: content.subject.description,
@@ -315,13 +316,20 @@ extension Subject.DatabaseRepository {
             .delete(on: database)
     }
 
-    public func mark(active subject: Subject, canPractice: Bool, for user: User) throws -> EventLoopFuture<Void> {
-        User.ActiveSubject(
-            userID: user.id,
-            subjectID: subject.id,
-            canPractice: canPractice
-        )
-            .create(on: database)
+    public func mark(active subjectID: Subject.ID, canPractice: Bool, for userID: User.ID) -> EventLoopFuture<Void> {
+        User.ActiveSubject.query(on: database)
+            .filter(\.$subject.$id == subjectID)
+            .filter(\.$user.$id == userID)
+            .first()
+            .flatMap { activeSubject in
+                guard activeSubject == nil else { return database.eventLoop.future() }
+                return User.ActiveSubject(
+                    userID: userID,
+                    subjectID: subjectID,
+                    canPractice: canPractice
+                )
+                .create(on: database)
+            }
     }
 
     public func grantModeratorPrivilege(for userID: User.ID, in subjectID: Subject.ID, by moderator: User) throws -> EventLoopFuture<Void> {
@@ -375,7 +383,12 @@ extension Subject.DatabaseRepository {
         var query = Subject.DatabaseModel.query(on: database)
         if let subjectName = searchQuery?.name {
             // Inefficent search method
-            query = query.filter(\.$name, .custom("ILIKE"), "%\(subjectName)%")
+            // Should probably move to a suffix trie
+            // or index terms
+            query = query.group(.or) {
+                $0.filter(\.$name, .custom("ILIKE"), "%\(subjectName)%")
+                    .filter(\.$code, .custom("ILIKE"), "%\(subjectName)%")
+            }
         }
         return query
             .all()
@@ -388,7 +401,7 @@ extension Subject.DatabaseRepository {
                         }
                     )
                 }
-                return User.ActiveSubject.query(on: self.database)
+                return User.ActiveSubject.query(on: database)
                     .filter(\.$user.$id == userID)
                     .all()
                     .map { activeSubjects in
@@ -492,6 +505,7 @@ extension Subject.DatabaseRepository {
             .flatMapThrowing { subject in
                 try Subject.Overview(
                     id: subject.requireID(),
+                    code: subject.code,
                     name: subject.name,
                     description: subject.description,
                     category: subject.description,
@@ -511,6 +525,7 @@ extension Subject.DatabaseRepository {
             .flatMapThrowing { subject in
                 try Subject.Overview(
                     id: subject.requireID(),
+                    code: subject.code,
                     name: subject.name,
                     description: subject.description,
                     category: subject.description,
@@ -541,12 +556,89 @@ extension Subject.DatabaseRepository {
     public func tasksWith(subjectID: Subject.ID, user: User, query: TaskOverviewQuery?, maxAmount: Int?, withSoftDeleted: Bool) -> EventLoopFuture<[CreatorTaskContent]> {
         taskRepository.getTasks(in: subjectID, user: user, query: query, maxAmount: maxAmount, withSoftDeleted: withSoftDeleted)
     }
+
+    public func feideSubjects(for userID: User.ID) -> EventLoopFuture<[User.FeideSubject]> {
+        User.FeideSubject.DatabaseModel.query(on: database)
+            .filter(\.$user.$id == userID)
+            .all()
+            .flatMapEachThrowing { try $0.content() }
+    }
+
+    public func save(subjects: [Feide.Subject], for userID: User.ID) -> EventLoopFuture<Void> {
+        User.FeideSubject.DatabaseModel
+            .query(on: database)
+            .filter(\.$user.$id == userID)
+            .all()
+            .map { (savedSubjects: [User.FeideSubject.DatabaseModel]) -> [Feide.Subject] in
+                subjects.filter { subject in
+                    !savedSubjects.contains(where: { $0.groupID == subject.id })
+                }
+            }
+            .flatMap { (feideSubjects: [Feide.Subject]) -> EventLoopFuture<Void> in
+                var subjectCodes = [String: Feide.Subject]()
+                for subject in feideSubjects {
+                    let parts = subject.id.split(separator: ":")
+                    if parts.count > 2 {
+                        subjectCodes[String(parts[parts.count - 2])] = subject
+                    }
+                }
+                return self.subjects(with: Set(subjectCodes.keys))
+                    .map { (savedSubjects: [Subject]) -> [User.FeideSubject.DatabaseModel] in
+
+                        let savedSubjectDict: [String: Subject] = Dictionary(uniqueKeysWithValues: savedSubjects.map { ($0.code, $0) })
+
+                        return subjectCodes.map { (code, feideSubject) in
+                            User.FeideSubject.DatabaseModel(
+                                subject: feideSubject,
+                                code: code,
+                                userID: userID,
+                                subjectID: savedSubjectDict[code]?.id
+                            )
+                        }
+                    }
+                    .flatMap { $0.create(on: database) }
+            }
+            .transform(to: ())
+    }
+
+    func subjects(with codes: Set<String>) -> EventLoopFuture<[Subject]> {
+        Subject.DatabaseModel.query(on: database)
+            .filter(\.$code ~~ codes)
+            .all()
+            .flatMapEachThrowing { try $0.content() }
+    }
+
+    public func update(potensialSubjects: [User.FeideSubject.Update], for userID: User.ID) -> EventLoopFuture<Void> {
+
+        let potensialFeideSubjectsID = potensialSubjects.map { $0.id }
+        let activeFeideSubjects = Set(potensialSubjects.filter { $0.isActive }.map { $0.id })
+
+        return User.FeideSubject.DatabaseModel.query(on: database)
+            .filter(\.$user.$id == userID)
+            .filter(\.$id ~~ potensialFeideSubjectsID)
+            .all()
+            .flatMap { feideSubjects in
+                feideSubjects.forEach { $0.wasViewedAt = .now }
+                let activeSubjects = feideSubjects
+                    .filter { activeFeideSubjects.contains($0.id!) }
+                    .compactMap { $0.$subject.id }
+
+                return activeSubjects
+                    .map { mark(active: $0, canPractice: true, for: userID) }
+                    .flatten(on: database.eventLoop)
+                    .flatMap {
+                        feideSubjects.map { $0.save(on: database) }
+                            .flatten(on: database.eventLoop)
+                    }
+            }
+    }
 }
 
 extension Subject.ListOverview {
     init(subject: Subject.DatabaseModel, isActive: Bool) {
         self.init(
             id: subject.id ?? 0,
+            code: subject.code,
             name: subject.name,
             description: subject.description,
             category: subject.category,
@@ -583,6 +675,7 @@ extension Subject.ListOverview {
     init(subject: Subject.DatabaseModel, active: [User.ActiveSubject]) {
         self.init(
             id: subject.id ?? 0,
+            code: subject.code,
             name: subject.name,
             description: subject.description,
             category: subject.category,

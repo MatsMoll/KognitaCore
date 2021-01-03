@@ -48,7 +48,16 @@ class SubjectTests: VaporTestCase {
         XCTAssertEqual(topicExport.subtopics.last?.multipleChoiceTasks.count, 1)
         XCTAssertEqual(topicExport.subtopics.last?.typingTasks.count, 1)
 
-        _ = try subjectRepository.importContent(subjectExport.importContent).wait()
+        let modifiedImportContent = Subject.Import(
+            subject: Subject.Create.Data(
+                code: Subject.uniqueCode(),
+                name: subjectExport.subject.name,
+                description: subjectExport.subject.description,
+                category: subjectExport.subject.category
+            ),
+            topics: subjectExport.importContent.topics
+        )
+        _ = try subjectRepository.importContent(modifiedImportContent).wait()
 
         XCTAssertEqual(try taskRepository.all().wait().count, 10)
         XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: database).all().wait().count, 10)
@@ -71,7 +80,12 @@ class SubjectTests: VaporTestCase {
             .exportTopics(in: subject).wait()
         let subjectImport = subjectExport.importContent
         let modefiedImport = Subject.Import(
-            subject: subjectImport.subject,
+            subject: Subject.Create.Data(
+                code: Subject.uniqueCode(),
+                name: subjectImport.subject.name,
+                description: subjectImport.subject.description,
+                category: subjectImport.subject.category
+            ),
             topics: subjectImport.topics + [
                 Topic.Import(
                     topic: .init(
@@ -100,6 +114,15 @@ class SubjectTests: VaporTestCase {
                 )
             ]
         )
+        let modifiedImportContent = Subject.Import(
+            subject: Subject.Create.Data(
+                code: Subject.uniqueCode(),
+                name: subjectImport.subject.name,
+                description: subjectImport.subject.description,
+                category: subjectImport.subject.category
+            ),
+            topics: subjectImport.topics
+        )
 
         do {
             _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
@@ -116,7 +139,7 @@ class SubjectTests: VaporTestCase {
         XCTAssertEqual(try TaskSolution.DatabaseModel.query(on: database).all().wait().count, 5)
 
         _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
-            repo.subjectRepository.importContent(subjectImport)
+            repo.subjectRepository.importContent(modifiedImportContent)
         }
         .wait()
 
@@ -258,7 +281,7 @@ class SubjectTests: VaporTestCase {
                 .unwrap(or: Errors.badTest)
                 .wait()
 
-            try subjectRepository.mark(active: subject.content(), canPractice: true, for: userTwo).wait()
+            try subjectRepository.mark(active: subject.requireID(), canPractice: true, for: userTwo.id).wait()
 
             let subjects = try subjectRepository.allSubjects(for: user.id, searchQuery: nil).wait()
             XCTAssertEqual(subjects.count, 4)
@@ -329,7 +352,7 @@ class SubjectTests: VaporTestCase {
         let expectedNumberOfExamTasks = numberOfTopics * 5
 
         let importContent = Subject.Import(
-            subject: .init(name: "Test", description: "Test", category: "Test"),
+            subject: .init(code: "TDT123", name: "Test", description: "Test", category: "Test"),
             topics: (1...numberOfTopics).map {
                 Topic.Import.testData(chapter: $0, topicName: "Test \($0)")
             }

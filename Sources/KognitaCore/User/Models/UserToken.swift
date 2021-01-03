@@ -14,7 +14,9 @@ extension User.Login.Token {
             // generate a random 128-bit, base64-encoded string.
             let string = [UInt8].random(count: 32).base64
             // init a new `UserToken` from that string.
-            return .init(string: string, userID: userID)
+            // set token to expire after 5 hours
+            let expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
+            return .init(string: string, expiresAt: expiresAt, userID: userID)
         }
 
         /// See `Model`
@@ -36,11 +38,10 @@ extension User.Login.Token {
         public var expiresAt: Date
 
         /// Creates a new `UserToken`.
-        init(id: Int? = nil, string: String, userID: User.ID) {
+        init(id: Int? = nil, string: String, expiresAt: Date, userID: User.ID) {
             self.id = id
             self.string = string
-            // set token to expire after 5 hours
-            self.expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
+            self.expiresAt = expiresAt
             self.$user.id = userID
         }
 

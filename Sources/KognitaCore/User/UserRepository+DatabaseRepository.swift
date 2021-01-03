@@ -37,17 +37,26 @@ extension String {
     }
 }
 
+extension User.Create.Data: UserRepresentable {
+    public var usedPassword: String? { password }
+
+    public var isEmailVerified: Bool { false }
+
+    public var origin: String { "Kognita" }
+}
+
 extension User.DatabaseRepository: UserRepository {
 
     public func verify(email: String, with password: String) -> EventLoopFuture<User?> {
 
         User.DatabaseModel.query(on: database)
             .filter(\.$email == email)
-            .first()
-            .flatMapThrowing { user in
+            .join(superclass: KognitaUser.self, with: User.DatabaseModel.self)
+            .first(User.DatabaseModel.self, KognitaUser.self)
+            .flatMapThrowing { (userContent) in
                 if
-                    let user = user,
-                    (try? self.password.verify(password, created: user.passwordHash)) == true
+                    let (user, kognitaUser) = userContent,
+                    (try? self.password.verify(password, created: kognitaUser.passwordHash)) == true
                 {
                     return try user.content()
                 }
@@ -97,10 +106,20 @@ extension User.DatabaseRepository: UserRepository {
     public func login(with user: User) throws -> EventLoopFuture<User.Login.Token> {
         // create new token for this user
         let token = try User.Login.Token.DatabaseModel.create(userID: user.id)
-
         // save and return token
         return token.save(on: database)
             .flatMapThrowing { try token.content() }
+    }
+
+    public func loginWith(feide tokenConfig: TokenConfig, for userID: User.ID) throws -> EventLoopFuture<User.Login.Token> {
+        let token = User.Login.Token.DatabaseModel(string: tokenConfig.token, expiresAt: tokenConfig.expiresAt, userID: userID)
+        return token.create(on: database)
+            .failableFlatMap {
+                try FeideUser.Token(id: token.requireID())
+                    .create(on: database)
+                    .transform(to: token)
+            }
+            .flatMapThrowing { try $0.content() }
     }
 
     public func logLogin(for user: User, with ipAddress: String?) -> EventLoopFuture<Void> {
@@ -125,36 +144,58 @@ extension User.DatabaseRepository: UserRepository {
             throw Errors.invalidEmail
         }
 
-        // hash user's password using BCrypt
-        let hash = try password.hash(content.password)
-        // save new user
+        return try unsafeCreate(content, handleDuplicateSilently: false)
+    }
+
+    public func unsafeCreate(_ user: UserRepresentable, handleDuplicateSilently: Bool) throws -> EventLoopFuture<User> {
+
         let newUser = User.DatabaseModel(
-            username: content.username,
-            email: content.email,
-            passwordHash: hash
+            username: user.username,
+            email: user.email.lowercased(),
+            pictureUrl: user.pictureUrl,
+            isEmailVerified: user.isEmailVerified
         )
 
         return User.DatabaseModel.query(on: database)
             .group(.or) {
                 $0
-                    .filter(\.$email == newUser.email.lowercased())
+                    .filter(\.$email == newUser.email)
                     .filter(\.$username == newUser.username)
             }
             .first()
             .flatMap { existingUser in
-
-                guard existingUser == nil else {
-                    if existingUser?.username == newUser.username {
+                if
+                    !handleDuplicateSilently, // If it should throw an error on duplicate user
+                    let dbUser = existingUser
+                {
+                    if dbUser.username == newUser.username {
                         return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
                     } else {
                         return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
                     }
                 }
-                return newUser.save(on: self.database)
-                    .failableFlatMap {
 
-                        try User.VerifyEmail.Token.DatabaseModel.create(userID: newUser.requireID())
-                            .save(on: self.database)
+                return newUser.save(on: database)
+                    .failableFlatMap {
+                        let userID = try newUser.requireID()
+                        // If a passowrd is used, then it is a Kognita user otherwise Feide
+                        if let userPassword = user.usedPassword {
+                            return try KognitaUser(
+                                id: userID,
+                                passwordHash: password.hash(userPassword)
+                            )
+                            .create(on: database)
+                        } else {
+                            return FeideUser(id: userID).create(on: database)
+                        }
+                    }
+                    .failableFlatMap {
+                        if !user.isEmailVerified {
+                            return try User.VerifyEmail.Token.DatabaseModel.create(userID: newUser.requireID())
+                                .save(on: database)
+                        } else {
+                            return database.eventLoop.future()
+                        }
                 }
                 .flatMapThrowing { try newUser.content() }
         }
@@ -263,5 +304,42 @@ extension User.DatabaseRepository: UserRepository {
             .first()
             .unwrap(or: Abort(.badRequest))
             .map { User.VerifyEmail.Token(token: $0.token) }
+    }
+
+    public func saveFeide(grant: Feide.Grant, for userID: User.ID) -> EventLoopFuture<Void> {
+        Feide.Grant.DatabaseModel(grant: grant, userID: userID)
+            .create(on: database)
+    }
+
+    public func latestFeideGrant(for userID: User.ID) -> EventLoopFuture<Feide.Grant?> {
+        Feide.Grant.DatabaseModel.query(on: database)
+            .sort(\.$createdAt, .descending)
+            .filter(\.$loggedOutAt == nil)
+            .first()
+            .map { grant in
+                guard let grant = grant else { return nil }
+                return Feide.Grant(code: grant.token, state: nil)
+            }
+    }
+
+    public func markAsOutdated(grant: Feide.Grant, for userID: User.ID) -> EventLoopFuture<Void> {
+        Feide.Grant.DatabaseModel.query(on: database)
+            .filter(\.$token == grant.code)
+            .filter(\.$user.$id == userID)
+            .first()
+            .unwrap(or: Abort(.badRequest))
+            .flatMap { grant in
+                grant.loggedOutAt = .now
+                return grant.save(on: database)
+            }
+    }
+
+    public func latestFeideToken(for userID: User.ID) -> EventLoopFuture<User.Login.Token?> {
+        FeideUser.Token.query(on: database)
+            .join(superclass: User.Login.Token.DatabaseModel.self, with: FeideUser.Token.self)
+            .filter(User.Login.Token.DatabaseModel.self, \User.Login.Token.DatabaseModel.$user.$id == userID)
+            .filter(User.Login.Token.DatabaseModel.self, \User.Login.Token.DatabaseModel.$expiresAt < Date())
+            .first(User.Login.Token.DatabaseModel.self)
+            .flatMapThrowing { try $0?.content() }
     }
 }

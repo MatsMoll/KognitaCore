@@ -119,11 +119,11 @@ extension User.DatabaseRepository: ResetPasswordRepositoring {
             .unwrap(or: ResetErrors.incorrectOrExpiredToken)
             .flatMap { tokenModel in
 
-                User.DatabaseModel
+                KognitaUser
                     .find(tokenModel.$user.id, on: database)
                     .unwrap(or: Abort(.badRequest))
             }
-            .flatMapThrowing { (user: User.DatabaseModel) -> User.DatabaseModel in
+            .flatMapThrowing { (user: KognitaUser) -> KognitaUser in
                 user.passwordHash = try password.hash(content.password)
                 return user
             }

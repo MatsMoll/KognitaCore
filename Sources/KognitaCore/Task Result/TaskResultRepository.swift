@@ -316,8 +316,9 @@ extension TaskResult.DatabaseRepository {
             return database.eventLoop.future(error: Abort(.internalServerError))
         }
 
-        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: Date()) ??
-            Date().addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
+        let now = Date()
+        let dateThreshold = Calendar.current.date(byAdding: .weekOfYear, value: -numberOfWeeks, to: now) ??
+            now.addingTimeInterval(-7 * 24 * 60 * 60 * Double(numberOfWeeks)) // Four weeks back
 
         return sqlDB.select()
             .count(\TaskResult.DatabaseModel.$id, as: "numberOfTasksCompleted")
@@ -332,8 +333,6 @@ extension TaskResult.DatabaseRepository {
             .flatMapThrowing { days in
 
 //                // FIXME: - there is a bug where the database uses one loale and the formatter another and this can leed to incorrect grouping
-                let now = Date()
-
                 var data = [String: TaskResult.History]()
 
                 try (0...(numberOfWeeks - 1)).forEach {
@@ -360,7 +359,7 @@ extension TaskResult.DatabaseRepository {
                     data["\(Int(day.year))-\(Int(day.week))"] = day
                 }
 
-                return data.map { $1 }
+                let sortedResults = data.map { $1 }
                     .sorted(by: { first, second in
                         if first.year == second.year {
                             return first.week < second.week
@@ -368,6 +367,11 @@ extension TaskResult.DatabaseRepository {
                             return first.year < second.year
                         }
                 })
+                if sortedResults.count > numberOfWeeks {
+                    return Array(sortedResults.dropFirst(sortedResults.count - numberOfWeeks))
+                } else {
+                    return sortedResults
+                }
         }
     }
 
