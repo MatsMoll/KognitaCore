@@ -5,6 +5,7 @@
 //  Created by Mats Mollestad on 20/12/2020.
 //
 
+import Foundation
 import FluentKit
 
 extension User.FeideSubject {
