@@ -45,6 +45,8 @@ public class TestableRepositories: RepositoriesRepresentable {
 
     public var lectureNoteTakingRepository: LectureNoteTakingSessionRepository
 
+    public var resourceRepository: ResourceRepository
+
     init(repositories: RepositoriesRepresentable) {
         self.lectureNoteRepository = repositories.lectureNoteRepository
         self.taskResultRepository = repositories.taskResultRepository
@@ -63,6 +65,7 @@ public class TestableRepositories: RepositoriesRepresentable {
         self.lectureNoteRecapRepository = repositories.lectureNoteRecapRepository
         self.examRepository = repositories.examRepository
         self.examSessionRepository = repositories.examSessionRepository
+        self.resourceRepository = repositories.resourceRepository
     }
 
     private static var shared: TestableRepositories!

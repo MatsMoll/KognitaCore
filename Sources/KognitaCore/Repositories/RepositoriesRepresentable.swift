@@ -54,6 +54,9 @@ public protocol RepositoriesRepresentable {
 
     /// A repository handeling exam sessions
     var examSessionRepository: ExamSessionRepository { get }
+
+    /// A repository handeling resources
+    var resourceRepository: ResourceRepository { get }
 }
 
 /// A protocol defining how to connect to the different repositories

@@ -72,4 +72,6 @@ public struct DatabaseRepositories: RepositoriesRepresentable {
     public var examRepository: ExamRepository { ExamDatabaseRepository(database: database, repositories: self) }
 
     public var examSessionRepository: ExamSessionRepository { ExamSession.DatabaseRepository(database: database, repositories: self) }
+
+    public var resourceRepository: ResourceRepository { DatabaseResourceRepository(database: database) }
 }

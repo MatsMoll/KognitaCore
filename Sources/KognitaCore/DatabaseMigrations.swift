@@ -29,11 +29,20 @@ public class DatabaseMigrations {
 //            app.migrations.add(TaskSession.Pivot.Task.Migrations.Create())
 //            app.migrations.add(ExamSession.Migrations.Create())
 
+            // Feide support
             app.migrations.add(User.Migrations.FeideSupport())
             app.migrations.add(FeideUser.Token.Migrations.Create())
             app.migrations.add(User.FeideSubject.Migrations.Create())
             app.migrations.add(Subject.Migrations.CodeAttribute())
             app.migrations.add(Feide.Grant.Migrations.Create())
+
+            // Resources support
+            app.migrations.add(Resource.Migrations.Create())
+            app.migrations.add(VideoResource.Migrations.Create())
+            app.migrations.add(BookResource.Migrations.Create())
+            app.migrations.add(ArticleResource.Migrations.Create())
+            app.migrations.add(Resource.TaskPivot.Migrations.Create())
+            app.migrations.add(Resource.Migrations.ConvertSolutionSourceToResource())
         }
         if app.environment != .testing {
             versionBump(app.migrations)
@@ -99,7 +108,13 @@ public class DatabaseMigrations {
             TaskResult.Migrations.Create(),
             TaskSessionAnswer.Migrations.Create(),
 
-            ExamSession.Migrations.Create()
+            ExamSession.Migrations.Create(),
+
+            Resource.Migrations.Create(),
+            VideoResource.Migrations.Create(),
+            BookResource.Migrations.Create(),
+            ArticleResource.Migrations.Create(),
+            Resource.TaskPivot.Migrations.Create()
         ])
     }
 
