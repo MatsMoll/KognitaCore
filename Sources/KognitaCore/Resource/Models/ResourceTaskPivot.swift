@@ -41,6 +41,7 @@ extension Resource.TaskPivot {
                     .id()
                     .field("taskID", .uint, .required, .references(TaskDatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("resourceID", .uint, .required, .references(Resource.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                    .unique(on: "taskID", "resourceID")
                     .create()
             }
 

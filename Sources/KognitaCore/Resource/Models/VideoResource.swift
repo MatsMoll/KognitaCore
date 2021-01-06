@@ -23,7 +23,7 @@ extension VideoResource {
         var creator: String
 
         @Field(key: "duration")
-        var duration: Int
+        var duration: Int?
 
         init() {}
 
@@ -45,7 +45,7 @@ extension VideoResource {
                     .field("id", .uint, .identifier(auto: false), .references(Resource.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("url", .string, .required)
                     .field("creator", .string, .required)
-                    .field("duration", .int, .required)
+                    .field("duration", .uint)
                     .create()
             }
 

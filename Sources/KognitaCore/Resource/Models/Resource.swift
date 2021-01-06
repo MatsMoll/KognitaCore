@@ -76,49 +76,26 @@ extension Resource {
                         }
                     }
                     .flatMap { links in
-                        groupResources(links: links)
-                            .map { (article, taskIDs) in
-                                repository.create(article: article, by: 1)
-                                    .flatMap { resourceID in
-                                        taskIDs.map { taskID in
-                                            repository.connect(taskID: taskID, to: resourceID)
-                                        }
-                                        .flatten(on: database.eventLoop)
-                                }
-                        }
-                        .flatten(on: database.eventLoop)
+                        repository.saveResources(
+                            existing: [:],
+                            solutions: repository.groupResources(links: links)
+                        )
                     }
             }
 
             func revert(on database: Database) -> EventLoopFuture<Void> {
                 database.eventLoop.future()
             }
-
-            func groupResources(links: [(Task.ID, PageLink)]) -> [(ArticleResource.Create.Data, [Task.ID])] {
-                links.group(by: \.1.url).map { (url, groupedLinks) -> (ArticleResource.Create.Data, [Task.ID]) in
-
-                    let (title, _) = groupedLinks.count(equal: \.1.title)
-                        .max(by: { (first, second) in
-                            first.value > second.value
-                        })!
-                    var author = "Unknown"
-                    if let components = URLComponents(string: url), let host = components.host {
-                        author = host
-                    }
-
-                    let article = ArticleResource.Create.Data(
-                        title: title,
-                        url: url,
-                        author: author
-                    )
-                    return (article, groupedLinks.map(\.0))
-                }
-            }
         }
     }
 }
 
 public struct PageLink {
+    public init(title: String, url: String) {
+        self.title = title
+        self.url = url
+    }
+    
     public let title: String
     public let url: String
 }
