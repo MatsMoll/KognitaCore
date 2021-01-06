@@ -94,7 +94,7 @@ struct DatabaseResourceRepository: ResourceRepository {
             .all(\.$resource.$id)
             .flatMap(resourcesWith(ids: ))
     }
-    
+
     func resourcesFor(taskIDs: [Task.ID]) -> EventLoopFuture<[Resource]> {
         Resource.TaskPivot.query(on: database)
             .filter(\.$task.$id ~~ taskIDs)
@@ -179,17 +179,16 @@ struct DatabaseResourceRepository: ResourceRepository {
             .unwrap(or: Abort(.badRequest))
             .delete(on: database)
     }
-    
-    
+
     public func analyseResourcesIn(subjectID: Subject.ID) -> EventLoopFuture<Void> {
         VideoResource.DatabaseModel.query(on: database)
             .all()
             .flatMap { videos in
-                
+
                 ArticleResource.DatabaseModel.query(on: database)
                     .all()
                     .map { articles in
-                        var existingResources = [String : Resource.ID]()
+                        var existingResources = [String: Resource.ID]()
                         existingResources = articles.reduce(into: existingResources) { $0[$1.url] = $1.id! }
                         return videos.reduce(into: existingResources) { $0[$1.url] = $1.id! }
                     }
@@ -215,18 +214,18 @@ struct DatabaseResourceRepository: ResourceRepository {
                 }
             }
     }
-    
+
     func groupResources(links: [(Task.ID, PageLink)]) -> ResourceAnalyse {
         var articles = [(ArticleResource.Create.Data, [Task.ID])]()
         var videos = [(VideoResource.Create.Data, [Task.ID])]()
-        
+
         for (url, groupedLinks) in links.group(by: \.1.url) {
 
             let (title, _) = groupedLinks.count(equal: \.1.title.capitalized)
                 .max(by: { (first, second) in
                     first.value > second.value
                 })!
-            
+
             var author = url
             if let url = URL(string: url) {
                 guard
@@ -237,7 +236,7 @@ struct DatabaseResourceRepository: ResourceRepository {
                     continue
                 }
             }
-            
+
             if
                 let components = URLComponents(string: url),
                 let host = components.host
@@ -267,8 +266,8 @@ struct DatabaseResourceRepository: ResourceRepository {
             videos: videos
         )
     }
-    
-    func saveResources(existing: [String : Resource.ID], solutions: ResourceAnalyse) -> EventLoopFuture<Void> {
+
+    func saveResources(existing: [String: Resource.ID], solutions: ResourceAnalyse) -> EventLoopFuture<Void> {
         solutions.articles.map { (article, taskIDs) in
             if let resourceID = existing[article.url] {
                 return taskIDs.map { taskID in
@@ -307,7 +306,6 @@ struct DatabaseResourceRepository: ResourceRepository {
         }
     }
 }
-
 
 struct ResourceAnalyse {
     let articles: [(ArticleResource.Create.Data, [Task.ID])]

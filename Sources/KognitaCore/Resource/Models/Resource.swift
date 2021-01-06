@@ -95,7 +95,7 @@ public struct PageLink {
         self.title = title
         self.url = url
     }
-    
+
     public let title: String
     public let url: String
 }

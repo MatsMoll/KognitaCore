@@ -22,6 +22,6 @@ public protocol ResourceRepository {
     func resourcesFor(taskIDs: [Task.ID]) -> EventLoopFuture<[Resource]>
 
     func deleteResourceWith(id: Resource.ID) -> EventLoopFuture<Void>
-    
+
     func analyseResourcesIn(subjectID: Subject.ID) -> EventLoopFuture<Void>
 }
