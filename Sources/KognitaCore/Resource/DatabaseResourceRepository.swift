@@ -216,8 +216,8 @@ struct DatabaseResourceRepository: ResourceRepository {
     }
 
     func groupResources(links: [(Task.ID, PageLink)]) -> ResourceAnalyse {
-        var articles = [(ArticleResource.Create.Data, [Task.ID])]()
-        var videos = [(VideoResource.Create.Data, [Task.ID])]()
+        var articles = [(ArticleResource.Create.Data, Set<Task.ID>)]()
+        var videos = [(VideoResource.Create.Data, Set<Task.ID>)]()
 
         for (url, groupedLinks) in links.group(by: \.1.url) {
 
@@ -251,14 +251,14 @@ struct DatabaseResourceRepository: ResourceRepository {
                     creator: author,
                     duration: nil
                 )
-                videos.append((video, groupedLinks.map(\.0)))
+                videos.append((video, Set(groupedLinks.map(\.0))))
             } else {
                 let article = ArticleResource.Create.Data(
                     title: title,
                     url: url,
                     author: author
                 )
-                articles.append((article, groupedLinks.map(\.0)))
+                articles.append((article, Set(groupedLinks.map(\.0))))
             }
         }
         return ResourceAnalyse(
@@ -308,6 +308,6 @@ struct DatabaseResourceRepository: ResourceRepository {
 }
 
 struct ResourceAnalyse {
-    let articles: [(ArticleResource.Create.Data, [Task.ID])]
-    let videos: [(VideoResource.Create.Data, [Task.ID])]
+    let articles: [(ArticleResource.Create.Data, Set<Task.ID>)]
+    let videos: [(VideoResource.Create.Data, Set<Task.ID>)]
 }

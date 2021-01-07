@@ -7,6 +7,7 @@
 
 import FluentKit
 import Foundation
+import SwiftSoup
 
 extension Resource {
     final class DatabaseModel: Model {
@@ -117,8 +118,21 @@ extension String {
         var relevantIndex = self.startIndex
         var potensialTitle = ""
 
-        var links = [PageLink]()
-
+        var links: [PageLink] = []
+        if let htmlRepresentation = try? parse(self) {
+            do {
+                links = try htmlRepresentation.select("a").compactMap { link in
+                   guard
+                    let href = try? link.attr("href"),
+                    let text = try? link.text(),
+                    !href.isEmpty
+                   else { return nil }
+                   return PageLink(title: text, url: href)
+               }
+            } catch { }
+        }
+        
+        // Markdown links
         while currentIndex < self.endIndex {
             switch state {
             case .other:
