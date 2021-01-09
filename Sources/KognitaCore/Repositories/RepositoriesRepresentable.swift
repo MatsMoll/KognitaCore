@@ -57,7 +57,7 @@ public protocol RepositoriesRepresentable {
 
     /// A repository handeling resources
     var resourceRepository: ResourceRepository { get }
-    
+
     /// A repository handeling terms
     var termRepository: TermRepository { get }
 }

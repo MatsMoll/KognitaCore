@@ -82,7 +82,7 @@ public protocol ContentConvertable {
 }
 
 extension EventLoopFuture {
-    func content<T: ContentConvertable>() -> EventLoopFuture<[T.ResponseModel]> where Value == Array<T> {
+    func content<T: ContentConvertable>() -> EventLoopFuture<[T.ResponseModel]> where Value == [T] {
         self.flatMapEachThrowing { try $0.content() }
     }
 }

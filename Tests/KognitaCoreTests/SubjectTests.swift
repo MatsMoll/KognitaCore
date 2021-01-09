@@ -55,7 +55,8 @@ class SubjectTests: VaporTestCase {
                 description: subjectExport.subject.description,
                 category: subjectExport.subject.category
             ),
-            topics: subjectExport.importContent.topics
+            topics: subjectExport.importContent.topics,
+            resources: []
         )
         _ = try subjectRepository.importContent(modifiedImportContent).wait()
 
@@ -105,14 +106,16 @@ class SubjectTests: VaporTestCase {
                                     isMultipleSelect: false,
                                     // Should cause an error
                                     choices: [],
-                                    solutions: []
+                                    solutions: [],
+                                    sources: []
                                 )
                             ],
                             typingTasks: []
                         )
                     ]
                 )
-            ]
+            ],
+            resources: []
         )
         let modifiedImportContent = Subject.Import(
             subject: Subject.Create.Data(
@@ -121,7 +124,8 @@ class SubjectTests: VaporTestCase {
                 description: subjectImport.subject.description,
                 category: subjectImport.subject.category
             ),
-            topics: subjectImport.topics
+            topics: subjectImport.topics,
+            resources: []
         )
 
         do {
@@ -355,7 +359,8 @@ class SubjectTests: VaporTestCase {
             subject: .init(code: "TDT123", name: "Test", description: "Test", category: "Test"),
             topics: (1...numberOfTopics).map {
                 Topic.Import.testData(chapter: $0, topicName: "Test \($0)")
-            }
+            },
+            resources: []
         )
 
         _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in

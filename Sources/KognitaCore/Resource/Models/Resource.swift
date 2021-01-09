@@ -131,7 +131,7 @@ extension String {
                }
             } catch { }
         }
-        
+
         // Markdown links
         while currentIndex < self.endIndex {
             switch state {

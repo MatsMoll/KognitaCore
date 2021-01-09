@@ -40,6 +40,7 @@ extension ArticleResource {
                     .field("id", .uint, .identifier(auto: false), .references(Resource.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
                     .field("url", .string, .required)
                     .field("author", .string, .required)
+                    .unique(on: "url")
                     .create()
             }
 

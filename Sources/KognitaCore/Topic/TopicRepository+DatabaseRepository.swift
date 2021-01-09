@@ -40,7 +40,7 @@ extension Topic {
 
         /// The typing task repository to use
         private var typingTaskRepository: TypingTaskRepository { repositories.typingTaskRepository }
-        
+
         /// The term repository
         private var termRepository: TermRepository { repositories.termRepository }
     }

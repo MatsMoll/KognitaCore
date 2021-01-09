@@ -46,7 +46,7 @@ public class TestableRepositories: RepositoriesRepresentable {
     public var lectureNoteTakingRepository: LectureNoteTakingSessionRepository
 
     public var resourceRepository: ResourceRepository
-    
+
     public var termRepository: TermRepository
 
     init(repositories: RepositoriesRepresentable) {

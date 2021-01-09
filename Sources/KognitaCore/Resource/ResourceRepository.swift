@@ -20,7 +20,7 @@ public protocol ResourceRepository {
     func disconnect(taskID: Task.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void>
     func resourcesFor(taskID: Task.ID) -> EventLoopFuture<[Resource]>
     func resourcesFor(taskIDs: [Task.ID]) -> EventLoopFuture<[Resource]>
-    
+
     func connect(termID: Term.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void>
     func disconnect(termID: Term.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void>
     func resourcesFor(termIDs: [Term.ID]) -> EventLoopFuture<[Resource]>

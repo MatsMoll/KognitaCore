@@ -46,6 +46,7 @@ extension VideoResource {
                     .field("url", .string, .required)
                     .field("creator", .string, .required)
                     .field("duration", .uint)
+                    .unique(on: "url")
                     .create()
             }
 

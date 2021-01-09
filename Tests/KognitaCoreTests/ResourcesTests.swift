@@ -48,7 +48,7 @@ final class ResourcesTests: VaporTestCase {
         let resources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertEqual(resources.count, 1)
         let firstResource = try XCTUnwrap(resources.first)
-        XCTAssertEqual(firstResource, .book(bookResource.resource))
+        XCTAssertEqual(firstResource, .book(bookResource.resource(id: firstResource.id)))
         try resourceRepository.deleteResourceWith(id: resourceID).wait()
         let updatedResources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertTrue(updatedResources.isEmpty)
@@ -63,10 +63,18 @@ final class ResourcesTests: VaporTestCase {
         let resources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertEqual(resources.count, 1)
         let firstResource = try XCTUnwrap(resources.first)
-        XCTAssertEqual(firstResource, .video(videoResource.resource))
+        XCTAssertEqual(firstResource, .video(videoResource.resource(id: firstResource.id)))
         try resourceRepository.deleteResourceWith(id: resourceID).wait()
         let updatedResources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertTrue(updatedResources.isEmpty)
+    }
+
+    func testCreateDuplicateVideoResources() throws {
+        let user = try User.create(on: app)
+        let resource = videoResource
+        let resourceID = try resourceRepository.create(video: resource, by: user.id).wait()
+        let duplicateResourceID = try resourceRepository.create(video: resource, by: user.id).wait()
+        XCTAssertEqual(resourceID, duplicateResourceID)
     }
 
     func testCreateArticleResources() throws {
@@ -78,10 +86,18 @@ final class ResourcesTests: VaporTestCase {
         let resources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertEqual(resources.count, 1)
         let firstResource = try XCTUnwrap(resources.first)
-        XCTAssertEqual(firstResource, .article(articleResource.resource))
+        XCTAssertEqual(firstResource, .article(articleResource.resource(id: firstResource.id)))
         try resourceRepository.deleteResourceWith(id: resourceID).wait()
         let updatedResources = try resourceRepository.resourcesFor(taskID: task.id).wait()
         XCTAssertTrue(updatedResources.isEmpty)
+    }
+
+    func testCreateDuplicateArticleResources() throws {
+        let user = try User.create(on: app)
+        let resource = articleResource
+        let resourceID = try resourceRepository.create(article: resource, by: user.id).wait()
+        let duplicateResourceID = try resourceRepository.create(article: resource, by: user.id).wait()
+        XCTAssertEqual(resourceID, duplicateResourceID)
     }
 
     func testCreateMultipleResourcesForATask() throws {
@@ -102,17 +118,17 @@ final class ResourcesTests: VaporTestCase {
         let resources = try resourceRepository.resourcesFor(taskID: task.id).wait()
 
         XCTAssertEqual(resources.count, 3)
-        XCTAssertTrue(resources.contains(.book(bookResource.resource)))
-        XCTAssertTrue(resources.contains(.video(videoResource.resource)))
-        XCTAssertTrue(resources.contains(.article(articleResource.resource)))
+        XCTAssertTrue(resources.contains(.book(bookResource.resource(id: bookResourceID))))
+        XCTAssertTrue(resources.contains(.video(videoResource.resource(id: videoResourceID))))
+        XCTAssertTrue(resources.contains(.article(articleResource.resource(id: articleResourceID))))
 
         try resourceRepository.deleteResourceWith(id: bookResourceID).wait()
         let updatedResources = try resourceRepository.resourcesFor(taskID: task.id).wait()
 
         XCTAssertEqual(updatedResources.count, 2)
-        XCTAssertFalse(updatedResources.contains(.book(bookResource.resource)))
-        XCTAssertTrue(updatedResources.contains(.video(videoResource.resource)))
-        XCTAssertTrue(updatedResources.contains(.article(articleResource.resource)))
+        XCTAssertFalse(updatedResources.contains(.book(bookResource.resource(id: bookResourceID))))
+        XCTAssertTrue(updatedResources.contains(.video(videoResource.resource(id: videoResourceID))))
+        XCTAssertTrue(updatedResources.contains(.article(articleResource.resource(id: articleResourceID))))
     }
 
     func testHrefStringDetector() throws {
@@ -139,8 +155,9 @@ final class ResourcesTests: VaporTestCase {
 }
 
 extension BookResource.Create.Data {
-    var resource: BookResource {
+    func resource(id: Resource.ID) -> BookResource {
         BookResource(
+            id: id,
             title: title,
             bookTitle: bookTitle,
             startPageNumber: startPageNumber,
@@ -151,8 +168,9 @@ extension BookResource.Create.Data {
 }
 
 extension VideoResource.Create.Data {
-    var resource: VideoResource {
+    func resource(id: Resource.ID) -> VideoResource {
         VideoResource(
+            id: id,
             url: url,
             title: title,
             creator: creator,
@@ -161,8 +179,9 @@ extension VideoResource.Create.Data {
     }
 }
 extension ArticleResource.Create.Data {
-    var resource: ArticleResource {
+    func resource(id: Resource.ID) -> ArticleResource {
         ArticleResource(
+            id: id,
             title: title,
             url: url,
             author: author

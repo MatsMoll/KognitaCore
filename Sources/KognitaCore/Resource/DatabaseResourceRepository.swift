@@ -30,7 +30,7 @@ struct DatabaseResourceRepository: ResourceRepository {
                 if let resourceID = existingResource?.id {
                     return database.eventLoop.future(resourceID)
                 }
-        
+
                 return createResourceWith(title: video.title, userID: userID)
                     .flatMap { resourceID in
                         VideoResource.DatabaseModel(id: resourceID, data: video)
@@ -103,7 +103,7 @@ struct DatabaseResourceRepository: ResourceRepository {
                 return connection.delete(on: database)
             }
     }
-    
+
     func connect(termID: Term.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void> {
         Resource.TermPivot.query(on: database)
             .filter(\.$resource.$id == resourceID)
@@ -118,7 +118,7 @@ struct DatabaseResourceRepository: ResourceRepository {
                 }
             }
     }
-    
+
     func disconnect(termID: Term.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void> {
         Resource.TermPivot.query(on: database)
             .filter(\.$resource.$id == resourceID)
@@ -129,7 +129,7 @@ struct DatabaseResourceRepository: ResourceRepository {
                 return connection.delete(on: database)
             }
     }
-    
+
     func resourcesFor(termIDs: [Term.ID]) -> EventLoopFuture<[Resource]> {
         Resource.TermPivot.query(on: database)
             .filter(\.$term.$id ~~ termIDs)
@@ -154,7 +154,7 @@ struct DatabaseResourceRepository: ResourceRepository {
     private func resourcesWith(ids: [Resource.ID]) -> EventLoopFuture<[Resource]> {
 
         let uniqueIDs = Set(ids)
-        
+
         return Resource.DatabaseModel.query(on: database)
             .filter(\.$id ~~ uniqueIDs)
             .all()

@@ -13,18 +13,18 @@ extension User {
 }
 
 struct DatabaseTermRepository: TermRepository {
-    
+
     let database: Database
     let repositories: RepositoriesRepresentable
-    
+
     private var resourceRepository: ResourceRepository { repositories.resourceRepository }
     private var multipleChoiceRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
-    
+
     init(database: Database, repositories: RepositoriesRepresentable) {
         self.database = database
         self.repositories = repositories
     }
-    
+
     func create(term: Term.Create.Data) -> EventLoopFuture<Term.ID> {
         Term.DatabaseModel.query(on: database)
             .filter(\.$subtopic.$id == term.subtopicID)
@@ -40,27 +40,27 @@ struct DatabaseTermRepository: TermRepository {
                     .flatMapThrowing { try mewTerm.requireID() }
             }
     }
-    
+
     func updateTermWith(id: Term.ID, to data: Term.Create.Data) -> EventLoopFuture<Void> {
         database.eventLoop.future(error: Abort(.notImplemented))
     }
-    
+
     func deleteTermWith(id: Term.ID) -> EventLoopFuture<Void> {
         Term.DatabaseModel.find(id, on: database)
             .unwrap(or: Abort(.badRequest))
             .delete(on: database)
     }
-    
+
     func generateMultipleChoiceTasksWith(termIDs: Set<Term.ID>, toSubtopicID subtopicID: Subtopic.ID) -> EventLoopFuture<Void> {
-        
+
         Term.DatabaseModel.query(on: database)
             .filter(\.$id ~~ termIDs)
             .all()
             .flatMap { terms in
-                
+
                 resourceRepository.resourcesFor(termIDs: terms.compactMap { $0.id })
                     .failableFlatMap { resources in
-                        
+
                         try multipleChoiceData(from: terms, subtopicID: subtopicID)
                             .map {
                                 try multipleChoiceRepository.create(from: $0, by: .unknownUser)
@@ -77,21 +77,21 @@ struct DatabaseTermRepository: TermRepository {
                                             .flatten(on: database.eventLoop)
                                         }
                                 }
-                                
+
                             }
                             .flatten(on: database.eventLoop)
                             .transform(to: ())
                 }
             }
     }
-    
+
     func allWith(subtopicID: Subtopic.ID) -> EventLoopFuture<[Term]> {
         Term.DatabaseModel.query(on: database)
             .filter(\.$subtopic.$id == subtopicID)
             .all()
             .content()
     }
-    
+
     func importContent(term: Term.Import, for subtopicID: Subtopic.ID, resourceMap: [Resource.ID: Resource.ID]) -> EventLoopFuture<Void> {
         do {
             return create(
@@ -113,9 +113,9 @@ struct DatabaseTermRepository: TermRepository {
             return database.eventLoop.future(error: Abort(.internalServerError, reason: "Unable to clean the term meaning for XSS"))
         }
     }
-    
+
     private func multipleChoiceData(from terms: [Term.DatabaseModel], subtopicID: Subtopic.ID) -> [MultipleChoiceTask.Create.Data] {
-        
+
         var multipleChoiceTasks = [MultipleChoiceTask.Create.Data]()
         if terms.count > 2 {
 
@@ -127,7 +127,7 @@ struct DatabaseTermRepository: TermRepository {
             if numberOfGroupes >= 2 || (numberOfGroupes == 1 && remainingTerms > 2) {
                 var unselectedChoices = termContent
                 termGroups = []
-                if (numberOfGroupes == 1 && remainingTerms > 2) {
+                if numberOfGroupes == 1 && remainingTerms > 2 {
                     numberOfGroupes += 1
                 }
                 for _ in 0..<numberOfGroupes {

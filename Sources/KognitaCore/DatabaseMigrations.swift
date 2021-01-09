@@ -43,7 +43,7 @@ public class DatabaseMigrations {
             app.migrations.add(ArticleResource.Migrations.Create())
             app.migrations.add(Resource.TaskPivot.Migrations.Create())
             app.migrations.add(Resource.Migrations.ConvertSolutionSourceToResource())
-            
+
             // Term support
             app.migrations.add(Term.Migrations.Create())
             app.migrations.add(Term.TaskPivot.Migrations.Create())
@@ -119,7 +119,11 @@ public class DatabaseMigrations {
             VideoResource.Migrations.Create(),
             BookResource.Migrations.Create(),
             ArticleResource.Migrations.Create(),
-            Resource.TaskPivot.Migrations.Create()
+            Resource.TaskPivot.Migrations.Create(),
+
+            Term.Migrations.Create(),
+            Term.TaskPivot.Migrations.Create(),
+            Resource.TermPivot.Migrations.Create()
         ])
     }
 
