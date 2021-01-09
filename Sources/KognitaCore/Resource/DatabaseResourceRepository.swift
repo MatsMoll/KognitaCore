@@ -23,11 +23,20 @@ struct DatabaseResourceRepository: ResourceRepository {
     }
 
     func create(video: VideoResource.Create.Data, by userID: User.ID) -> EventLoopFuture<Resource.ID> {
-        createResourceWith(title: video.title, userID: userID)
-            .flatMap { resourceID in
-                VideoResource.DatabaseModel(id: resourceID, data: video)
-                    .create(on: database)
-                    .transform(to: resourceID)
+        VideoResource.DatabaseModel.query(on: database)
+            .filter(\.$url == video.url)
+            .first()
+            .flatMap { existingResource in
+                if let resourceID = existingResource?.id {
+                    return database.eventLoop.future(resourceID)
+                }
+        
+                return createResourceWith(title: video.title, userID: userID)
+                    .flatMap { resourceID in
+                        VideoResource.DatabaseModel(id: resourceID, data: video)
+                            .create(on: database)
+                            .transform(to: resourceID)
+                    }
             }
     }
 
@@ -41,11 +50,19 @@ struct DatabaseResourceRepository: ResourceRepository {
     }
 
     func create(article: ArticleResource.Create.Data, by userID: User.ID) -> EventLoopFuture<Resource.ID> {
-        createResourceWith(title: article.title, userID: userID)
-            .flatMap { resourceID in
-                ArticleResource.DatabaseModel(id: resourceID, url: article.url, author: article.author)
-                    .create(on: database)
-                    .transform(to: resourceID)
+        ArticleResource.DatabaseModel.query(on: database)
+            .filter(\.$url == article.url)
+            .first()
+            .flatMap { existingResource in
+                if let resourceID = existingResource?.id {
+                    return database.eventLoop.future(resourceID)
+                }
+                return createResourceWith(title: article.title, userID: userID)
+                    .flatMap { resourceID in
+                        ArticleResource.DatabaseModel(id: resourceID, url: article.url, author: article.author)
+                            .create(on: database)
+                            .transform(to: resourceID)
+                    }
             }
     }
 
@@ -74,7 +91,6 @@ struct DatabaseResourceRepository: ResourceRepository {
                         .create(on: database)
                 }
             }
-
     }
 
     func disconnect(taskID: Task.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void> {
@@ -86,6 +102,39 @@ struct DatabaseResourceRepository: ResourceRepository {
                 guard let connection = connection else { return database.eventLoop.future() }
                 return connection.delete(on: database)
             }
+    }
+    
+    func connect(termID: Term.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void> {
+        Resource.TermPivot.query(on: database)
+            .filter(\.$resource.$id == resourceID)
+            .filter(\.$term.$id == termID)
+            .first()
+            .flatMap { connection in
+                if connection != nil {
+                    return database.eventLoop.future()
+                } else {
+                    return Resource.TermPivot(resourceID: resourceID, termID: termID)
+                        .create(on: database)
+                }
+            }
+    }
+    
+    func disconnect(termID: Term.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void> {
+        Resource.TermPivot.query(on: database)
+            .filter(\.$resource.$id == resourceID)
+            .filter(\.$term.$id == termID)
+            .first()
+            .flatMap { connection in
+                guard let connection = connection else { return database.eventLoop.future() }
+                return connection.delete(on: database)
+            }
+    }
+    
+    func resourcesFor(termIDs: [Term.ID]) -> EventLoopFuture<[Resource]> {
+        Resource.TermPivot.query(on: database)
+            .filter(\.$term.$id ~~ termIDs)
+            .all(\.$resource.$id)
+            .flatMap(resourcesWith(ids: ))
     }
 
     func resourcesFor(taskID: Task.ID) -> EventLoopFuture<[Resource]> {
@@ -104,25 +153,27 @@ struct DatabaseResourceRepository: ResourceRepository {
 
     private func resourcesWith(ids: [Resource.ID]) -> EventLoopFuture<[Resource]> {
 
-        Resource.DatabaseModel.query(on: database)
-            .filter(\.$id ~~ ids)
+        let uniqueIDs = Set(ids)
+        
+        return Resource.DatabaseModel.query(on: database)
+            .filter(\.$id ~~ uniqueIDs)
             .all()
             .flatMap { resources in
 
                 let titles = Dictionary(uniqueKeysWithValues: resources.compactMap { try? ($0.requireID(), $0.title) })
 
                 return VideoResource.DatabaseModel.query(on: database)
-                    .filter(\.$id ~~ ids)
+                    .filter(\.$id ~~ uniqueIDs)
                     .all()
                     .flatMap { videoResources in
 
                         BookResource.DatabaseModel.query(on: database)
-                            .filter(\.$id ~~ ids)
+                            .filter(\.$id ~~ uniqueIDs)
                             .all()
                             .flatMap { bookResources in
 
                                 ArticleResource.DatabaseModel.query(on: database)
-                                    .filter(\.$id ~~ ids)
+                                    .filter(\.$id ~~ uniqueIDs)
                                     .all()
                                     .map { articleResources -> [Resource] in
                                         combineResources(
@@ -140,9 +191,13 @@ struct DatabaseResourceRepository: ResourceRepository {
     private func combineResources(videos: [VideoResource.DatabaseModel], books: [BookResource.DatabaseModel], articles: [ArticleResource.DatabaseModel], titles: [Resource.ID: String]) -> [Resource] {
 
         videos.compactMap { video in
-            guard let title = (try? titles[video.requireID()]) else { return nil }
+            guard
+                let id = try? video.requireID(),
+                let title = titles[id]
+            else { return nil }
             return Resource.video(
                 VideoResource(
+                    id: id,
                     url: video.url,
                     title: title,
                     creator: video.creator,
@@ -151,9 +206,13 @@ struct DatabaseResourceRepository: ResourceRepository {
             )
         } +
         books.compactMap { book in
-            guard let title = (try? titles[book.requireID()]) else { return nil }
+            guard
+                let id = try? book.requireID(),
+                let title = titles[id]
+            else { return nil }
             return Resource.book(
                 BookResource(
+                    id: id,
                     title: title,
                     bookTitle: book.bookTitle,
                     startPageNumber: book.startPageNumber,
@@ -163,9 +222,13 @@ struct DatabaseResourceRepository: ResourceRepository {
             )
         } +
         articles.compactMap { article in
-            guard let title = (try? titles[article.requireID()]) else { return nil }
+            guard
+                let id = try? article.requireID(),
+                let title = titles[id]
+            else { return nil }
             return Resource.article(
                 ArticleResource(
+                    id: id,
                     title: title,
                     url: article.url,
                     author: article.author

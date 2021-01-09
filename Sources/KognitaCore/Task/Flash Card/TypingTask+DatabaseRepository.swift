@@ -31,6 +31,7 @@ extension TypingTask {
         private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
         private var userRepository: UserRepository { repositories.userRepository }
         private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
+        private var resourceRepository: ResourceRepository { repositories.resourceRepository }
         private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
@@ -118,7 +119,7 @@ extension TypingTask.DatabaseRepository {
         }
     }
 
-    public func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) -> EventLoopFuture<Void> {
+    public func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?, resourceMap: [Resource.ID: Resource.ID]) -> EventLoopFuture<Void> {
 
         let savedTask = TaskDatabaseModel(
             subtopicID: subtopic.id,
@@ -137,20 +138,31 @@ extension TypingTask.DatabaseRepository {
                 try FlashCardTask(taskId: savedTask.requireID())
             }
             .create(on: self.database)
-            .failableFlatMap { _ in
-                try task.solutions.map { solution in
+            .failableFlatMap { () -> EventLoopFuture<Task.ID> in
+                let taskID = try savedTask.requireID()
+                return try task.solutions.map { solution in
                     try TaskSolution.DatabaseModel(
                         data: TaskSolution.Create.Data(
                             solution: solution.solution,
                             presentUser: true,
-                            taskID: savedTask.requireID()
+                            taskID: taskID
                         ),
                         creatorID: 1
                     )
                     .create(on: database)
                 }
                 .flatten(on: database.eventLoop)
-        }
+                .transform(to: taskID)
+            }
+            .flatMap { taskID in
+                guard let sources = task.sources else { return database.eventLoop.future() }
+                return sources.compactMap { oldResourceID in
+                    resourceMap[oldResourceID]
+                }.map { resourceID in
+                    resourceRepository.connect(taskID: taskID, to: resourceID)
+                }
+                .flatten(on: database.eventLoop)
+            }
     }
 
 //    func get(task flashCard: FlashCardTask) throws -> EventLoopFuture<TaskDatabaseModel> {

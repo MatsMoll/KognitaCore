@@ -8,24 +8,6 @@
 import Foundation
 import FluentKit
 
-struct Term: Codable, Identifiable {
-    let id: Int
-}
-
-extension Term {
-    enum Create {
-        struct Data: Codable {
-            let term: String
-            let meaning: String
-            let subtopicID: Subtopic.ID
-        }
-    }
-}
-
-//struct Resource: Codable, Identifiable {
-//    let id: Int
-//}
-
 extension Term {
     final class DatabaseModel: Model {
 
@@ -40,6 +22,7 @@ extension Term {
         @Parent(key: "subtopicID")
         var subtopic: Subtopic.DatabaseModel
 
+        /// This may contain Markdown
         @Field(key: "meaning")
         var meaning: String
 
@@ -59,6 +42,19 @@ extension Term {
     }
 }
 
+extension Term.DatabaseModel: ContentConvertable {
+    public func content() throws -> Term {
+        try Term(
+            id: requireID(),
+            term: term,
+            meaning: meaning,
+            subtopicID: $subtopic.id,
+            createdAt: createdAt ?? .now,
+            updatedAt: updatedAt ?? .now
+        )
+    }
+}
+
 extension Term {
 
     enum Migrations {
@@ -66,6 +62,12 @@ extension Term {
 
             func prepare(on database: Database) -> EventLoopFuture<Void> {
                 database.schema(Term.DatabaseModel.schema)
+                    .field("id", .uint, .identifier(auto: true))
+                    .field("term", .string, .required)
+                    .field("subtopicID", .uint, .required, .references(Subtopic.DatabaseModel.schema, .id, onDelete: .cascade, onUpdate: .cascade))
+                    .field("meaning", .string, .required)
+                    .defaultTimestamps()
+                    .unique(on: "subtopicID", "term")
                     .create()
             }
 

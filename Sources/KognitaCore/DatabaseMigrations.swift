@@ -43,6 +43,11 @@ public class DatabaseMigrations {
             app.migrations.add(ArticleResource.Migrations.Create())
             app.migrations.add(Resource.TaskPivot.Migrations.Create())
             app.migrations.add(Resource.Migrations.ConvertSolutionSourceToResource())
+            
+            // Term support
+            app.migrations.add(Term.Migrations.Create())
+            app.migrations.add(Term.TaskPivot.Migrations.Create())
+            app.migrations.add(Resource.TermPivot.Migrations.Create())
         }
         if app.environment != .testing {
             versionBump(app.migrations)

@@ -80,3 +80,9 @@ public protocol ContentConvertable {
     associatedtype ResponseModel
     func content() throws -> ResponseModel
 }
+
+extension EventLoopFuture {
+    func content<T: ContentConvertable>() -> EventLoopFuture<[T.ResponseModel]> where Value == Array<T> {
+        self.flatMapEachThrowing { try $0.content() }
+    }
+}

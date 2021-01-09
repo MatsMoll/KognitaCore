@@ -40,6 +40,9 @@ extension Topic {
 
         /// The typing task repository to use
         private var typingTaskRepository: TypingTaskRepository { repositories.typingTaskRepository }
+        
+        /// The term repository
+        private var termRepository: TermRepository { repositories.termRepository }
     }
 }
 
@@ -172,7 +175,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                 try topics.map { try self.exportTasks(in: $0) }
                     .flatten(on: self.database.eventLoop)
         }.map { topicContent in
-            Subject.Export(subject: subject, topics: topicContent)
+            Subject.Export(subject: subject, topics: topicContent, resources: [])
         }
     }
 
@@ -247,7 +250,7 @@ extension Topic.DatabaseRepository: TopicRepository {
         }
     }
 
-    public func importContent(from content: Topic.Import, in subjectID: Subject.ID) -> EventLoopFuture<Void> {
+    public func importContent(from content: Topic.Import, in subjectID: Subject.ID, resourceMap: [Resource.ID: Resource.ID]) -> EventLoopFuture<Void> {
         do {
             let topic = try Topic.DatabaseModel(
                 name: content.topic.name,
@@ -260,7 +263,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                     topic.create(on: database)
                         .failableFlatMap {
                             try content.subtopics.map {
-                                try importContent(from: $0, in: topic.content())
+                                try importContent(from: $0, in: topic.content(), resourceMap: resourceMap)
                             }
                             .flatten(on: database.eventLoop)
                     }.transform(to: ())
@@ -270,7 +273,7 @@ extension Topic.DatabaseRepository: TopicRepository {
         }
     }
 
-    public func importContent(from content: Subtopic.Import, in topic: Topic) throws -> EventLoopFuture<Void> {
+    public func importContent(from content: Subtopic.Import, in topic: Topic, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void> {
 
 //        content.subtopic.id = nil
 //        content.subtopic.topicId = try topic.requireID()
@@ -291,7 +294,7 @@ extension Topic.DatabaseRepository: TopicRepository {
                         try content.multipleChoiceTasks
                             .map { task in
                                 try multipeChoiseRepository
-                                    .importTask(from: task, in: subtopic.content(), examID: task.exam == nil ? nil : examIDs[task.exam!])
+                                    .importTask(from: task, in: subtopic.content(), examID: task.exam == nil ? nil : examIDs[task.exam!], resourceMap: resourceMap)
                         }
                         .flatten(on: database.eventLoop)
                 }
@@ -299,11 +302,32 @@ extension Topic.DatabaseRepository: TopicRepository {
                     try content.typingTasks
                         .map { task in
                             try typingTaskRepository
-                                .importTask(from: task, in: subtopic.content(), examID: task.exam == nil ? nil : examIDs[task.exam!])
+                                .importTask(from: task, in: subtopic.content(), examID: task.exam == nil ? nil : examIDs[task.exam!], resourceMap: resourceMap)
                     }
                     .flatten(on: database.eventLoop)
                 }
-                .transform(to: ())
+                .failableFlatMap {
+                    let subtopicID = try subtopic.requireID()
+                    var existingTerms = Set<String>()
+                    return content.terms.filter { term in
+                        if existingTerms.contains(term.term) {
+                            return false
+                        } else {
+                            existingTerms.insert(term.term)
+                            return true
+                        }
+                    }.map { term in
+                        termRepository.importContent(term: term, for: subtopicID, resourceMap: resourceMap)
+                    }
+                    .flatten(on: database.eventLoop)
+                    .transform(to: subtopicID)
+                }
+                .flatMap { subtopicID in
+                    termRepository.allWith(subtopicID: subtopicID)
+                        .flatMap { terms in
+                            termRepository.generateMultipleChoiceTasksWith(termIDs: Set(terms.map { $0.id }), toSubtopicID: subtopicID)
+                    }
+                }
             }
     }
 

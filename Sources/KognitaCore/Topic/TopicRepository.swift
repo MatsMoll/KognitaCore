@@ -47,13 +47,13 @@ public protocol TopicRepository: DeleteModelRepository {
     /// - Parameters:
     ///   - content: The topic content to import
     ///   - subjectID: The subject to import it into
-    func importContent(from content: Topic.Import, in subjectID: Subject.ID) -> EventLoopFuture<Void>
+    func importContent(from content: Topic.Import, in subjectID: Subject.ID, resourceMap: [Resource.ID: Resource.ID]) -> EventLoopFuture<Void>
 
     /// Import the subtopic content for a gicen topic
     /// - Parameters:
     ///   - content: The subtopic data to import
     ///   - topic: The topic to import it into
-    func importContent(from content: Subtopic.Import, in topic: Topic) throws -> EventLoopFuture<Void>
+    func importContent(from content: Subtopic.Import, in topic: Topic, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void>
 
     /// Return more detailed Topic data containing the number of tasks in each topic for a given subject id
     /// - Parameter subjectID: The subject to return the `Topic`s for
