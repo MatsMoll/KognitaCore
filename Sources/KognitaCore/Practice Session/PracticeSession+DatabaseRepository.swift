@@ -331,6 +331,12 @@ extension PracticeSession.DatabaseRepository: PracticeSessionRepository {
             .unwrap(or: Abort(.badRequest))
             .map { $0.$task.id }
     }
+
+    public func tasksWith(sessionID: PracticeSession.ID) -> EventLoopFuture<[Task.ID]> {
+        PracticeSession.Pivot.Task.query(on: database)
+            .filter(\.$session.$id == sessionID)
+            .all(\.$task.$id)
+    }
 }
 
 extension PracticeSession.DatabaseRepository {

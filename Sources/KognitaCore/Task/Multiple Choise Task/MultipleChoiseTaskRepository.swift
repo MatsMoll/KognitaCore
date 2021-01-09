@@ -51,7 +51,8 @@ public protocol MultipleChoiseTaskRepository: DeleteModelRepository {
     ///   - taskContent: The content defining the task
     ///   - subtopic: The subtopic to import the task in
     ///   - examID: The exam id to assosiate the task with
-    func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
+    ///   - resourceMap: A dict prev resource.id's used in the import to the saved resouces
+    func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void>
 
     /// Creates an answer for a given choice in a session
     /// - Parameters:

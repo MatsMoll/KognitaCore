@@ -70,6 +70,8 @@ public protocol PracticeSessionRepository {
     ///   - sessionID: The session id
     func taskID(index: Int, in sessionID: PracticeSession.ID) -> EventLoopFuture<Task.ID>
 
+    func tasksWith(sessionID: PracticeSession.ID) -> EventLoopFuture<[Task.ID]>
+
     /// Returnting the results for a session id
     /// - Parameter sessionID: The session id
     func getResult(for sessionID: PracticeSession.ID) throws -> EventLoopFuture<[Sessions.TaskResult]>

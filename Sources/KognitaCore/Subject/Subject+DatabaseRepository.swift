@@ -58,6 +58,7 @@ extension Subject {
         private var subtopicRepository: SubtopicRepositoring { repositories.subtopicRepository }
         private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
         private var examRepository: ExamRepository { repositories.examRepository }
+        private var resourceRepository: ResourceRepository { repositories.resourceRepository }
         private let taskRepository: TaskRepository
     }
 }
@@ -154,10 +155,27 @@ extension Subject.DatabaseRepository {
                 try subject.requireID()
             }
             .flatMap { subjectID in
-                handle(exams: content.exams, subjectID: subjectID)
-                    .flatMap {
-                        content.topics.map { topicRepository.importContent(from: $0, in: subjectID) }
-                            .flatten(on: database.eventLoop)
+                content.resources.map { resource in
+                    database.eventLoop.future().flatMap {
+                        switch resource {
+                        case .article(let article):
+                            return resourceRepository.create(article: article.createContent, by: 1)
+                        case .video(let video):
+                            return resourceRepository.create(video: video.createContent, by: 1)
+                        case .book(let book):
+                            return resourceRepository.create(book: book.createContent, by: 1)
+                        }
+                    }
+                    .map { newResourceID in (resource.id, newResourceID) }
+                }
+                .flatten(on: database.eventLoop)
+                .map { Dictionary.init(uniqueKeysWithValues: $0) }
+                .flatMap { (resources: [Resource.ID: Resource.ID]) in
+                    handle(exams: content.exams, subjectID: subjectID)
+                        .flatMap {
+                            content.topics.map { topicRepository.importContent(from: $0, in: subjectID, resourceMap: resources) }
+                                .flatten(on: database.eventLoop)
+                    }
                 }
             }
             .flatMapThrowing { try subject.content() }

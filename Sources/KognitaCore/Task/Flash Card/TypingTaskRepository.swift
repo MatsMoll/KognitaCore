@@ -29,7 +29,7 @@ public protocol TypingTaskRepository: DeleteModelRepository {
     ///   - task: The task information to import
     ///   - subtopic: The subtopic the task is assosiated with
     ///   - examID: The exam the task is assosiated with
-    func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void>
+    func importTask(from task: TypingTask.Import, in subtopic: Subtopic, examID: Exam.ID?, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void>
 
     /// Returns the information needed to display a GUI edit screen for a given task id
     /// - Parameter taskID: The task id to get the information for

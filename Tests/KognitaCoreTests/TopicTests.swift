@@ -78,7 +78,7 @@ class TopicTests: VaporTestCase {
         let importContent = Topic.Import.testData(chapter: 2, topicName: "Test")
 
         _ = try app.repositoriesFactory.make!.repositories(app: app) { (repo) in
-            repo.topicRepository.importContent(from: importContent, in: subject.id)
+            repo.topicRepository.importContent(from: importContent, in: subject.id, resourceMap: [:])
         }
         .wait()
 
@@ -108,7 +108,8 @@ extension Topic.Import {
                             isTestable: false,
                             isMultipleSelect: false,
                             choices: [MultipleChoiceTaskChoice.Create.Data(choice: "Hello", isCorrect: false), MultipleChoiceTaskChoice.Create.Data(choice: "Hello 2", isCorrect: false)],
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         )
                     ],
                     typingTasks: [
@@ -116,19 +117,22 @@ extension Topic.Import {
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .original, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .continuation, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: nil,
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         )
                     ]
                 ),
@@ -140,19 +144,22 @@ extension Topic.Import {
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .original, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .continuation, year: 2018),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: nil,
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)]
+                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            sources: nil
                         )
                     ]
                 )

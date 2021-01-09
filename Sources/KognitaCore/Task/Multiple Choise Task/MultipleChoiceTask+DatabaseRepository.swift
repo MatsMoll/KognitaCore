@@ -31,6 +31,7 @@ extension MultipleChoiceTask {
         private var userRepository: UserRepository { repositories.userRepository }
         private var subjectRepository: SubjectRepositoring { repositories.subjectRepository }
         private var topicRepository: TopicRepository { repositories.topicRepository }
+        private var resourceRepository: ResourceRepository { repositories.resourceRepository }
         private var taskAnswerRepository: TaskSessionAnswerRepository { TaskSessionAnswer.DatabaseRepository(database: database) }
     }
 }
@@ -164,7 +165,7 @@ extension MultipleChoiceTask.DatabaseRepository {
         }
     }
 
-    public func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?) throws -> EventLoopFuture<Void> {
+    public func importTask(from taskContent: MultipleChoiceTask.Import, in subtopic: Subtopic, examID: Exam.ID?, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void> {
 
         guard taskContent.solutions.isEmpty == false else {
             return database.eventLoop.future(error: Abort(.badRequest, reason: "Mutliple Choice Task do not contain any solutions"))
@@ -198,10 +199,10 @@ extension MultipleChoiceTask.DatabaseRepository {
                     ),
                     by: unknownUser
                 )
-                .failableFlatMap { task -> EventLoopFuture<Void> in
+                .failableFlatMap { task -> EventLoopFuture<Task.ID> in
                     let otherSolutions = Array(taskContent.solutions.dropFirst())
                     guard otherSolutions.isEmpty == false else {
-                        return database.eventLoop.future()
+                        return database.eventLoop.future(task.id)
                     }
 
                     return try otherSolutions.map { solution in
@@ -215,7 +216,15 @@ extension MultipleChoiceTask.DatabaseRepository {
                         )
                     }
                     .flatten(on: database.eventLoop)
-                    .transform(to: ())
+                    .transform(to: task.id)
+                }.flatMap { taskID in
+                    guard let sources = taskContent.sources else { return database.eventLoop.future() }
+                    return sources.compactMap { oldResourceID in
+                        resourceMap[oldResourceID]
+                    }.map { resourceID in
+                        resourceRepository.connect(taskID: taskID, to: resourceID)
+                    }
+                    .flatten(on: database.eventLoop)
                 }
         }
     }
