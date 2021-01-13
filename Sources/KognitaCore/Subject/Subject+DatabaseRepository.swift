@@ -59,6 +59,7 @@ extension Subject {
         private var multipleChoiseRepository: MultipleChoiseTaskRepository { repositories.multipleChoiceTaskRepository }
         private var examRepository: ExamRepository { repositories.examRepository }
         private var resourceRepository: ResourceRepository { repositories.resourceRepository }
+        private var termRepository: TermRepository { repositories.termRepository }
         private let taskRepository: TaskRepository
     }
 }
@@ -478,40 +479,56 @@ extension Subject.DatabaseRepository {
                     TaskSolution.DatabaseModel.query(on: self.database)
                         .filter(\.$task.$id ~~ data.compactMap { $0.id })
                         .all()
-                        .map { solutions in
+                        .flatMap { solutions in
 
-                            Subject.Compendium(
-                                subjectID: subjectID,
-                                subjectName: subject.name,
-                                topics: data.group(by: \TaskDatabaseModel.subtopic.topic.id)
-                                    .map { _, topicData in
-
-                                        Subject.Compendium.TopicData(
-                                            name: topicData.first!.subtopic.topic.name,
-                                            chapter: topicData.first!.subtopic.topic.chapter,
-                                            subtopics: topicData.group(by: \.$subtopic.id)
-                                                .map { subtopicID, questions in
-
-                                                    Subject.Compendium.SubtopicData(
-                                                        subjectID: subjectID,
-                                                        subtopicID: subtopicID,
-                                                        name: questions.first!.subtopic.name,
-                                                        questions: questions.map { question in
-
-                                                            Subject.Compendium.QuestionData(
-                                                                question: question.question,
-                                                                solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
-                                                            )
-                                                        }
-                                                    )
-                                            }
-                                        )
+                            database.eventLoop.future().flatMap {
+                                if let subtopicIDs = filter.subtopicIDs {
+                                    return termRepository.allWith(subtopicIDs: subtopicIDs)
+                                } else {
+                                    return termRepository.allWith(subjectID: subjectID)
                                 }
-                                .sorted(by: { $0.chapter < $1.chapter })
-                            )
+                            }
+                            .map { terms in
+                                compendiumData(subjectID: subjectID, subject: subject, tasks: data, solutions: solutions, terms: terms)
+                            }
                     }
                 }
         }
+    }
+
+    private func compendiumData(subjectID: Subject.ID, subject: Subject.DatabaseModel, tasks: [TaskDatabaseModel], solutions: [TaskSolution.DatabaseModel], terms: [Term]) -> Subject.Compendium {
+        Subject.Compendium(
+            subjectID: subjectID,
+            subjectName: subject.name,
+            topics: tasks.group(by: \TaskDatabaseModel.subtopic.topic.id)
+                .map { _, topicData in
+
+                    Subject.Compendium.TopicData(
+                        name: topicData.first!.subtopic.topic.name,
+                        chapter: topicData.first!.subtopic.topic.chapter,
+                        subtopics: topicData.group(by: \.$subtopic.id)
+                            .sorted(by: { $0.0 > $1.0 })
+                            .map { subtopicID, questions in
+
+                                Subject.Compendium.SubtopicData(
+                                    subjectID: subjectID,
+                                    subtopicID: subtopicID,
+                                    name: questions.first!.subtopic.name,
+                                    questions: questions.map { question in
+
+                                        Subject.Compendium.QuestionData(
+                                            question: question.question,
+                                            solution: solutions.first(where: { $0.$task.id == question.id })?.solution ?? ""
+                                        )
+                                    },
+                                    terms: terms.filter { $0.subtopicID == subtopicID }
+                                        .map { Term.Compact(id: $0.id, term: $0.term, meaning: $0.meaning) }
+                                )
+                        }
+                    )
+            }
+            .sorted(by: { $0.chapter < $1.chapter })
+        )
     }
 
     public func overviewFor(id: Subject.ID) -> EventLoopFuture<Subject.Overview> {
