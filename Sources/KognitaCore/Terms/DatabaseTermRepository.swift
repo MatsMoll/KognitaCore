@@ -41,6 +41,10 @@ struct DatabaseTermRepository: TermRepository {
             }
     }
 
+    func with(id: Term.ID) -> EventLoopFuture<Term> {
+        Term.DatabaseModel.find(id, on: database).unwrap(or: Abort(.badRequest)).content()
+    }
+
     func updateTermWith(id: Term.ID, to data: Term.Create.Data) -> EventLoopFuture<Void> {
         database.eventLoop.future(error: Abort(.notImplemented))
     }
@@ -48,7 +52,24 @@ struct DatabaseTermRepository: TermRepository {
     func deleteTermWith(id: Term.ID) -> EventLoopFuture<Void> {
         Term.DatabaseModel.find(id, on: database)
             .unwrap(or: Abort(.badRequest))
+            .flatMap { term in
+                deleteTasksConnected(toTermID: id)
+                    .transform(to: term)
+            }
             .delete(on: database)
+    }
+    
+    private func deleteTasksConnected(toTermID termID: Term.ID) -> EventLoopFuture<Void> {
+        Term.TaskPivot.query(on: database)
+            .filter(\.$term.$id == termID)
+            .all(\.$task.$id)
+            .flatMapEachCompact(on: database.eventLoop, { (taskID) in
+                TaskDatabaseModel.find(taskID, on: database)
+            })
+            .flatMapEach(on: database.eventLoop) { (task) in
+                task.delete(on: database)
+            }
+            .transform(to: ())
     }
 
     func generateMultipleChoiceTasksWith(termIDs: Set<Term.ID>, toSubtopicID subtopicID: Subtopic.ID) -> EventLoopFuture<Void> {
@@ -88,6 +109,22 @@ struct DatabaseTermRepository: TermRepository {
     func allWith(subtopicID: Subtopic.ID) -> EventLoopFuture<[Term]> {
         Term.DatabaseModel.query(on: database)
             .filter(\.$subtopic.$id == subtopicID)
+            .all()
+            .content()
+    }
+
+    func allWith(subtopicIDs: Set<Subtopic.ID>) -> EventLoopFuture<[Term]> {
+        Term.DatabaseModel.query(on: database)
+            .filter(\.$subtopic.$id ~~ subtopicIDs)
+            .all()
+            .content()
+    }
+
+    func allWith(subjectID: Subject.ID) -> EventLoopFuture<[Term]> {
+        Term.DatabaseModel.query(on: database)
+            .join(parent: \Term.DatabaseModel.$subtopic)
+            .join(parent: \Subtopic.DatabaseModel.$topic)
+            .filter(Topic.DatabaseModel.self, \.$subject.$id == subjectID)
             .all()
             .content()
     }
