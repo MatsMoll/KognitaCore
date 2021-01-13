@@ -13,9 +13,25 @@ extension String {
         guard let string = try SwiftSoup.clean(noNewLine, whitelist) else {
             throw CleaningError.noStringLeft
         }
-        return string
-            .replacingOccurrences(of: "</p>\n<p>", with: "\n\n")
-            .replacingOccurrences(of: "</p>", with: "")
-            .replacingOccurrences(of: "<p>", with: "")
+        let html = try SwiftSoup.parse(string)
+        return try (html.body() ?? html)
+            .children()
+            .reduce(into: "") { result, node in
+                if node.nodeName() == "p" {
+                    let inner = try node.html()
+                    guard !inner.isEmpty else { return }
+                    let newLine: String
+                    if result.hasSuffix("\n\n") || result.isEmpty {
+                        newLine = ""
+                    } else if result.hasSuffix("\n") {
+                        newLine = "\n"
+                    } else {
+                        newLine = "\n\n"
+                    }
+                    result += "\(newLine)\(inner)"
+                } else {
+                    result += try "\n\(node.outerHtml())"
+                }
+        }
     }
 }
