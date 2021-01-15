@@ -18,6 +18,8 @@ public protocol TermRepository {
 
     func allWith(subtopicIDs: Set<Subtopic.ID>) -> EventLoopFuture<[Term]>
 
+    func allWith(topicID: Topic.ID) -> EventLoopFuture<[Term]>
+    
     func allWith(subjectID: Subject.ID) -> EventLoopFuture<[Term]>
 
     func with(id: Term.ID) -> EventLoopFuture<Term>

@@ -15,6 +15,8 @@ public protocol ResourceRepository {
     func connect(subtopicID: Subtopic.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void>
     func disconnect(subtopicID: Subtopic.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void>
     func resourcesFor(subtopicID: Subtopic.ID) -> EventLoopFuture<[Resource]>
+    
+    func resourcesFor(topicID: Topic.ID) -> EventLoopFuture<[Resource]>
 
     func connect(taskID: Task.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void>
     func disconnect(taskID: Task.ID, from resourceID: Resource.ID) -> EventLoopFuture<Void>

@@ -128,6 +128,14 @@ struct DatabaseTermRepository: TermRepository {
             .all()
             .content()
     }
+    
+    func allWith(topicID: Topic.ID) -> EventLoopFuture<[Term]> {
+        Term.DatabaseModel.query(on: database)
+            .join(parent: \.$subtopic)
+            .filter(Subtopic.DatabaseModel.self, \Subtopic.DatabaseModel.$topic.$id == topicID)
+            .all()
+            .content()
+    }
 
     func importContent(term: Term.Import, for subtopicID: Subtopic.ID, resourceMap: [Resource.ID: Resource.ID]) -> EventLoopFuture<Void> {
         do {
