@@ -77,6 +77,15 @@ struct DatabaseResourceRepository: ResourceRepository {
     func resourcesFor(subtopicID: Subtopic.ID) -> EventLoopFuture<[Resource]> {
         fatalError()
     }
+    
+    func resourcesFor(topicID: Topic.ID) -> EventLoopFuture<[Resource]> {
+        Resource.TaskPivot.query(on: database)
+            .join(parent: \.$task)
+            .join(parent: \TaskDatabaseModel.$subtopic)
+            .filter(Subtopic.DatabaseModel.self, \.$topic.$id == topicID)
+            .all(\Resource.TaskPivot.$resource.$id)
+            .flatMap(resourcesWith(ids: ))
+    }
 
     func connect(taskID: Task.ID, to resourceID: Resource.ID) -> EventLoopFuture<Void> {
         Resource.TaskPivot.query(on: database)
