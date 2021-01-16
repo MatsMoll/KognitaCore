@@ -65,6 +65,7 @@ extension LectureNote.Create.Data: TaskCreationContentable {
     public var isTestable: Bool { false }
     public var isDraft: Bool { true }
     public var examID: Exam.ID? { nil }
+    public var resources: [Resource.Create] { [] }
 }
 
 extension KognitaModels.TypingTask {

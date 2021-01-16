@@ -15,7 +15,7 @@ extension MultipleChoiceTask {
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
             self.repositories = repositories
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: repositories.taskResultRepository, userRepository: repositories.userRepository)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, repositories: repositories)
         }
 
         /// The database to connect to
@@ -195,7 +195,8 @@ extension MultipleChoiceTask.DatabaseRepository {
                         isMultipleSelect: taskContent.isMultipleSelect,
                         examID: examID,
                         isTestable: false,
-                        choises: taskContent.choices.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
+                        choises: taskContent.choices.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) },
+                        resources: []
                     ),
                     by: unknownUser
                 )

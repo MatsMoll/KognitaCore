@@ -13,6 +13,14 @@ import FluentPostgresDriver
 struct DatabaseResourceRepository: ResourceRepository {
 
     let database: Database
+    
+    func create(resource: Resource.Create, by userID: User.ID) -> EventLoopFuture<Resource.ID> {
+        switch resource {
+        case .article(let article): return create(article: article, by: userID)
+        case .book(let book): return create(book: book, by: userID)
+        case .video(let video): return create(video: video, by: userID)
+        }
+    }
 
     private func createResourceWith(title: String, userID: User.ID) -> EventLoopFuture<Resource.ID> {
         let resource = Resource.DatabaseModel(title: title, addedByUserID: userID)

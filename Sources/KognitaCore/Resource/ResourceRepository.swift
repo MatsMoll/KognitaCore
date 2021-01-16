@@ -8,6 +8,9 @@
 import Vapor
 
 public protocol ResourceRepository {
+    
+    func create(resource: Resource.Create, by userID: User.ID) -> EventLoopFuture<Resource.ID>
+    
     func create(video: VideoResource.Create.Data, by userID: User.ID) -> EventLoopFuture<Resource.ID>
     func create(book: BookResource.Create.Data, by userID: User.ID) -> EventLoopFuture<Resource.ID>
     func create(article: ArticleResource.Create.Data, by userID: User.ID) -> EventLoopFuture<Resource.ID>

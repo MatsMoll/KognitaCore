@@ -16,7 +16,7 @@ extension TypingTask {
         init(database: Database, repositories: RepositoriesRepresentable) {
             self.database = database
             self.repositories = repositories
-            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: repositories.taskResultRepository, userRepository: repositories.userRepository)
+            self.taskRepository = TaskDatabaseModel.DatabaseRepository(database: database, repositories: repositories)
         }
 
         /// The database the repo is connected to

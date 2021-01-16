@@ -38,10 +38,12 @@ extension TaskDatabaseModel {
 
         public let database: Database
 
-        internal let taskResultRepository: TaskResultRepositoring
-        internal var userRepository: UserRepository
+        internal let repositories: RepositoriesRepresentable
+        internal var taskResultRepository: TaskResultRepositoring { repositories.taskResultRepository }
+        internal var userRepository: UserRepository { repositories.userRepository }
+        internal var resourceRepository: ResourceRepository { repositories.resourceRepository }
+        
         private var taskSolutionRepository: TaskSolutionRepositoring { TaskSolution.DatabaseRepository(database: database, userRepository: userRepository) }
-        private var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: taskResultRepository, userRepository: userRepository) }
     }
 }
 
@@ -87,7 +89,21 @@ extension TaskDatabaseModel.DatabaseRepository {
                 with: nil
             )
         }
+        .flatMapThrowing { _ in try task.requireID() }
+        .flatMap { taskID in
+            connect(resources: content.content.resources, toTaskID: taskID, userID: user.id)
+        }
         .transform(to: task)
+    }
+    
+    func connect(resources: [Resource.Create], toTaskID taskID: Task.ID, userID: User.ID) -> EventLoopFuture<Void> {
+        resources.map { (resource: Resource.Create) -> EventLoopFuture<Void> in
+            resourceRepository.create(resource: resource, by: userID)
+                .flatMap { resourceID -> EventLoopFuture<Void> in
+                    resourceRepository.connect(taskID: taskID, to: resourceID)
+            }
+        }
+        .flatten(on: database.eventLoop)
     }
 
     func update(taskID: Task.ID, with data: TaskDatabaseModel.Create.Data, by user: User) -> EventLoopFuture<Void> {

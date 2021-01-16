@@ -37,7 +37,7 @@ public struct DatabaseRepositories: RepositoriesRepresentable {
     var logger: Logger
 
     /// A internal task repository to use
-    var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: self.database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository) }
+    var taskRepository: TaskRepository { TaskDatabaseModel.DatabaseRepository(database: self.database, repositories: self) }
 
     public var subjectRepository: SubjectRepositoring { Subject.DatabaseRepository(database: database, repositories: self, taskRepository: self.taskRepository) }
 
