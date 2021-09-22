@@ -23,7 +23,7 @@ public func config(app: Application) {
     DatabaseMigrations.migrationConfig(app)
     app.repositoriesFactory.use(DatabaseRepositorieFactory())
     if (try? MetricsSystem.prometheus()) == nil {
-        MetricsSystem.bootstrap(PrometheusClient())
+        MetricsSystem.bootstrap(PrometheusMetricsFactory(client: PrometheusClient()))
     }
     app.metricsFactory.use(factory: { _ in MetricsSystem.factory })
 
