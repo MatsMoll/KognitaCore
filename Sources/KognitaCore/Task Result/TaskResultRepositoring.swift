@@ -86,4 +86,7 @@ public protocol TaskResultRepositoring {
     ///   - ids: The ids of the exam to fetch
     ///   - userID: The user to fetch the results for
     func completionInExamWith(ids: [Exam.ID], userID: User.ID) -> EventLoopFuture<[Exam.Completion]>
+    
+    /// The total number of tasks completed by all users
+    func numberOfCompletedTasks() -> EventLoopFuture<Int>
 }

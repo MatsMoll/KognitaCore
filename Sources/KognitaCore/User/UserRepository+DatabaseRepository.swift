@@ -339,4 +339,8 @@ extension User.DatabaseRepository: UserRepository {
             .first(User.Login.Token.DatabaseModel.self)
             .flatMapThrowing { try $0?.content() }
     }
+    
+    public func numberOfUsers() -> EventLoopFuture<Int> {
+        return User.DatabaseModel.query(on: database).count()
+    }
 }

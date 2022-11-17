@@ -86,7 +86,7 @@ extension MultipleChoiceTask.DatabaseRepository {
             throw Abort(.unauthorized)
         }
         guard content.choises.isEmpty == false else {
-            throw Abort(.badRequest)
+            throw Abort(.badRequest, reason: "Missing choices for multiple choice task")
         }
         return self.subtopicRepository
             .find(content.subtopicId, or: TaskDatabaseModel.Create.Errors.invalidTopic)

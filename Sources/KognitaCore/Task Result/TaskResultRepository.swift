@@ -201,6 +201,10 @@ extension TaskResult.DatabaseRepository {
 //                    .all(decoding: TaskResult.self)
 //        }
     }
+    
+    public func numberOfCompletedTasks() -> EventLoopFuture<Int> {
+        return TaskResult.DatabaseModel.query(on: database).count()
+    }
 
     public func getSpaceRepetitionTask(for userID: User.ID, sessionID: PracticeSession.ID) -> EventLoopFuture<SpaceRepetitionTask?> {
 

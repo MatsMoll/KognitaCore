@@ -201,8 +201,9 @@ extension Topic.DatabaseRepository: TopicRepository {
 
         return TaskDatabaseModel.query(on: database)
             .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self, method: .left)
+            .join(parent: \TaskDatabaseModel.$exam)
             .filter(\TaskDatabaseModel.$subtopic.$id == subtopic.id)
-            .all(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self)
+            .all(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self, Exam.DatabaseModel?.self)
             .flatMap { tasks in
 
                 TaskSolution.DatabaseModel.query(on: self.database)
@@ -218,11 +219,12 @@ extension Topic.DatabaseRepository: TopicRepository {
                                 var multipleTasks = [Int: MultipleChoiceTask.Details]()
                                 var typingTask = [TypingTask.Details]()
 
-                                try tasks.forEach { task, multiple in
+                                try tasks.forEach { task, multiple, exam in
                                     guard let id = task.id else { return }
 
                                     let taskSolutions = solutions.filter({ $0.$task.id == id }).compactMap { try? $0.content() }
 
+                                    task.$exam.value = exam
                                     if let multiple = multiple {
                                         multipleTasks[id] = MultipleChoiceTask.Details(
                                             task: try task.content(),
@@ -275,9 +277,6 @@ extension Topic.DatabaseRepository: TopicRepository {
 
     public func importContent(from content: Subtopic.Import, in topic: Topic, resourceMap: [Resource.ID: Resource.ID]) throws -> EventLoopFuture<Void> {
 
-//        content.subtopic.id = nil
-//        content.subtopic.topicId = try topic.requireID()
-
         let subtopic = Subtopic.DatabaseModel(
             name: content.subtopic.name,
             topicID: topic.id
@@ -309,18 +308,19 @@ extension Topic.DatabaseRepository: TopicRepository {
                 .failableFlatMap {
                     let subtopicID = try subtopic.requireID()
                     var existingTerms = Set<String>()
-                    return content.terms.filter { term in
-                        if existingTerms.contains(term.term) {
-                            return false
-                        } else {
-                            existingTerms.insert(term.term)
-                            return true
-                        }
-                    }.map { term in
-                        termRepository.importContent(term: term, for: subtopicID, resourceMap: resourceMap)
-                    }
-                    .flatten(on: database.eventLoop)
-                    .transform(to: subtopicID)
+                    return database.eventLoop.future(subtopicID)
+//                    return content.terms.filter { term in
+//                        if existingTerms.contains(term.term) {
+//                            return false
+//                        } else {
+//                            existingTerms.insert(term.term)
+//                            return true
+//                        }
+//                    }.map { term in
+//                        termRepository.importContent(term: term, for: subtopicID, resourceMap: resourceMap)
+//                    }
+//                    .flatten(on: database.eventLoop)
+//                    .transform(to: subtopicID)
                 }
                 .flatMap { subtopicID in
                     termRepository.allWith(subtopicID: subtopicID)

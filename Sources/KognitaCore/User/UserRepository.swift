@@ -151,4 +151,6 @@ public protocol UserRepository: ResetPasswordRepositoring {
     /// Returns te verify token for a given user
     /// - Parameter userID: The id assosiated with the `User`
     func verifyToken(for userID: User.ID) -> EventLoopFuture<User.VerifyEmail.Token>
+    
+    func numberOfUsers() -> EventLoopFuture<Int>
 }
