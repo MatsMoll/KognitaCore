@@ -243,7 +243,8 @@ extension Subject.DatabaseRepository {
                                                     isMultipleSelect: false,
                                                     examID: nil,
                                                     isTestable: false,
-                                                    choises: task.choises
+                                                    choises: task.choises,
+                                                    resources: []
                                                 ),
                                                 by: user
                                             )

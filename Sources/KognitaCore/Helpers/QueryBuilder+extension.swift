@@ -80,6 +80,18 @@ extension QueryBuilder {
             try $0.map { (try $0.joined(Joined.self), try? $0.joined(JoinedTwo.self)) }
         }
     }
+    
+    public func all<Joined, JoinedTwo, JoinedThird>(
+        _ joined: Joined.Type,
+        _ joinedTwo: Optional<JoinedTwo>.Type,
+        _ joinedThired: Optional<JoinedThird>.Type
+    ) -> EventLoopFuture<[(Joined, JoinedTwo?, JoinedThird?)]>
+    where Joined: Schema, JoinedTwo: Schema, JoinedThird: Schema {
+        let copy = self.copy()
+        return copy.all().flatMapThrowing {
+            try $0.map { (try $0.joined(Joined.self), try? $0.joined(JoinedTwo.self), try? $0.joined(JoinedThird.self)) }
+        }
+    }
 
     public func first<Joined>(
         _ joined: Joined.Type

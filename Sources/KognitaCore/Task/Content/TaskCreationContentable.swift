@@ -15,6 +15,9 @@ public protocol TaskCreationContentable {
 
     /// The semester of the exam
     var examID: Exam.ID? { get }
+    
+    /// The resources assosiated with a task
+    var resources: [Resource.Create] { get }
 }
 
 extension TaskCreationContentable where Self: Validatable {

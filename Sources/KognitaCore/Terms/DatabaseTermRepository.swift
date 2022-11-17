@@ -204,7 +204,8 @@ struct DatabaseTermRepository: TermRepository {
                             isTestable: false,
                             choises: termGroup.map {
                                 MultipleChoiceTaskChoice.Create.Data(choice: $0.meaning, isCorrect: $0.id == term.id)
-                            }
+                            },
+                            resources: []
                         )
                     )
                 }
@@ -221,7 +222,8 @@ struct DatabaseTermRepository: TermRepository {
                             isTestable: false,
                             choises: termGroup.map {
                                 MultipleChoiceTaskChoice.Create.Data(choice: $0.term, isCorrect: $0.id == term.id)
-                            }
+                            },
+                            resources: []
                         )
                     )
                 }

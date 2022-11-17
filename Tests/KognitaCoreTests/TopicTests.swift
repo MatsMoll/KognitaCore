@@ -108,7 +108,7 @@ extension Topic.Import {
                             isTestable: false,
                             isMultipleSelect: false,
                             choices: [MultipleChoiceTaskChoice.Create.Data(choice: "Hello", isCorrect: false), MultipleChoiceTaskChoice.Create.Data(choice: "Hello 2", isCorrect: false)],
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         )
                     ],
@@ -117,21 +117,21 @@ extension Topic.Import {
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .original, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .continuation, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: nil,
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         )
                     ]
@@ -144,21 +144,21 @@ extension Topic.Import {
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .original, year: 2019),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: Exam.Compact(subjectID: 0, type: .continuation, year: 2018),
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         ),
                         TypingTask.Import(
                             description: nil,
                             question: "Test",
                             exam: nil,
-                            solutions: [TaskSolution.Create.Data(solution: "Some Solution", presentUser: true, taskID: 0)],
+                            solutions: [TaskSolution.Import(solution: "Some Solution")],
                             sources: nil
                         )
                     ]

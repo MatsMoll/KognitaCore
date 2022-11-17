@@ -14,7 +14,7 @@ class TaskTests: VaporTestCase {
 
     lazy var taskResultRepository: TaskResultRepositoring = { TestableRepositories.testable(with: app).taskResultRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
-    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: self.taskResultRepository, userRepository: TestableRepositories.testable(with: app).userRepository) }()
+    lazy var taskRepository: TaskRepository = { TaskDatabaseModel.DatabaseRepository(database: database, repositories: TestableRepositories.testable(with: app)) }()
     lazy var typingTaskRepository: TypingTaskRepository = { TestableRepositories.testable(with: app).typingTaskRepository }()
 
     func testTasksInSubject() throws {
@@ -76,7 +76,8 @@ class TaskTests: VaporTestCase {
             question: "Some question",
             solution: "",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -100,7 +101,8 @@ Hallo
 Dette er flere linjer
 """,
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -122,7 +124,8 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
         let createData = TaskDatabaseModel.Create.Data(
             content: xssData,
@@ -145,7 +148,8 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
         let task = try typingTaskRepository.create(from: xssData, by: user).wait()
         let flashCardTask = try FlashCardTask.find(task.id, on: database).unwrap(or: Errors.badTest).wait()
@@ -170,7 +174,8 @@ Dette er flere linjer
             question: "Some question",
             solution: "<IMG SRC=javascript:alert(&quot;XSS&quot;)>More XSS $$\\frac{1}{2}$$",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
         let task = try typingTaskRepository.create(from: xssData, by: user).wait()
 

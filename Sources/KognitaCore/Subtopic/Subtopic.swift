@@ -40,12 +40,12 @@ extension Subtopic {
 
         init(content: Create.Data) {
             self.name = content.name
-            self.$topic.id = content.topicId
+            self.$topic.id = content.topicID
         }
 
         public func updateValues(with content: Create.Data) {
             self.name = content.name
-            self.$topic.id = content.topicId
+            self.$topic.id = content.topicID
         }
     }
 }

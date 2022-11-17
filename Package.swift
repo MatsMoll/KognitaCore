@@ -1,4 +1,4 @@
-// swift-tools-version:5.2
+// swift-tools-version:5.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,7 +6,7 @@ import Foundation
 
 var dependencies: [Package.Dependency] = [
     // 💧 A server-side Swift web framework.
-    .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.29.0"),
+    .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.67.3"),
 
     // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
     .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.1.1"),
@@ -31,12 +31,12 @@ case "LOCAL":
     )
 case "DEV":
     dependencies.append(contentsOf: [
-            .package(name: "KognitaModels", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", .branch("develop")),
+            .package(name: "KognitaModels", url: "https://github.com/MatsMoll/KognitaModels", .branch("develop")),
         ]
     )
 default:
     dependencies.append(contentsOf: [
-            .package(name: "KognitaModels", url: "https://Kognita:dyjdov-bupgev-goffY8@github.com/MatsMoll/KognitaModels", from: "1.0.0"),
+            .package(name: "KognitaModels", url: "https://github.com/MatsMoll/KognitaModels", from: "1.0.0"),
         ]
     )
 }

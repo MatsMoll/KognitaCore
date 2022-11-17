@@ -28,7 +28,8 @@ class FlashCardTaskTests: VaporTestCase {
             question: "Test",
             solution: "Some solution",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
 
         let flashCardTask = try typingTaskRepository
@@ -56,7 +57,8 @@ class FlashCardTaskTests: VaporTestCase {
             question: "Test",
             solution: "Some solution",
             isTestable: false,
-            examID: nil
+            examID: nil,
+            resources: []
         )
 
         do {
@@ -92,7 +94,8 @@ class FlashCardTaskTests: VaporTestCase {
                 question: "Some question 2",
                 solution: "Some solution",
                 isTestable: false,
-                examID: nil
+                examID: nil,
+                resources: []
             )
 
             let editedTask = try typingTaskRepository

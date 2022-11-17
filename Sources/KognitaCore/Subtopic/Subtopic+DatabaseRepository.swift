@@ -42,7 +42,7 @@ extension Subtopic.DatabaseRepository {
         guard let user = user else { throw Abort(.unauthorized) }
 
         return try userRepository
-            .isModerator(user: user, topicID: content.topicId)
+            .isModerator(user: user, topicID: content.topicID)
             .ifFalse(throw: Abort(.forbidden))
             .flatMap {
                 let subtopic = Subtopic.DatabaseModel(content: content)

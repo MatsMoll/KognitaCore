@@ -16,7 +16,7 @@ class SubjectTests: VaporTestCase {
     lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: app).topicRepository }()
     lazy var subjectRepository: SubjectRepositoring = { TestableRepositories.testable(with: app).subjectRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
-    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository) }()
+    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: app.db, repositories: TestableRepositories.testable(with: app)) }()
     lazy var userRepository: UserRepository = { TestableRepositories.testable(with: app).userRepository }()
 
     func testExportAndImport() throws {
@@ -43,6 +43,8 @@ class SubjectTests: VaporTestCase {
         }
         XCTAssertEqual(topicExport.topic.id, topic.id)
         XCTAssertEqual(topicExport.subtopics.count, 2)
+        print("Exported subtopic")
+        print(topicExport.subtopics.first)
         XCTAssertEqual(topicExport.subtopics.first?.multipleChoiceTasks.count, 2)
         XCTAssertEqual(topicExport.subtopics.first?.typingTasks.count, 1)
         XCTAssertEqual(topicExport.subtopics.last?.multipleChoiceTasks.count, 1)

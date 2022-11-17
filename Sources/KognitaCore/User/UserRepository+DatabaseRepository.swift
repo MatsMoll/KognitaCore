@@ -140,9 +140,6 @@ extension User.DatabaseRepository: UserRepository {
         guard lowercasedEmail.isValidEmail else {
             throw Errors.misformed(field: "email", reason: "innholder mellomrom eller lignende tegn")
         }
-        guard lowercasedEmail.hasSuffix("ntnu.no") else {
-            throw Errors.invalidEmail
-        }
 
         return try unsafeCreate(content, handleDuplicateSilently: false)
     }
@@ -169,7 +166,7 @@ extension User.DatabaseRepository: UserRepository {
                     let dbUser = existingUser
                 {
                     if dbUser.username == newUser.username {
-                        return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
+                        return self.database.eventLoop.future(error: Errors.existingUsername(username: newUser.username))
                     } else {
                         return self.database.eventLoop.future(error: Errors.existingUser(email: newUser.email))
                     }
@@ -341,5 +338,9 @@ extension User.DatabaseRepository: UserRepository {
             .filter(User.Login.Token.DatabaseModel.self, \User.Login.Token.DatabaseModel.$expiresAt < Date())
             .first(User.Login.Token.DatabaseModel.self)
             .flatMapThrowing { try $0?.content() }
+    }
+    
+    public func numberOfUsers() -> EventLoopFuture<Int> {
+        return User.DatabaseModel.query(on: database).count()
     }
 }
