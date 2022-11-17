@@ -201,7 +201,7 @@ extension Topic.DatabaseRepository: TopicRepository {
 
         return TaskDatabaseModel.query(on: database)
             .join(superclass: MultipleChoiceTask.DatabaseModel.self, with: TaskDatabaseModel.self, method: .left)
-            .join(parent: \TaskDatabaseModel.$exam)
+            .join(parent: \TaskDatabaseModel.$exam, method: .left)
             .filter(\TaskDatabaseModel.$subtopic.$id == subtopic.id)
             .all(TaskDatabaseModel.self, MultipleChoiceTask.DatabaseModel?.self, Exam.DatabaseModel?.self)
             .flatMap { tasks in
