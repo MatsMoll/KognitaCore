@@ -32,7 +32,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: [
                 .init(choice: "not", isCorrect: false),
                 .init(choice: "yes", isCorrect: true)
-            ]
+            ],
+            resources: []
         )
         let multiple = try multipleChoiceRepository
             .create(from: taskData, by: user)
@@ -67,7 +68,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: [
                 .init(choice: "not", isCorrect: false),
                 .init(choice: "yes", isCorrect: true)
-            ]
+            ],
+            resources: []
         )
         let multiple = try multipleChoiceRepository
             .create(from: taskData, by: user)
@@ -101,7 +103,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: [
                 .init(choice: "not", isCorrect: false),
                 .init(choice: "yes", isCorrect: true)
-            ]
+            ],
+            resources: []
         )
 
         let editedMultiple = try multipleChoiceRepository
@@ -134,7 +137,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             choises: [
                 .init(choice: "not", isCorrect: false),
                 .init(choice: "yes", isCorrect: true)
-            ]
+            ],
+            resources: []
         )
 
         let editedMultiple = try multipleChoiceRepository
@@ -169,7 +173,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: startingMultiple.isMultipleSelect,
             examID: nil,
             isTestable: startingMultiple.isTestable,
-            choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) }
+            choises: startingMultiple.choises.map { MultipleChoiceTaskChoice.Create.Data(choice: $0.choice, isCorrect: $0.isCorrect) },
+            resources: []
         )
 
         let editedMultiple = try multipleChoiceRepository
@@ -200,7 +205,8 @@ class MultipleChoiseTaskTests: VaporTestCase {
             isMultipleSelect: startingMultiple.isMultipleSelect,
             examID: nil,
             isTestable: startingMultiple.isTestable,
-            choises: (0...3).map { _ in MultipleChoiceTaskChoice.Create.Data(choice: "Test", isCorrect: false) }
+            choises: (0...3).map { _ in MultipleChoiceTaskChoice.Create.Data(choice: "Test", isCorrect: false) },
+            resources: []
         )
 
         XCTAssertThrowsError(

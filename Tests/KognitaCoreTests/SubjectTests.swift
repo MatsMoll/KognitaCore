@@ -16,7 +16,7 @@ class SubjectTests: VaporTestCase {
     lazy var topicRepository: TopicRepository = { TestableRepositories.testable(with: app).topicRepository }()
     lazy var subjectRepository: SubjectRepositoring = { TestableRepositories.testable(with: app).subjectRepository }()
     lazy var taskSolutionRepository: TaskSolutionRepositoring = { TestableRepositories.testable(with: app).taskSolutionRepository }()
-    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: database, taskResultRepository: self.taskResultRepository, userRepository: self.userRepository) }()
+    lazy var taskRepository: TaskDatabaseModel.DatabaseRepository = { TaskDatabaseModel.DatabaseRepository(database: app.db, repositories: TestableRepositories.testable(with: app)) }()
     lazy var userRepository: UserRepository = { TestableRepositories.testable(with: app).userRepository }()
 
     func testExportAndImport() throws {
