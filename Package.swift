@@ -6,7 +6,7 @@ import Foundation
 
 var dependencies: [Package.Dependency] = [
     // 💧 A server-side Swift web framework.
-    .package(name: "vapor", url: "https://github.com/vapor/vapor.git", from: "4.67.3"),
+    .package(name: "vapor", url: "https://github.com/vapor/vapor.git", .exact("4.58.0")),
 
     // 🐘 Non-blocking, event-driven Swift client for PostgreSQL.
     .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.1.1"),

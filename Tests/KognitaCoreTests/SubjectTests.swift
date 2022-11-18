@@ -43,8 +43,6 @@ class SubjectTests: VaporTestCase {
         }
         XCTAssertEqual(topicExport.topic.id, topic.id)
         XCTAssertEqual(topicExport.subtopics.count, 2)
-        print("Exported subtopic")
-        print(topicExport.subtopics.first)
         XCTAssertEqual(topicExport.subtopics.first?.multipleChoiceTasks.count, 2)
         XCTAssertEqual(topicExport.subtopics.first?.typingTasks.count, 1)
         XCTAssertEqual(topicExport.subtopics.last?.multipleChoiceTasks.count, 1)
